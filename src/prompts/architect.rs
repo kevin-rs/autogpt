@@ -1,4 +1,4 @@
-pub const ARCHITECT_SCOPE_PROMPT: &str = r#"
+pub(crate) const ARCHITECT_SCOPE_PROMPT: &str = r#"
 Generate a response tailored for website project descriptions.
 
 Instructions:
@@ -39,7 +39,7 @@ Examples:
    }
 "#;
 
-pub const ARCHITECT_ENDPOINTS_PROMPT: &str = r#"
+pub(crate) const ARCHITECT_ENDPOINTS_PROMPT: &str = r#"
 Generate a response focused on selecting external API endpoints for website development.
 
 Instructions:

@@ -2,13 +2,17 @@ use autogpt::agents::architect::ArchitectGPT;
 use autogpt::common::utils::{Scope, Status, Tasks};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::Functions;
-use tracing_subscriber::fmt;
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
 async fn test_get_scope() {
-    tracing_subscriber::registry().with(fmt::layer()).init();
+    let filter = filter::LevelFilter::INFO;
+    let (filter, reload_handle) = reload::Layer::new(filter);
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::Layer::default())
+        .init();
+
     let objective = "Creates innovative website designs and user experiences";
     let position = "Lead UX/UI Designer";
 
@@ -50,7 +54,7 @@ async fn test_get_urls() {
             auth: false,
             external: true,
         }),
-        urls: None,
+        urls: Some(Vec::new()),
         backend_code: None,
         api_schema: None,
     };
@@ -80,10 +84,7 @@ async fn test_architect_agent() {
         api_schema: None,
     };
 
-    architect_agent
-        .execute(&mut tasks)
-        .await
-        .expect("Unable to execute Solutions Architect Agent");
+    architect_agent.execute(&mut tasks).await.unwrap();
 
     assert!(tasks.scope != None);
     assert!(tasks.urls.is_some());

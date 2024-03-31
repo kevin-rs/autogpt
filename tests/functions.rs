@@ -4,10 +4,8 @@ use autogpt::common::utils::{Route, Scope, Tasks};
 use autogpt::traits::functions::Functions;
 use serde_json::json;
 use std::borrow::Cow;
-use tracing::debug;
-use tracing_subscriber::fmt;
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing::info;
+use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 pub struct MockFunctions {
     agent: AgentGPT,
@@ -19,7 +17,7 @@ impl Functions for MockFunctions {
     }
 
     async fn execute(&mut self, tasks: &mut Tasks) -> Result<()> {
-        debug!("Executing tasks: {:?}", tasks.clone());
+        info!("Executing tasks: {:?}", tasks.clone());
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
@@ -31,7 +29,13 @@ impl Functions for MockFunctions {
 
 #[tokio::test]
 async fn test_functions_execution() {
-    tracing_subscriber::registry().with(fmt::layer()).init();
+    let filter = filter::LevelFilter::INFO;
+    let (filter, reload_handle) = reload::Layer::new(filter);
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::Layer::default())
+        .init();
+
     let objective = "Objective";
     let position = "Position";
     let agent = AgentGPT::new_borrowed(objective, position);

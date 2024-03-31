@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
+use std::io::stdin;
+use std::io::stdout;
+use tracing::info;
+use std::io::Write;
 
 /// Represents a communication between agents.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -117,4 +121,30 @@ pub fn extract_array(text: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+pub fn check_if_proceed() -> bool {
+    while true {
+        info!("Attention: You are about to execute code generated entirely by AI.");
+        info!("Please review your code carefully before proceeding.");
+
+        info!("(y) Proceed (All good)");
+        info!("(n) Stop execution (Let's halt this project)");
+
+        info!("Enter your choice: ");
+        std::io::stdout().flush().expect("Failed to flush stdout");
+        let mut human_response = String::new();
+        stdin().read_line(&mut human_response).expect("Failed to read response");
+
+        let human_response = human_response.trim().to_lowercase();
+
+        if human_response == "y" {
+            return true;
+        } else if human_response == "n" {
+            return false;
+        } else {
+            info!("Invalid input. Please select '1' to proceed or '2' to stop execution.");
+        }
+    }
+    true
 }
