@@ -10,7 +10,7 @@ use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
 use std::time::Duration;
-use tracing::debug;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct ArchitectGPT {
@@ -27,7 +27,7 @@ impl ArchitectGPT {
             .to_owned();
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);
-        debug!("[*] {:?}: {:?}", position, agent);
+        info!("[*] {:?}: {:?}", position, agent);
 
         let req_client: ReqClient = ReqClient::builder()
             .timeout(Duration::from_secs(3))
@@ -57,7 +57,7 @@ impl ArchitectGPT {
 
         tasks.scope = Some(gemini_response);
         self.agent.update(Status::Completed);
-        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(gemini_response)
     }
@@ -71,7 +71,7 @@ impl ArchitectGPT {
         let gemini_response: Vec<Cow<'static, str>> =
             match self.client.generate_content(&request).await {
                 Ok(response) => {
-                    debug!(
+                    info!(
                         "[*] {:?}: Got Response {:?}",
                         self.agent.position(),
                         response
@@ -83,7 +83,7 @@ impl ArchitectGPT {
 
         tasks.urls = Some(gemini_response);
         self.agent.update(Status::InUnitTesting);
-        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(())
     }
@@ -102,7 +102,7 @@ impl Functions for ArchitectGPT {
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
                 Status::InDiscovery => {
-                    debug!("[*] {:?}: InDiscovery", self.agent.position());
+                    info!("[*] {:?}: InDiscovery", self.agent.position());
 
                     let scope: Scope = self.get_scope(tasks).await?;
 
@@ -115,21 +115,33 @@ impl Functions for ArchitectGPT {
                 Status::InUnitTesting => {
                     let mut exclude: Vec<Cow<'static, str>> = Vec::new();
 
-                    let urls: &Vec<Cow<'static, str>> =
-                        tasks.urls.as_ref().expect("No URL object on tasks");
+                    let urls: &Vec<Cow<'static, str>> = tasks.urls.as_ref().expect("No URLS found");
 
                     for url in urls {
-                        debug!(
+                        info!(
                             "[*] {:?}: Testing URL Endpoint: {}",
                             self.agent.position(),
                             url
                         );
 
                         // ping url
-                        let status_code =
-                            self.req_client.get(url.to_string()).send().await?.status();
-                        if status_code != 200 {
-                            exclude.push(url.clone())
+                        let status_code_result = self.req_client.get(url.to_string()).send().await;
+
+                        match status_code_result {
+                            Ok(response) => {
+                                let status_code = response.status();
+                                if status_code != reqwest::StatusCode::OK {
+                                    exclude.push(url.clone());
+                                }
+                            }
+                            Err(err) => {
+                                info!(
+                                    "[*] {:?}: Error sending request for URL {}: {:?}",
+                                    self.agent.position(),
+                                    url,
+                                    err
+                                );
+                            }
                         }
                     }
 
