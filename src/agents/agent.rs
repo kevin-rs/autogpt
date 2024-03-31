@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 /// Represents an agent with specific characteristics.
 #[derive(Debug, PartialEq, Default, Clone)]
-pub struct AgentKevin {
+pub struct AgentGPT {
     /// The objective of the agent.
     objective: Cow<'static, str>,
     /// The position of the agent.
@@ -15,7 +15,7 @@ pub struct AgentKevin {
     memory: Vec<Communication>,
 }
 
-impl AgentKevin {
+impl AgentGPT {
     /// Adds a communication to the memory of the agent.
     ///
     /// # Arguments
@@ -25,7 +25,7 @@ impl AgentKevin {
         self.memory.push(communication);
     }
 
-    /// Creates a new instance of `AgentKevin` with owned strings.
+    /// Creates a new instance of `AgentGPT` with owned strings.
     ///
     /// # Arguments
     ///
@@ -34,7 +34,7 @@ impl AgentKevin {
     ///
     /// # Returns
     ///
-    /// A new instance of `AgentKevin`.
+    /// A new instance of `AgentGPT`.
     pub fn new_owned(objective: String, position: String) -> Self {
         Self {
             objective: Cow::Owned(objective),
@@ -44,7 +44,7 @@ impl AgentKevin {
         }
     }
 
-    /// Creates a new instance of `AgentKevin` with borrowed strings.
+    /// Creates a new instance of `AgentGPT` with borrowed strings.
     ///
     /// # Arguments
     ///
@@ -53,7 +53,7 @@ impl AgentKevin {
     ///
     /// # Returns
     ///
-    /// A new instance of `AgentKevin`.
+    /// A new instance of `AgentGPT`.
     pub fn new_borrowed(objective: &'static str, position: &'static str) -> Self {
         Self {
             objective: Cow::Borrowed(objective),
@@ -64,7 +64,7 @@ impl AgentKevin {
     }
 }
 
-impl Agent for AgentKevin {
+impl Agent for AgentGPT {
     /// Creates a new instance of an agent with the specified objective and position.
     ///
     /// # Arguments

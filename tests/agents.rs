@@ -1,13 +1,14 @@
-use kevin::agents::agent::AgentKevin;
-use kevin::common::utils::{Communication, Status};
-use kevin::traits::agent::Agent;
+use autogpt::agents::agent::AgentGPT;
+use autogpt::common::utils::{Communication, Status};
+use autogpt::traits::agent::Agent;
 use std::borrow::Cow;
 
 #[test]
 fn test_create_agent() {
-    let objective = "Objective";
-    let position = "Position";
-    let agent = AgentKevin::new_borrowed(objective, position);
+    let objective = "Creates innovative website designs and user experiences";
+    let position = "Lead UX/UI Designer";
+
+    let agent = AgentGPT::new_borrowed(objective, position);
 
     assert_eq!(*agent.objective(), *objective);
     assert_eq!(*agent.position(), *position);
@@ -17,7 +18,10 @@ fn test_create_agent() {
 
 #[test]
 fn test_update_status() {
-    let mut agent = AgentKevin::new_borrowed("Objective", "Position");
+    let objective = "Develops cutting-edge web applications with advanced features";
+    let position = "Lead Web Developer";
+
+    let mut agent = AgentGPT::new_borrowed(objective, position);
 
     agent.update(Status::Active);
     assert_eq!(*agent.status(), Status::Active);
@@ -28,15 +32,21 @@ fn test_update_status() {
 
 #[test]
 fn test_access_properties() {
-    let agent = AgentKevin::new_borrowed("Objective", "Position");
+    let objective = "Creates innovative website designs and user experiences";
+    let position = "Lead UX/UI Designer";
 
-    assert_eq!(*agent.objective(), "Objective");
-    assert_eq!(*agent.position(), "Position");
+    let agent = AgentGPT::new_borrowed(objective, position);
+
+    assert_eq!(*agent.objective(), objective);
+    assert_eq!(*agent.position(), position);
 }
 
 #[test]
 fn test_memory() {
-    let mut agent = AgentKevin::new_borrowed("Objective", "Position");
+    let objective = "Develops cutting-edge web applications with advanced features";
+    let position = "Lead Web Developer";
+
+    let mut agent = AgentGPT::new_borrowed(objective, position);
 
     assert!(agent.memory().clone().is_empty());
 
