@@ -1,7 +1,7 @@
 use anyhow::Result;
-use kevin::agents::agent::AgentKevin;
-use kevin::common::utils::{Route, Scope, Tasks};
-use kevin::traits::functions::Functions;
+use autogpt::agents::agent::AgentGPT;
+use autogpt::common::utils::{Route, Scope, Tasks};
+use autogpt::traits::functions::Functions;
 use serde_json::json;
 use std::borrow::Cow;
 use tracing::debug;
@@ -10,11 +10,11 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 pub struct MockFunctions {
-    agent: AgentKevin,
+    agent: AgentGPT,
 }
 
 impl Functions for MockFunctions {
-    fn get_agent(&self) -> &AgentKevin {
+    fn get_agent(&self) -> &AgentGPT {
         &self.agent
     }
 
@@ -34,7 +34,7 @@ async fn test_functions_execution() {
     tracing_subscriber::registry().with(fmt::layer()).init();
     let objective = "Objective";
     let position = "Position";
-    let agent = AgentKevin::new_borrowed(objective, position);
+    let agent = AgentGPT::new_borrowed(objective, position);
 
     let mut tasks = Tasks {
         description: Cow::Borrowed("Tasks"),

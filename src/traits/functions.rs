@@ -1,4 +1,4 @@
-use crate::agents::agent::AgentKevin;
+use crate::agents::agent::AgentGPT;
 use crate::common::utils::Tasks;
 use anyhow::Result;
 
@@ -9,7 +9,7 @@ pub trait Functions {
     /// # Returns
     ///
     /// A reference to the agent.
-    fn get_agent(&self) -> &AgentKevin;
+    fn get_agent(&self) -> &AgentGPT;
 
     /// Execute special functions for an agent.
     ///

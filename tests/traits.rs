@@ -1,5 +1,5 @@
-use kevin::common::utils::{Communication, Status};
-use kevin::traits::agent::Agent;
+use autogpt::common::utils::{Communication, Status};
+use autogpt::traits::agent::Agent;
 use std::borrow::Cow;
 
 pub struct MockAgent {
