@@ -3,8 +3,8 @@ use serde_json::Value;
 use std::borrow::Cow;
 use std::io::stdin;
 use std::io::stdout;
-use tracing::info;
 use std::io::Write;
+use tracing::info;
 
 /// Represents a communication between agents.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -64,6 +64,8 @@ pub struct Tasks {
     pub scope: Option<Scope>,
     /// External URLs required by the project.
     pub urls: Option<Vec<Cow<'static, str>>>,
+    /// Frontend code of the project.
+    pub frontend_code: Option<Cow<'static, str>>,
     /// Backend code of the project.
     pub backend_code: Option<Cow<'static, str>>,
     /// Schema of API endpoints.
@@ -134,7 +136,9 @@ pub fn check_if_proceed() -> bool {
         info!("Enter your choice: ");
         std::io::stdout().flush().expect("Failed to flush stdout");
         let mut human_response = String::new();
-        stdin().read_line(&mut human_response).expect("Failed to read response");
+        stdin()
+            .read_line(&mut human_response)
+            .expect("Failed to read response");
 
         let human_response = human_response.trim().to_lowercase();
 

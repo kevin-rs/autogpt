@@ -27,6 +27,7 @@ async fn test_generate_backend_code() {
             external: false,
         }),
         urls: None,
+        frontend_code: None,
         backend_code: None,
         api_schema: None,
     };
@@ -51,6 +52,7 @@ async fn test_improve_backend_code() {
             external: false,
         }),
         urls: None,
+        frontend_code: None,
         backend_code: None,
         api_schema: None,
     };
@@ -130,6 +132,7 @@ async fn test_fix_code_bugs() {
             external: false,
         }),
         urls: None,
+        frontend_code: None,
         backend_code: None,
         api_schema: None,
     };
@@ -262,6 +265,7 @@ async fn tests_backend_dev_one() {
             "https://kevin-rs.dev/products".into(),
             "https://kevin-rs.dev/cart".into(),
         ]),
+        frontend_code: None,
         backend_code: None,
         api_schema: None,
     };
