@@ -49,6 +49,7 @@ async fn test_functions_execution() {
         }),
         urls: Some(vec![Cow::Borrowed("https://kevin-rs.dev")]),
         backend_code: Some(Cow::Borrowed("fn main() {}")),
+        frontend_code: None,
         api_schema: Some(vec![
             Route {
                 dynamic: Cow::Borrowed("no"),

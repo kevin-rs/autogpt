@@ -23,6 +23,7 @@ async fn test_get_scope() {
         scope: None,
         urls: None,
         backend_code: None,
+        frontend_code: None,
         api_schema: None,
     };
 
@@ -55,6 +56,7 @@ async fn test_get_urls() {
             external: true,
         }),
         urls: Some(Vec::new()),
+        frontend_code: None,
         backend_code: None,
         api_schema: None,
     };
@@ -80,6 +82,7 @@ async fn test_architect_agent() {
             external: true,
         }),
         urls: None,
+        frontend_code: None,
         backend_code: None,
         api_schema: None,
     };
