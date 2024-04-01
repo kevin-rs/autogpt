@@ -16,7 +16,7 @@ impl Functions for MockFunctions {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, max_tries: u64) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
         info!("Executing tasks: {:?}", tasks.clone());
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

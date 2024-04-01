@@ -87,7 +87,7 @@ async fn test_architect_agent() {
         api_schema: None,
     };
 
-    architect_agent.execute(&mut tasks, true).await.unwrap();
+    architect_agent.execute(&mut tasks, true, 3).await.unwrap();
 
     assert!(tasks.scope != None);
     assert!(tasks.urls.is_some());
