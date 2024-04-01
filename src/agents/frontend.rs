@@ -1,5 +1,5 @@
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{Status, Tasks};
+use crate::common::utils::{strip_code_blocks, Status, Tasks};
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
@@ -11,6 +11,7 @@ use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
 use std::fs;
+use std::io::Read;
 use std::process::Command;
 use std::process::Stdio;
 use std::time::Duration;
@@ -23,11 +24,12 @@ pub struct FrontendGPT {
     client: Client,
     req_client: ReqClient,
     bugs: Option<Cow<'static, str>>,
+    language: &'static str,
     nb_bugs: u64,
 }
 
 impl FrontendGPT {
-    pub fn new(objective: &'static str, position: &'static str) -> Self {
+    pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro".to_string())
@@ -46,6 +48,7 @@ impl FrontendGPT {
             client,
             req_client,
             bugs: None,
+            language: language,
             nb_bugs: 0,
         }
     }
@@ -55,7 +58,19 @@ impl FrontendGPT {
             .unwrap_or("frontend".to_string())
             .to_owned();
 
-        let full_path = format!("{}/{}", path, "src/template.rs");
+        let full_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/template.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "template.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/template.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
+
         info!("[*] {:?}: {:?}", self.agent.position(), full_path);
 
         let template = fs::read_to_string(full_path)?;
@@ -66,11 +81,22 @@ impl FrontendGPT {
         );
 
         let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => response,
+            Ok(response) => strip_code_blocks(&response),
             Err(_err) => Default::default(),
         };
 
-        let frontend_path = format!("{}/{}", path, "src/main.rs");
+        let frontend_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
 
         fs::write(frontend_path, gemini_response.clone())?;
 
@@ -95,11 +121,23 @@ impl FrontendGPT {
         );
 
         let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => response,
+            Ok(response) => strip_code_blocks(&response),
             Err(_err) => Default::default(),
         };
 
-        let frontend_path = format!("{}/{}", path, "src/main.rs");
+        let frontend_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
+
         info!("[*] {:?}: {:?}", self.agent.position(), frontend_path);
 
         fs::write(frontend_path, gemini_response.clone())?;
@@ -125,11 +163,22 @@ impl FrontendGPT {
         );
 
         let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => response,
+            Ok(response) => strip_code_blocks(&response),
             Err(_err) => Default::default(),
         };
 
-        let frontend_path = format!("{}/{}", path, "src/main.rs");
+        let frontend_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
 
         fs::write(frontend_path, gemini_response.clone())?;
 
@@ -179,57 +228,90 @@ impl Functions for FrontendGPT {
 
                 Status::InUnitTesting => {
                     info!(
-                        "[*] {:?}: Frontend Code Unit Testing: Awaiting user confirmation for code safety...",
-                        self.agent.position(),
-                    );
+                "[*] {:?}: Frontend Code Unit Testing: Awaiting user confirmation for code safety...",
+                self.agent.position(),
+            );
 
                     if !execute {
                         info!(
-                            "[*] {:?}: It seems the code isn't safe to proceed. Consider revising or seeking assistance...",
-                            self.agent.position(),
-                        );
-                    } else {
-                        info!(
-                            "[*] {:?}: Frontend Code Unit Testing: Building the frontend project...",
-                            self.agent.position(),
-                        );
+                    "[*] {:?}: It seems the code isn't safe to proceed. Consider revising or seeking assistance...",
+                    self.agent.position(),
+                );
+                    }
 
-                        let serve_command = format!("trunk build --release");
-                        let output = Command::new("sh")
-                            .arg("-c")
-                            .arg(&serve_command)
+                    info!(
+                "[*] {:?}: Frontend Code Unit Testing: Building and running the frontend project...",
+                self.agent.position(),
+            );
+
+                    let result = match self.language {
+                        "rust" => {
+                            let mut build_command = Command::new("timeout");
+                            build_command
+                                .arg(format!("{}s", 10))
+                                .arg("cargo")
+                                .arg("build")
+                                .arg("--release")
+                                .current_dir(path.clone())
+                                .stdout(Stdio::piped())
+                                .stderr(Stdio::piped())
+                                .spawn()
+                        }
+                        "python" => Command::new("timeout")
+                            .arg(format!("{}s", 10))
+                            .arg("uvicorn")
+                            .arg("main:app")
                             .current_dir(path.clone())
                             .stdout(Stdio::piped())
                             .stderr(Stdio::piped())
-                            .output()
-                            .expect("Failed to execute trunk build command");
+                            .spawn(),
+                        "javascript" => Command::new("timeout")
+                            .arg(format!("{}s", 10))
+                            .arg("npm")
+                            .arg("run")
+                            .arg("start")
+                            .current_dir(path.clone())
+                            .stdout(Stdio::piped())
+                            .stderr(Stdio::piped())
+                            .spawn(),
+                        _ => panic!("Unsupported language, consider opening an Issue/PR"),
+                    };
 
-                        if output.status.success() {
-                            self.nb_bugs = 0;
-                            info!(
-                                "[*] {:?}: Frontend Code Unit Testing: Frontend server build successful...",
+                    match result {
+                        Ok(mut child) => {
+                            let mut stderr_output = String::new();
+                            child
+                                .stderr
+                                .as_mut()
+                                .expect("Failed to capture build stderr")
+                                .read_to_string(&mut stderr_output)
+                                .expect("Failed to read build stderr");
+
+                            if !stderr_output.trim().is_empty() {
+                                self.nb_bugs += 1;
+                                self.bugs = Some(stderr_output.into());
+
+                                if self.nb_bugs > max_tries {
+                                    info!(
+                                "[*] {:?}: Frontend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
                                 self.agent.position(),
                             );
-                        } else {
-                            let error_arr: Vec<u8> = output.stderr;
-                            let error_str: String = String::from_utf8(error_arr).unwrap();
-
-                            self.nb_bugs += 1;
-                            self.bugs = Some(error_str.into());
-
-                            if self.nb_bugs > max_tries {
+                                    break;
+                                } else {
+                                    self.agent.update(Status::Active);
+                                }
+                            } else {
+                                self.nb_bugs = 0;
                                 info!(
-                                    "[*] {:?}: Frontend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
-                                    self.agent.position(),
-                                );
-                                break;
+                            "[*] {:?}: Frontend Code Unit Testing: Frontend server build successful...",
+                            self.agent.position(),
+                        );
                             }
-
-                            self.agent.update(Status::Active);
-                            continue;
+                        }
+                        Err(err) => {
+                            panic!("Failed to execute command: {}", err);
                         }
                     }
-                    self.agent.update(Status::Completed);
                 }
                 _ => {}
             }

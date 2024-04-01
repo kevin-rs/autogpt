@@ -1,11 +1,12 @@
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::Route;
-use crate::common::utils::{Status, Tasks};
+use crate::common::utils::{strip_code_blocks, Status, Tasks};
 use crate::prompts::backend::{
     API_ENDPOINTS_PROMPT, FIX_CODE_PROMPT, IMPROVED_WEBSERVER_CODE_PROMPT, WEBSERVER_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
+use std::io::Read;
 use std::process::Command;
 use std::process::Stdio;
 use std::thread::sleep;
@@ -25,11 +26,12 @@ pub struct BackendGPT {
     client: Client,
     req_client: ReqClient,
     bugs: Option<Cow<'static, str>>,
+    language: &'static str,
     nb_bugs: u64,
 }
 
 impl BackendGPT {
-    pub fn new(objective: &'static str, position: &'static str) -> Self {
+    pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro".to_string())
@@ -48,6 +50,7 @@ impl BackendGPT {
             client,
             req_client,
             bugs: None,
+            language: language,
             nb_bugs: 0,
         }
     }
@@ -57,7 +60,19 @@ impl BackendGPT {
             .unwrap_or("backend".to_string())
             .to_owned();
 
-        let full_path = format!("{}/{}", path, "src/template.rs");
+        let full_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
+
         info!("[*] {:?}: {:?}", self.agent.position(), full_path);
 
         let template = fs::read_to_string(full_path)?;
@@ -68,11 +83,22 @@ impl BackendGPT {
         );
 
         let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => response,
+            Ok(response) => strip_code_blocks(&response),
             Err(_err) => Default::default(),
         };
 
-        let backend_path = format!("{}/{}", path, "src/main.rs");
+        let backend_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
 
         fs::write(backend_path, gemini_response.clone())?;
 
@@ -97,11 +123,23 @@ impl BackendGPT {
         );
 
         let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => response,
+            Ok(response) => strip_code_blocks(&response),
             Err(_err) => Default::default(),
         };
 
-        let backend_path = format!("{}/{}", path, "src/main.rs");
+        let backend_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
+
         info!("[*] {:?}: {:?}", self.agent.position(), backend_path);
 
         fs::write(backend_path, gemini_response.clone())?;
@@ -127,11 +165,22 @@ impl BackendGPT {
         );
 
         let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => response,
+            Ok(response) => strip_code_blocks(&response),
             Err(_err) => Default::default(),
         };
 
-        let backend_path = format!("{}/{}", path, "src/main.rs");
+        let backend_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
 
         fs::write(backend_path, gemini_response.clone())?;
 
@@ -148,7 +197,19 @@ impl BackendGPT {
             .unwrap_or("backend".to_string())
             .to_owned();
 
-        let full_path = format!("{}/{}", path, "src/main.rs");
+        let full_path = match self.language {
+            "rust" => {
+                format!("{}/{}", path, "src/main.rs")
+            }
+            "python" => {
+                format!("{}/{}", path, "main.py")
+            }
+            "javascript" => {
+                format!("{}/{}", path, "src/index.js")
+            }
+            _ => panic!("Unsupported language, consider open an Issue/PR"),
+        };
+
         info!("[*] {:?}: {:?}", self.agent.position(), full_path);
 
         let backend_code = fs::read_to_string(full_path)?;
@@ -159,7 +220,7 @@ impl BackendGPT {
         );
 
         let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => response,
+            Ok(response) => strip_code_blocks(&response),
             Err(_err) => Default::default(),
         };
 
@@ -187,6 +248,7 @@ impl Functions for BackendGPT {
         let path = var("BACKEND_TEMPLATE_PATH")
             .unwrap_or("backend".to_string())
             .to_owned();
+
         while self.agent.status() != &Status::Completed {
             match &self.agent.status() {
                 Status::InDiscovery => {
@@ -218,126 +280,153 @@ impl Functions for BackendGPT {
                         );
                     } else {
                         info!(
-                            "[*] {:?}: Backend Code Unit Testing: Building the backend project...",
+                            "[*] {:?}: Backend Code Unit Testing: Building and running the backend project...",
                             self.agent.position(),
                         );
 
-                        let build_backend_server: std::process::Output = Command::new("cargo")
-                            .arg("build")
-                            .arg("--release")
-                            .arg("--verbose")
-                            .current_dir(path.clone())
-                            .stdout(Stdio::piped())
-                            .stderr(Stdio::piped())
-                            .output()
-                            .expect("Failed to build the backend application");
+                        let result = match self.language {
+                            "rust" => {
+                                let mut build_command = Command::new("cargo");
+                                build_command
+                                    .arg("build")
+                                    .arg("--release")
+                                    .arg("--verbose")
+                                    .current_dir(&path);
+                                let build_output = build_command
+                                    .output()
+                                    .expect("Failed to build the backend application");
 
-                        if build_backend_server.status.success() {
-                            self.nb_bugs = 0;
-                            info!(
-                                "[*] {:?}: Backend Code Unit Testing: Backend server build successful...",
-                                self.agent.position(),
-                            );
-                        } else {
-                            let error_arr: Vec<u8> = build_backend_server.stderr;
-                            let error_str: String = String::from_utf8(error_arr).unwrap();
+                                if build_output.status.success() {
+                                    let run_output = Command::new("timeout")
+                                        .arg(format!("{}s", 10))
+                                        .arg("cargo")
+                                        .arg("run")
+                                        .arg("--release")
+                                        .arg("--verbose")
+                                        .current_dir(&path)
+                                        .stdout(Stdio::piped())
+                                        .stderr(Stdio::piped())
+                                        .spawn()
+                                        .expect("Failed to run the backend application");
+                                    Some(run_output)
+                                } else {
+                                    None
+                                }
+                            }
+                            "python" => {
+                                let run_output = Command::new("timeout")
+                                    .arg(format!("{}s", 10))
+                                    .arg("uvicorn")
+                                    .arg("main:app")
+                                    .current_dir(&path)
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::piped())
+                                    .spawn()
+                                    .expect("Failed to run the backend application");
+                                Some(run_output)
+                            }
+                            "javascript" => {
+                                let run_output = Command::new("timeout")
+                                    .arg(format!("{}s", 10))
+                                    .arg("node")
+                                    .arg("server.js")
+                                    .current_dir(&path)
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::piped())
+                                    .spawn()
+                                    .expect("Failed to run the backend application");
+                                Some(run_output)
+                            }
+                            _ => None,
+                        };
 
-                            self.nb_bugs += 1;
-                            self.bugs = Some(error_str.into());
+                        if let Some(mut child) = result {
+                            let _build_stdout =
+                                child.stdout.take().expect("Failed to capture build stdout");
+                            let mut build_stderr =
+                                child.stderr.take().expect("Failed to capture build stderr");
 
-                            if self.nb_bugs > max_tries {
+                            let mut stderr_output = String::new();
+                            build_stderr.read_to_string(&mut stderr_output).unwrap();
+
+                            if !stderr_output.trim().is_empty() {
+                                self.nb_bugs += 1;
+                                self.bugs = Some(stderr_output.into());
+
+                                if self.nb_bugs > max_tries {
+                                    info!(
+                                        "[*] {:?}: Backend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
+                                        self.agent.position(),
+                                    );
+                                    break;
+                                }
+
+                                self.agent.update(Status::Active);
+                                continue;
+                            } else {
+                                self.nb_bugs = 0;
                                 info!(
-                                    "[*] {:?}: Backend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
+                                    "[*] {:?}: Backend Code Unit Testing: Backend server build successful...",
                                     self.agent.position(),
                                 );
-                                break;
                             }
 
-                            self.agent.update(Status::Active);
-                            continue;
-                        }
+                            let seconds_sleep = Duration::from_secs(3);
+                            sleep(seconds_sleep);
 
-                        let endpoints: String = self.get_routes_json().await?;
+                            let endpoints: String = self.get_routes_json().await?;
 
-                        let api_endpoints: Vec<Route> = serde_json::from_str(endpoints.as_str())
-                            .expect("Failed to decode API Endpoints");
+                            let api_endpoints: Vec<Route> =
+                                serde_json::from_str(endpoints.as_str())
+                                    .expect("Failed to decode API Endpoints");
 
-                        let filtered_endpoints: Vec<Route> = api_endpoints
-                            .iter()
-                            .filter(|&route| route.method == "get" && route.dynamic == "false")
-                            .cloned()
-                            .collect();
+                            let filtered_endpoints: Vec<Route> = api_endpoints
+                                .iter()
+                                .filter(|&route| route.method == "get" && route.dynamic == "false")
+                                .cloned()
+                                .collect();
 
-                        tasks.api_schema = Some(filtered_endpoints.clone());
-
-                        info!(
-                            "[*] {:?}: Backend Code Unit Testing: Starting the web server to test endpoints...",
-                            self.agent.position(),
-                        );
-
-                        let mut run_backend_server: std::process::Child = Command::new("cargo")
-                            .arg("run")
-                            .arg("--release")
-                            .arg("--verbose")
-                            .current_dir(path.clone())
-                            .stdout(Stdio::piped())
-                            .stderr(Stdio::piped())
-                            .spawn()
-                            .expect("Failed to run the backend application");
-
-                        info!(
-                            "[*] {:?}: Backend Code Unit Testing: Initiating tests on the server in 3 seconds...",
-                            self.agent.position(),
-                        );
-
-                        let seconds_sleep: Duration = Duration::from_secs(3);
-                        sleep(seconds_sleep);
-
-                        for endpoint in filtered_endpoints {
-                            info!(
-                                "[*] {:?}: Testing endpoint: {}",
-                                self.agent.position(),
-                                endpoint.path
-                            );
-
-                            let url: String = format!("http://127.0.0.1:8080{}", endpoint.path);
+                            tasks.api_schema = Some(filtered_endpoints.clone());
 
                             info!(
-                                "[*] {:?}: Testing URL Endpoint: {}",
+                                "[*] {:?}: Backend Code Unit Testing: Starting the web server to test endpoints...",
                                 self.agent.position(),
-                                url
                             );
-
-                            let status_code =
-                                self.req_client.get(url.to_string()).send().await?.status();
-                            if status_code != 200 {
+                            for endpoint in filtered_endpoints {
                                 info!(
+                                    "[*] {:?}: Testing endpoint: {}",
+                                    self.agent.position(),
+                                    endpoint.path
+                                );
+
+                                let url = format!("http://127.0.0.1:8080{}", endpoint.path);
+                                let status_code =
+                                    self.req_client.get(url.to_string()).send().await?.status();
+
+                                if status_code != 200 {
+                                    info!(
                                     "[*] {:?}: Failed to fetch the backend endpoint: {}. Further investigation needed...",
                                     self.agent.position(),
                                     endpoint.path
                                 );
-                            } else {
-                                run_backend_server
-                                    .kill()
-                                    .expect("Failed to terminate the backend web server");
-                                info!(
-                                    "[*] {:?}: Error detected while checking the backend: {}. Investigation required...",
-                                    self.agent.position(),
-                                    endpoint.path
-                                );
+                                }
                             }
-                        }
 
-                        let backend_path = format!("{}/{}", path, "api.json");
+                            let _ = child.kill();
 
-                        fs::write(backend_path, endpoints)?;
-
-                        info!(
+                            let backend_path = format!("{}/{}", path, "api.json");
+                            fs::write(backend_path, endpoints)?;
+                            info!(
                             "[*] {:?}: Backend testing complete. Results written to 'api.json'...",
                             self.agent.position(),
                         );
-
-                        run_backend_server.kill()?;
+                        } else {
+                            info!(
+                            "[*] {:?}: Backend Code Unit Testing: Failed to build or run the backend project",
+                            self.agent.position(),
+                        );
+                            break;
+                        }
                     }
                     self.agent.update(Status::Completed);
                 }
