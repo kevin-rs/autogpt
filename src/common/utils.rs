@@ -152,3 +152,21 @@ pub fn similarity(s1: &str, s2: &str) -> f64 {
     let max_length = s1.chars().count().max(s2.chars().count()) as f64;
     1.0 - distance / max_length
 }
+
+pub fn strip_code_blocks(text: &str) -> String {
+    let mut lines = text.lines().collect::<Vec<_>>();
+
+    if let Some(first_line) = lines.first() {
+        if first_line.trim().starts_with("```") {
+            lines.remove(0);
+        }
+    }
+
+    if let Some(last_line) = lines.last() {
+        if last_line.trim().starts_with("```") {
+            lines.pop();
+        }
+    }
+
+    lines.join("\n")
+}

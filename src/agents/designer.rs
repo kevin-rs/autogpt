@@ -50,8 +50,7 @@ impl DesignerGPT {
         let text_response = self
             .img_client
             .generate_image_from_text(&text_prompt, 1024, 1024, 4, "jpeg", Some(512))
-            .await
-            .unwrap();
+            .await?;
 
         // Save text response image to file
         save_image(&text_response.image, "./img.jpg").unwrap();

@@ -12,10 +12,11 @@ async fn test_manager_gpt() {
         .init();
 
     let objective = "Expertise at managing projects at scale";
-    let request = "Develop a full stack app that fetches today's weather. Use the axum framework for the backend and Yew rust framework for the frontend.";
+    let request = "Develop a full stack app that fetches today's weather. Use the fastapi framework for both the backend and the frontend.";
     let position = "Manager";
+    let language = "python";
 
-    let mut manager = ManagerGPT::new(objective, position, request);
+    let mut manager = ManagerGPT::new(objective, position, request, language);
 
     manager.execute(true, 3).await;
 

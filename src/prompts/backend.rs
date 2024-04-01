@@ -5,8 +5,9 @@ Instructions:
 - The user will provide a project description and a code template for a website backend build.
 - The backend code provided is only an example. Modify it as needed to match the project description.
 - Write functions that make sense for the user's request if required.
-- You can use the provided libraries: serde, serde_json, tokio, axum.
+- You can use the provided libraries: serde, serde_json, tokio, axum if the selected language is Rust.
 - You should only output the code, nothing else.
+- You should remove all backticks surrounding the source code. Remove the first and last lines(remove "```").
 
 Example:
 
@@ -33,8 +34,6 @@ async fn generate_content(
         Err(error) => error.to_string(),
     }
 }
-
-Strip all backticks from your output, don't generate ```rust ```.
 "#;
 
 pub(crate) const IMPROVED_WEBSERVER_CODE_PROMPT: &str = r#"
@@ -57,6 +56,7 @@ Instructions:
 - The user will provide a broken code and the identified errors or bugs.
 - Your task is to fix the bugs in the code.
 - You should only output the new and improved code, without any commentary.
+- You should remove all backticks surrounding the source code. Remove the first and last lines(remove "```").
 "#;
 
 pub(crate) const API_ENDPOINTS_PROMPT: &str = r#"
@@ -73,6 +73,7 @@ Instructions:
   - "response": Specifies the expected output based on the provided structs and functions.
 - Ensure that all keys in the JSON schema are represented as strings, including boolean values enclosed in double quotes.
 - The generated output should strictly consist of the JSON schema representations without any additional commentary.
+- You should remove all backticks surrounding the source code. Remove the first and last lines(remove "```").
 
 Example:
 
@@ -247,4 +248,30 @@ Your Output:
         "response": "string"
     }
 ]
+
+User Request:
+
+from fastapi import FastAPI, Request, HTTPException
+import requests
+
+app = FastAPI()
+
+@app.get("/")
+async def root(request: Request):
+    return {"message": "Hello World"}
+
+@app.get("/weather")
+async def get_weather(request: Request):
+    city = request.query_params.get("city")
+    if not city:
+        raise HTTPException(status_code=400, detail="Missing city parameter")
+
+    r = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid=YOUR_API_KEY")
+    if r.status_code != 200:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+Your Output:
 "#;
