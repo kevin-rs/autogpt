@@ -98,7 +98,7 @@ impl Functions for ArchitectGPT {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool) -> Result<()> {
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
                 Status::InDiscovery => {

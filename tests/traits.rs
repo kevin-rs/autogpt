@@ -2,6 +2,7 @@ use autogpt::common::utils::{Communication, Status};
 use autogpt::traits::agent::Agent;
 use std::borrow::Cow;
 
+#[derive(Debug)]
 pub struct MockAgent {
     objective: Cow<'static, str>,
     position: Cow<'static, str>,

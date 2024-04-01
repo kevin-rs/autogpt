@@ -16,7 +16,7 @@ impl Functions for MockFunctions {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool) -> Result<()> {
         info!("Executing tasks: {:?}", tasks.clone());
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -30,7 +30,7 @@ impl Functions for MockFunctions {
 #[tokio::test]
 async fn test_functions_execution() {
     let filter = filter::LevelFilter::INFO;
-    let (filter, reload_handle) = reload::Layer::new(filter);
+    let (filter, _reload_handle) = reload::Layer::new(filter);
     tracing_subscriber::registry()
         .with(filter)
         .with(fmt::Layer::default())
@@ -70,7 +70,7 @@ async fn test_functions_execution() {
 
     let mut functions = MockFunctions { agent };
 
-    let result = functions.execute(&mut tasks).await;
+    let result = functions.execute(&mut tasks, true).await;
 
     assert!(result.is_ok());
 }

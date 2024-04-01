@@ -16,10 +16,11 @@ pub trait Functions {
     /// # Arguments
     ///
     /// * `tasks` - The tasks associated with the agent.
+    /// * `execute` - A boolean indicating whether to execute the generated code by the agent.
     ///
     /// # Returns
     ///
     /// A result indicating success or failure.
     #[allow(async_fn_in_trait)]
-    async fn execute(&mut self, tasks: &mut Tasks) -> Result<()>;
+    async fn execute(&mut self, tasks: &mut Tasks, execute: bool) -> Result<()>;
 }

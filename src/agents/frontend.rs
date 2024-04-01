@@ -1,6 +1,5 @@
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::Route;
-use crate::common::utils::{check_if_proceed, Scope, Status, Tasks};
+use crate::common::utils::{Status, Tasks};
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
@@ -13,10 +12,12 @@ use std::borrow::Cow;
 use std::env::var;
 use std::fs;
 use std::process::Command;
+use std::process::Stdio;
 use std::time::Duration;
 use tracing::info;
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct FrontendGPT {
     agent: AgentGPT,
     client: Client,
@@ -154,7 +155,7 @@ impl Functions for FrontendGPT {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, execute: bool) -> Result<()> {
         let path = var("FRONTEND_TEMPLATE_PATH")
             .unwrap_or("frontend".to_string())
             .to_owned();
@@ -182,52 +183,54 @@ impl Functions for FrontendGPT {
                         self.agent.position(),
                     );
 
-                    let is_safe_code: bool = check_if_proceed();
-
-                    if !is_safe_code {
-                        panic!("It seems the code isn't safe to proceed. Consider revising or seeking assistance...");
-                    }
-
-                    info!(
-                        "[*] {:?}: Frontend Code Unit Testing: Building the frontend project...",
-                        self.agent.position(),
-                    );
-
-                    let serve_command = format!("trunk build --release");
-                    let output = Command::new("sh")
-                        .arg("-c")
-                        .arg(&serve_command)
-                        .output()
-                        .expect("Failed to execute trunk build command");
-
-                    if output.status.success() {
-                        self.nb_bugs = 0;
+                    if !execute {
                         info!(
-                            "[*] {:?}: Frontend Code Unit Testing: Frontend server build successful...",
+                            "[*] {:?}: It seems the code isn't safe to proceed. Consider revising or seeking assistance...",
                             self.agent.position(),
                         );
                     } else {
-                        let error_arr: Vec<u8> = output.stderr;
-                        let error_str: String = String::from_utf8(error_arr).unwrap();
+                        info!(
+                            "[*] {:?}: Frontend Code Unit Testing: Building the frontend project...",
+                            self.agent.position(),
+                        );
 
-                        self.nb_bugs += 1;
-                        self.bugs = Some(error_str.into());
+                        let serve_command = format!("trunk build --release");
+                        let output = Command::new("sh")
+                            .arg("-c")
+                            .arg(&serve_command)
+                            .current_dir(path.clone())
+                            .stdout(Stdio::piped())
+                            .stderr(Stdio::piped())
+                            .output()
+                            .expect("Failed to execute trunk build command");
 
-                        if self.nb_bugs > 6 {
+                        if output.status.success() {
+                            self.nb_bugs = 0;
                             info!(
-                                "[*] {:?}: Frontend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
+                                "[*] {:?}: Frontend Code Unit Testing: Frontend server build successful...",
                                 self.agent.position(),
                             );
-                            panic!("Error: Too many bugs")
+                        } else {
+                            let error_arr: Vec<u8> = output.stderr;
+                            let error_str: String = String::from_utf8(error_arr).unwrap();
+
+                            self.nb_bugs += 1;
+                            self.bugs = Some(error_str.into());
+
+                            if self.nb_bugs > 6 {
+                                info!(
+                                    "[*] {:?}: Frontend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
+                                    self.agent.position(),
+                                );
+                                break;
+                            }
+
+                            self.agent.update(Status::Active);
+                            continue;
                         }
-
-                        self.agent.update(Status::Active);
-                        continue;
                     }
-
                     self.agent.update(Status::Completed);
                 }
-
                 _ => {}
             }
         }
