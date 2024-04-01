@@ -1,8 +1,9 @@
 use crate::common::utils::{Communication, Status};
 use std::borrow::Cow;
+use std::fmt::Debug;
 
 /// A trait defining basic functionalities for agents.
-pub trait Agent {
+pub trait Agent: Debug {
     /// Creates a new instance of an agent.
     ///
     /// # Arguments

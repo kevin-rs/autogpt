@@ -1,15 +1,11 @@
-use autogpt::agents::architect::ArchitectGPT;
 use autogpt::agents::frontend::FrontendGPT;
-use autogpt::common::utils::{Scope, Status, Tasks};
-use autogpt::traits::agent::Agent;
-use autogpt::traits::functions::Functions;
-use std::fs;
+use autogpt::common::utils::{Scope, Tasks};
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
 async fn test_generate_frontend_code() {
     let filter = filter::LevelFilter::INFO;
-    let (filter, reload_handle) = reload::Layer::new(filter);
+    let (filter, _reload_handle) = reload::Layer::new(filter);
     tracing_subscriber::registry()
         .with(filter)
         .with(fmt::Layer::default())
@@ -416,9 +412,9 @@ async fn tests_frontend_dev_one() {
     let objective = "Expertise lies in writing frontend code for Yew rust framework";
     let position = "Frontend Developer";
 
-    let mut frontend_gpt = FrontendGPT::new(objective, position);
+    let _frontend_gpt = FrontendGPT::new(objective, position);
 
-    let mut tasks = Tasks {
+    let _tasks = Tasks {
         description:
             "Build a website for an e-commerce platform with payment integration using Axum.".into(),
         scope: Some(Scope {
@@ -435,5 +431,5 @@ async fn tests_frontend_dev_one() {
         api_schema: None,
     };
 
-    // frontend_gpt.execute(&mut tasks).await.unwrap();
+    // frontend_gpt.execute(&mut tasks, true).await.unwrap();
 }

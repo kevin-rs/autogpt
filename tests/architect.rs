@@ -7,7 +7,7 @@ use tracing_subscriber::{filter, fmt, prelude::*, reload};
 #[tokio::test]
 async fn test_get_scope() {
     let filter = filter::LevelFilter::INFO;
-    let (filter, reload_handle) = reload::Layer::new(filter);
+    let (filter, _reload_handle) = reload::Layer::new(filter);
     tracing_subscriber::registry()
         .with(filter)
         .with(fmt::Layer::default())
@@ -87,7 +87,7 @@ async fn test_architect_agent() {
         api_schema: None,
     };
 
-    architect_agent.execute(&mut tasks).await.unwrap();
+    architect_agent.execute(&mut tasks, true).await.unwrap();
 
     assert!(tasks.scope != None);
     assert!(tasks.urls.is_some());

@@ -1,6 +1,6 @@
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::Route;
-use crate::common::utils::{check_if_proceed, Scope, Status, Tasks};
+use crate::common::utils::{Status, Tasks};
 use crate::prompts::backend::{
     API_ENDPOINTS_PROMPT, FIX_CODE_PROMPT, IMPROVED_WEBSERVER_CODE_PROMPT, WEBSERVER_CODE_PROMPT,
 };
@@ -183,7 +183,7 @@ impl Functions for BackendGPT {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, execute: bool) -> Result<()> {
         let path = var("BACKEND_TEMPLATE_PATH")
             .unwrap_or("backend".to_string())
             .to_owned();
@@ -211,137 +211,136 @@ impl Functions for BackendGPT {
                         self.agent.position(),
                     );
 
-                    let is_safe_code: bool = check_if_proceed();
-
-                    if !is_safe_code {
-                        panic!("It seems the code isn't safe to proceed. Consider revising or seeking assistance...");
-                    }
-
-                    info!(
-                        "[*] {:?}: Backend Code Unit Testing: Building the backend project...",
-                        self.agent.position(),
-                    );
-
-                    let build_backend_server: std::process::Output = Command::new("cargo")
-                        .arg("build")
-                        .arg("--release")
-                        .arg("--verbose")
-                        .current_dir(path.clone())
-                        .stdout(Stdio::piped())
-                        .stderr(Stdio::piped())
-                        .output()
-                        .expect("Failed to build the backend application");
-
-                    if build_backend_server.status.success() {
-                        self.nb_bugs = 0;
+                    if !execute {
                         info!(
-                            "[*] {:?}: Backend Code Unit Testing: Backend server build successful...",
+                            "[*] {:?}: It seems the code isn't safe to proceed. Consider revising or seeking assistance...",
                             self.agent.position(),
                         );
                     } else {
-                        let error_arr: Vec<u8> = build_backend_server.stderr;
-                        let error_str: String = String::from_utf8(error_arr).unwrap();
-
-                        self.nb_bugs += 1;
-                        self.bugs = Some(error_str.into());
-
-                        if self.nb_bugs > 2 {
-                            info!(
-                                "[*] {:?}: Backend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
-                                self.agent.position(),
-                            );
-                            panic!("Error: Too many bugs")
-                        }
-
-                        self.agent.update(Status::Active);
-                        continue;
-                    }
-
-                    let endpoints: String = self.get_routes_json().await?;
-
-                    let api_endpoints: Vec<Route> = serde_json::from_str(endpoints.as_str())
-                        .expect("Failed to decode API Endpoints");
-
-                    let filtered_endpoints: Vec<Route> = api_endpoints
-                        .iter()
-                        .filter(|&route| route.method == "get" && route.dynamic == "false")
-                        .cloned()
-                        .collect();
-
-                    tasks.api_schema = Some(filtered_endpoints.clone());
-
-                    info!(
-                        "[*] {:?}: Backend Code Unit Testing: Starting the web server to test endpoints...",
-                        self.agent.position(),
-                    );
-
-                    let mut run_backend_server: std::process::Child = Command::new("cargo")
-                        .arg("run")
-                        .arg("--release")
-                        .arg("--verbose")
-                        .current_dir(path.clone())
-                        .stdout(Stdio::piped())
-                        .stderr(Stdio::piped())
-                        .spawn()
-                        .expect("Failed to run the backend application");
-
-                    info!(
-                        "[*] {:?}: Backend Code Unit Testing: Initiating tests on the server in 3 seconds...",
-                        self.agent.position(),
-                    );
-
-                    let seconds_sleep: Duration = Duration::from_secs(3);
-                    sleep(seconds_sleep);
-
-                    for endpoint in filtered_endpoints {
                         info!(
-                            "[*] {:?}: Testing endpoint: {}",
+                            "[*] {:?}: Backend Code Unit Testing: Building the backend project...",
                             self.agent.position(),
-                            endpoint.path
                         );
 
-                        let url: String = format!("http://127.0.0.1:8080{}", endpoint.path);
+                        let build_backend_server: std::process::Output = Command::new("cargo")
+                            .arg("build")
+                            .arg("--release")
+                            .arg("--verbose")
+                            .current_dir(path.clone())
+                            .stdout(Stdio::piped())
+                            .stderr(Stdio::piped())
+                            .output()
+                            .expect("Failed to build the backend application");
 
-                        info!(
-                            "[*] {:?}: Testing URL Endpoint: {}",
-                            self.agent.position(),
-                            url
-                        );
-
-                        let status_code =
-                            self.req_client.get(url.to_string()).send().await?.status();
-                        if status_code != 200 {
+                        if build_backend_server.status.success() {
+                            self.nb_bugs = 0;
                             info!(
-                                "[*] {:?}: Failed to fetch the backend endpoint: {}. Further investigation needed...",
+                                "[*] {:?}: Backend Code Unit Testing: Backend server build successful...",
                                 self.agent.position(),
-                                endpoint.path
                             );
                         } else {
-                            run_backend_server
-                                .kill()
-                                .expect("Failed to terminate the backend web server");
+                            let error_arr: Vec<u8> = build_backend_server.stderr;
+                            let error_str: String = String::from_utf8(error_arr).unwrap();
+
+                            self.nb_bugs += 1;
+                            self.bugs = Some(error_str.into());
+
+                            if self.nb_bugs > 6 {
+                                info!(
+                                    "[*] {:?}: Backend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
+                                    self.agent.position(),
+                                );
+                                break;
+                            }
+
+                            self.agent.update(Status::Active);
+                            continue;
+                        }
+
+                        let endpoints: String = self.get_routes_json().await?;
+
+                        let api_endpoints: Vec<Route> = serde_json::from_str(endpoints.as_str())
+                            .expect("Failed to decode API Endpoints");
+
+                        let filtered_endpoints: Vec<Route> = api_endpoints
+                            .iter()
+                            .filter(|&route| route.method == "get" && route.dynamic == "false")
+                            .cloned()
+                            .collect();
+
+                        tasks.api_schema = Some(filtered_endpoints.clone());
+
+                        info!(
+                            "[*] {:?}: Backend Code Unit Testing: Starting the web server to test endpoints...",
+                            self.agent.position(),
+                        );
+
+                        let mut run_backend_server: std::process::Child = Command::new("cargo")
+                            .arg("run")
+                            .arg("--release")
+                            .arg("--verbose")
+                            .current_dir(path.clone())
+                            .stdout(Stdio::piped())
+                            .stderr(Stdio::piped())
+                            .spawn()
+                            .expect("Failed to run the backend application");
+
+                        info!(
+                            "[*] {:?}: Backend Code Unit Testing: Initiating tests on the server in 3 seconds...",
+                            self.agent.position(),
+                        );
+
+                        let seconds_sleep: Duration = Duration::from_secs(3);
+                        sleep(seconds_sleep);
+
+                        for endpoint in filtered_endpoints {
                             info!(
-                                "[*] {:?}: Error detected while checking the backend: {}. Investigation required...",
+                                "[*] {:?}: Testing endpoint: {}",
                                 self.agent.position(),
                                 endpoint.path
                             );
+
+                            let url: String = format!("http://127.0.0.1:8080{}", endpoint.path);
+
+                            info!(
+                                "[*] {:?}: Testing URL Endpoint: {}",
+                                self.agent.position(),
+                                url
+                            );
+
+                            let status_code =
+                                self.req_client.get(url.to_string()).send().await?.status();
+                            if status_code != 200 {
+                                info!(
+                                    "[*] {:?}: Failed to fetch the backend endpoint: {}. Further investigation needed...",
+                                    self.agent.position(),
+                                    endpoint.path
+                                );
+                            } else {
+                                run_backend_server
+                                    .kill()
+                                    .expect("Failed to terminate the backend web server");
+                                info!(
+                                    "[*] {:?}: Error detected while checking the backend: {}. Investigation required...",
+                                    self.agent.position(),
+                                    endpoint.path
+                                );
+                            }
                         }
+
+                        let backend_path = format!("{}/{}", path, "api.json");
+
+                        fs::write(backend_path, endpoints)?;
+
+                        info!(
+                            "[*] {:?}: Backend testing complete. Results written to 'api.json'...",
+                            self.agent.position(),
+                        );
+
+                        run_backend_server.kill()?;
                     }
-
-                    let backend_path = format!("{}/{}", path, "api.json");
-
-                    fs::write(backend_path, endpoints)?;
-
-                    info!(
-                        "[*] {:?}: Backend testing complete. Results written to 'api.json'...",
-                        self.agent.position(),
-                    );
-
-                    run_backend_server.kill()?;
-
                     self.agent.update(Status::Completed);
                 }
-
                 _ => {}
             }
         }
