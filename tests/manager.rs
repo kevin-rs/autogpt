@@ -17,7 +17,7 @@ async fn test_manager_gpt() {
 
     let mut manager = ManagerGPT::new(objective, position, request);
 
-    manager.execute(true).await;
+    manager.execute(true, 3).await;
 
     info!("{:?}", manager);
 }

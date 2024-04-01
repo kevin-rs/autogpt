@@ -1,62 +1,32 @@
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{Status, Tasks};
+use crate::common::utils::{similarity, Status, Tasks};
 use crate::prompts::designer::{STABILITY_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
 use gems::utils::load_and_encode_image;
 use gems::Client;
-use stabilityai::{
-    types::{ClipGuidancePreset, Sampler, StylePreset, TextToImageRequestBodyArgs},
-    Client as StabilityAIClient,
-};
+use getimg::{save_image, Client as ImgClient};
 use std::env::var;
 use tracing::info;
-
-fn levenshtein_distance(s1: &str, s2: &str) -> usize {
-    let len1 = s1.chars().count();
-    let len2 = s2.chars().count();
-
-    let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
-
-    for i in 0..=len1 {
-        matrix[i][0] = i;
-    }
-
-    for j in 0..=len2 {
-        matrix[0][j] = j;
-    }
-
-    for (i, char1) in s1.chars().enumerate() {
-        for (j, char2) in s2.chars().enumerate() {
-            let cost = if char1 == char2 { 0 } else { 1 };
-            matrix[i + 1][j + 1] = (matrix[i][j + 1] + 1)
-                .min(matrix[i + 1][j] + 1)
-                .min(matrix[i][j] + cost);
-        }
-    }
-
-    matrix[len1][len2]
-}
-
-fn similarity(s1: &str, s2: &str) -> f64 {
-    let distance = levenshtein_distance(s1, s2) as f64;
-    let max_length = s1.chars().count().max(s2.chars().count()) as f64;
-    1.0 - distance / max_length
-}
 
 #[derive(Debug)]
 pub struct DesignerGPT {
     agent: AgentGPT,
-    stab_client: StabilityAIClient,
+    img_client: ImgClient,
     client: Client,
 }
 
 impl DesignerGPT {
     pub fn new(objective: &'static str, position: &'static str) -> Self {
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
-        let _stability_api_key = var("STABILITY_API_KEY").unwrap_or_default().to_owned();
-        let stab_client = StabilityAIClient::new();
+        let getimg_api_key = var("GETIMG_APY_KEY").unwrap_or_default().to_owned();
+        let getimg_model = var("GETIMG__MODEL")
+            .unwrap_or("lcm-realistic-vision-v5-1".to_string())
+            .to_owned();
+
+        let img_client = ImgClient::new(&getimg_api_key, &getimg_model);
+
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro-vision".to_string())
             .to_owned();
@@ -67,7 +37,7 @@ impl DesignerGPT {
 
         Self {
             agent,
-            stab_client,
+            img_client,
             client,
         }
     }
@@ -75,32 +45,22 @@ impl DesignerGPT {
     pub async fn generate_image_from_text(&mut self, tasks: &Tasks) -> Result<()> {
         let text_prompt: String =
             format!("{}\n\nUser Prompt: {}", STABILITY_PROMPT, tasks.description);
-        let request = TextToImageRequestBodyArgs::default()
-            .text_prompts(text_prompt)
-            .samples(1)
-            .steps(30_u32)
-            .clip_guidance_preset(ClipGuidancePreset::FastBlue)
-            .sampler(Sampler::KDpmpp2sAncestral)
-            .width(1216_u16)
-            .height(832_u16)
-            .style_preset(StylePreset::ThreeDModel)
-            .build()?;
 
-        let artifacts = self
-            .stab_client
-            .generate("stable-diffusion-xl-1024-v1-0")
-            .text_to_image(request)
-            .await?;
+        // Generate image from text prompt
+        let text_response = self
+            .img_client
+            .generate_image_from_text(&text_prompt, 1024, 1024, 4, "jpeg", Some(512))
+            .await
+            .unwrap();
 
-        let paths = artifacts.save("images/").await?;
+        // Save text response image to file
+        save_image(&text_response.image, "./img.jpg").unwrap();
 
-        paths.iter().for_each(|path| {
-            info!(
-                "[*] {:?}: Image saved at {}",
-                self.agent.position(),
-                path.display()
-            )
-        });
+        info!(
+            "[*] {:?}: Image saved at {}",
+            self.agent.position(),
+            "./img.jpg"
+        );
 
         Ok(())
     }
@@ -135,10 +95,9 @@ impl DesignerGPT {
         generated_text: &str,
     ) -> Result<bool> {
         let stability_ai_prompt = &tasks.description;
-        let gems_response = self.generate_text_from_image(generated_text).await?;
 
-        let similarity_threshold = 0.8;
-        let similarity = similarity(&stability_ai_prompt, &gems_response);
+        let similarity_threshold = 0.2;
+        let similarity = similarity(&stability_ai_prompt, &generated_text);
 
         if similarity >= similarity_threshold {
             return Ok(true);
@@ -153,26 +112,31 @@ impl Functions for DesignerGPT {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, max_tries: u64) -> Result<()> {
+        let mut count = 0;
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
                 Status::InDiscovery => {
                     info!("[*] {:?}: InDiscovery", self.agent.position());
 
-                    let generated_image_path = self.generate_image_from_text(tasks).await?;
-                    // let generated_text = self.generate_image_from_text(tasks).await?;
+                    let _generated_image = self.generate_image_from_text(tasks).await?;
+                    let generated_text = self.generate_text_from_image("./img.jpg").await?;
+                    info!("[*] {:?}: InDiscovery", self.agent.position(),);
+
+                    let text_similarity = self
+                        .compare_text_and_image_prompts(tasks, &generated_text)
+                        .await?;
                     info!(
-                        "[*] {:?}: InDiscovery: generated_image_path {:?}",
+                        "[*] {:?}: InDiscovery: {}",
                         self.agent.position(),
-                        generated_image_path
+                        text_similarity
                     );
 
-                    // let text_similarity = self.compare_text_and_image_prompts(tasks, &generated_text).await?;
-
-                    // if text_similarity {
-                    //     self.agent.update(Status::Completed);
-                    // }
-                    self.agent.update(Status::Completed);
+                    if text_similarity || count == max_tries {
+                        self.agent.update(Status::Completed);
+                    }
+                    count += 1;
+                    // self.agent.update(Status::Completed);
                 }
                 _ => {
                     self.agent.update(Status::Completed);
