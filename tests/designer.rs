@@ -22,7 +22,7 @@ async fn test_generate_image_from_text() -> Result<()> {
     let mut designer_agent = DesignerGPT::new(objective, position);
 
     let mut tasks = Tasks {
-        description: "Generate a minimalist layout with a clean interface showing the forecast for the next week, with options to switch between Celsius and Fahrenheit.".into(),
+        description: "Generate a kanban-style task management board. The board is divided into three columns: To Do, In Progress, and Done. Each column contains a list of tasks. The tasks in the To Do column are prioritized from highest to lowest, with the highest priority task at the top. The tasks in the In Progress column are listed in the order in which they were started. The tasks in the Done column are listed in the order in which they were completed.".into(),
         scope: None,
         urls: None,
         backend_code: None,
@@ -30,9 +30,7 @@ async fn test_generate_image_from_text() -> Result<()> {
         api_schema: None,
     };
 
-    // let _ = designer_agent.generate_image_from_text(&mut tasks).await?;
-
-    // assert_eq!(designer_agent.get_agent().status(), &Status::Completed);
+    let _ = designer_agent.generate_image_from_text(&mut tasks).await?;
 
     Ok(())
 }
@@ -44,9 +42,28 @@ async fn test_generate_text_from_image() -> Result<()> {
 
     let mut designer_agent = DesignerGPT::new(objective, position);
 
-    let _ = designer_agent
-        .generate_text_from_image("data/img.png")
-        .await?;
+    let _ = designer_agent.generate_text_from_image("img.jpg").await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_execute_agent() -> Result<()> {
+    let objective = "Crafts stunning web design layouts";
+    let position = "Web Designer";
+
+    let mut designer_agent = DesignerGPT::new(objective, position);
+
+    let mut tasks = Tasks {
+        description: "A kanban-style task management board. The board is divided into three columns: To Do, In Progress, and Done. Each column contains a list of tasks. The tasks in the To Do column are prioritized from highest to lowest, with the highest priority task at the top. The tasks in the In Progress column are listed in the order in which they were started. The tasks in the Done column are listed in the order in which they were completed.".into(),
+        scope: None,
+        urls: None,
+        backend_code: None,
+        frontend_code: None,
+        api_schema: None,
+    };
+
+    let _ = designer_agent.execute(&mut tasks, true, 3).await?;
 
     Ok(())
 }

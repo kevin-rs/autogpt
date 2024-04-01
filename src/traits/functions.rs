@@ -17,10 +17,11 @@ pub trait Functions {
     ///
     /// * `tasks` - The tasks associated with the agent.
     /// * `execute` - A boolean indicating whether to execute the generated code by the agent.
+    /// * `max_tries` - A integer indicating the max number of tries fixing code bugs.
     ///
     /// # Returns
     ///
     /// A result indicating success or failure.
     #[allow(async_fn_in_trait)]
-    async fn execute(&mut self, tasks: &mut Tasks, execute: bool) -> Result<()>;
+    async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()>;
 }

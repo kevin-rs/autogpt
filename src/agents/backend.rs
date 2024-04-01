@@ -183,7 +183,7 @@ impl Functions for BackendGPT {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks, execute: bool) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
         let path = var("BACKEND_TEMPLATE_PATH")
             .unwrap_or("backend".to_string())
             .to_owned();
@@ -245,7 +245,7 @@ impl Functions for BackendGPT {
                             self.nb_bugs += 1;
                             self.bugs = Some(error_str.into());
 
-                            if self.nb_bugs > 6 {
+                            if self.nb_bugs > max_tries {
                                 info!(
                                     "[*] {:?}: Backend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
                                     self.agent.position(),

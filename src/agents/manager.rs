@@ -15,11 +15,11 @@ enum AgentType {
 }
 
 impl AgentType {
-    async fn execute(&mut self, tasks: &mut Tasks, execute: bool) -> Result<()> {
+    async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
         match self {
-            AgentType::Architect(agent) => agent.execute(tasks, execute).await,
-            AgentType::Backend(agent) => agent.execute(tasks, execute).await,
-            AgentType::Frontend(agent) => agent.execute(tasks, execute).await,
+            AgentType::Architect(agent) => agent.execute(tasks, execute, max_tries).await,
+            AgentType::Backend(agent) => agent.execute(tasks, execute, max_tries).await,
+            AgentType::Frontend(agent) => agent.execute(tasks, execute, max_tries).await,
         }
     }
 }
@@ -75,13 +75,13 @@ impl ManagerGPT {
         )));
     }
 
-    pub async fn execute(&mut self, execute: bool) {
+    pub async fn execute(&mut self, execute: bool, max_tries: u64) {
         if self.agents.is_empty() {
             self.spawn_default_agents();
         }
 
         for agent in &mut self.agents {
-            let _agent_res = agent.execute(&mut self.tasks, execute).await;
+            let _agent_res = agent.execute(&mut self.tasks, execute, max_tries).await;
         }
     }
 }
