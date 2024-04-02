@@ -269,7 +269,7 @@ impl Functions for FrontendGPT {
                             .arg(format!("{}s", 10))
                             .arg("npm")
                             .arg("run")
-                            .arg("start")
+                            .arg("build")
                             .current_dir(path.clone())
                             .stdout(Stdio::piped())
                             .stderr(Stdio::piped())
@@ -279,6 +279,7 @@ impl Functions for FrontendGPT {
 
                     match result {
                         Ok(mut child) => {
+                            self.nb_bugs += 1;
                             let mut stderr_output = String::new();
                             child
                                 .stderr
@@ -286,26 +287,22 @@ impl Functions for FrontendGPT {
                                 .expect("Failed to capture build stderr")
                                 .read_to_string(&mut stderr_output)
                                 .expect("Failed to read build stderr");
-
-                            if !stderr_output.trim().is_empty() {
-                                self.nb_bugs += 1;
-                                self.bugs = Some(stderr_output.into());
-
-                                if self.nb_bugs > max_tries {
-                                    info!(
-                                "[*] {:?}: Frontend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
-                                self.agent.position(),
-                            );
-                                    break;
-                                } else {
-                                    self.agent.update(Status::Active);
-                                }
-                            } else {
-                                self.nb_bugs = 0;
+                            if self.nb_bugs > max_tries {
                                 info!(
-                            "[*] {:?}: Frontend Code Unit Testing: Frontend server build successful...",
-                            self.agent.position(),
-                        );
+                                        "[*] {:?}: Frontend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
+                                        self.agent.position(),
+                                    );
+                                break;
+                            } else {
+                                self.agent.update(Status::Active);
+                            }
+                            if !stderr_output.trim().is_empty() {
+                                self.bugs = Some(stderr_output.into());
+                            } else {
+                                info!(
+                                    "[*] {:?}: Frontend Code Unit Testing: Frontend server build successful...",
+                                    self.agent.position(),
+                                );
                             }
                         }
                         Err(err) => {

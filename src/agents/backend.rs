@@ -329,7 +329,7 @@ impl Functions for BackendGPT {
                                 let run_output = Command::new("timeout")
                                     .arg(format!("{}s", 10))
                                     .arg("node")
-                                    .arg("server.js")
+                                    .arg("src/index.js")
                                     .current_dir(&path)
                                     .stdout(Stdio::piped())
                                     .stderr(Stdio::piped())
