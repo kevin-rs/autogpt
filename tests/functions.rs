@@ -1,6 +1,7 @@
 use anyhow::Result;
 use autogpt::agents::agent::AgentGPT;
 use autogpt::common::utils::{Route, Scope, Tasks};
+use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::Functions;
 use serde_json::json;
 use std::borrow::Cow;
@@ -17,7 +18,11 @@ impl Functions for MockFunctions {
     }
 
     async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
-        info!("Executing tasks: {:?}", tasks.clone());
+        info!(
+            "[*] {:?}: Executing tasks: {:?}",
+            self.agent.position(),
+            tasks.clone()
+        );
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 

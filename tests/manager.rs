@@ -1,5 +1,5 @@
 use autogpt::agents::manager::ManagerGPT;
-use tracing::info;
+use tracing::debug;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
@@ -12,13 +12,13 @@ async fn test_manager_gpt() {
         .init();
 
     let objective = "Expertise at managing projects at scale";
-    let request = "Develop a full stack app that fetches today's weather. Use the fastapi framework for both the backend and the frontend.";
+    let request = "Develop a full stack app that fetches today's weather in python using FastAPI.";
     let position = "Manager";
     let language = "python";
 
     let mut manager = ManagerGPT::new(objective, position, request, language);
 
-    manager.execute(true, 3).await;
+    let _ = manager.execute(true, 3).await;
 
-    info!("{:?}", manager);
+    debug!("{:?}", manager);
 }

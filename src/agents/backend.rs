@@ -18,9 +18,9 @@ use std::borrow::Cow;
 use std::env::var;
 use std::fs;
 use std::time::Duration;
-use tracing::info;
+use tracing::{debug, info};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BackendGPT {
     agent: AgentGPT,
     client: Client,
@@ -73,7 +73,7 @@ impl BackendGPT {
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
-        info!("[*] {:?}: {:?}", self.agent.position(), full_path);
+        debug!("[*] {:?}: {:?}", self.agent.position(), full_path);
 
         let template = fs::read_to_string(full_path)?;
 
@@ -105,7 +105,7 @@ impl BackendGPT {
         tasks.backend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
-        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(gemini_response)
     }
@@ -140,14 +140,14 @@ impl BackendGPT {
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
-        info!("[*] {:?}: {:?}", self.agent.position(), backend_path);
+        debug!("[*] {:?}: {:?}", self.agent.position(), backend_path);
 
         fs::write(backend_path, gemini_response.clone())?;
 
         tasks.backend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
-        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(gemini_response)
     }
@@ -187,7 +187,7 @@ impl BackendGPT {
         tasks.backend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
-        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(gemini_response)
     }
@@ -210,7 +210,7 @@ impl BackendGPT {
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
-        info!("[*] {:?}: {:?}", self.agent.position(), full_path);
+        debug!("[*] {:?}: {:?}", self.agent.position(), full_path);
 
         let backend_code = fs::read_to_string(full_path)?;
 
@@ -225,7 +225,7 @@ impl BackendGPT {
         };
 
         self.agent.update(Status::Completed);
-        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(gemini_response)
     }
@@ -245,6 +245,11 @@ impl Functions for BackendGPT {
     }
 
     async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
+        info!(
+            "[*] {:?}: Executing tasks: {:?}",
+            self.agent.position(),
+            tasks.clone()
+        );
         let path = var("BACKEND_TEMPLATE_PATH")
             .unwrap_or("backend".to_string())
             .to_owned();

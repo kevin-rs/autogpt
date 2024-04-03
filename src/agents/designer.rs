@@ -8,9 +8,9 @@ use gems::utils::load_and_encode_image;
 use gems::Client;
 use getimg::{save_image, Client as ImgClient};
 use std::env::var;
-use tracing::info;
+use tracing::{debug, info};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DesignerGPT {
     agent: AgentGPT,
     img_client: ImgClient,
@@ -68,7 +68,7 @@ impl DesignerGPT {
         let base64_image_data = match load_and_encode_image(&image_path) {
             Ok(data) => data,
             Err(_) => {
-                info!("[*] {:?}: Error loading image!", self.agent.position());
+                debug!("[*] {:?}: Error loading image!", self.agent.position());
                 "".to_string()
             }
         };
@@ -79,7 +79,7 @@ impl DesignerGPT {
             .await
             .unwrap();
 
-        info!(
+        debug!(
             "[*] {:?}: Got Image Description: {:?}",
             self.agent.position(),
             response
@@ -111,31 +111,35 @@ impl Functions for DesignerGPT {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, max_tries: u64) -> Result<()> {
-        let mut count = 0;
+    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
+        info!(
+            "[*] {:?}: Executing tasks: {:?}",
+            self.agent.position(),
+            tasks.clone()
+        );
+        let mut _count = 0;
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
                 Status::InDiscovery => {
-                    info!("[*] {:?}: InDiscovery", self.agent.position());
+                    debug!("[*] {:?}: InDiscovery", self.agent.position());
 
                     let _generated_image = self.generate_image_from_text(tasks).await?;
-                    let generated_text = self.generate_text_from_image("./img.jpg").await?;
-                    info!("[*] {:?}: InDiscovery", self.agent.position(),);
+                    // let generated_text = self.generate_text_from_image("./img.jpg").await?;
 
-                    let text_similarity = self
-                        .compare_text_and_image_prompts(tasks, &generated_text)
-                        .await?;
-                    info!(
-                        "[*] {:?}: InDiscovery: {}",
-                        self.agent.position(),
-                        text_similarity
-                    );
+                    // let text_similarity = self
+                    //     .compare_text_and_image_prompts(tasks, &generated_text)
+                    //     .await?;
+                    // debug!(
+                    //     "[*] {:?}: InDiscovery: {}",
+                    //     self.agent.position(),
+                    //     text_similarity
+                    // );
 
-                    if text_similarity || count == max_tries {
-                        self.agent.update(Status::Completed);
-                    }
-                    count += 1;
-                    // self.agent.update(Status::Completed);
+                    // if text_similarity || count == max_tries {
+                    //     self.agent.update(Status::Completed);
+                    // }
+                    _count += 1;
+                    self.agent.update(Status::Completed);
                 }
                 _ => {
                     self.agent.update(Status::Completed);
