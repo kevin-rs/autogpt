@@ -84,15 +84,15 @@ Executes Assigned Tasks     Executes Assigned Tasks      Executes Assigned Tasks
                       |               ManagerGPT           |
                       |       Collects and Consolidates    |
                       |        Results from Agents         |
-           			  +------------------+-----------------+
-           			                     |
-           			                     v
-           			  +------------------+-----------------+
-           			  |                User                |
-           			  |            Receives Final          |
-           			  |             Output from            |
-           			  |            ManagerGPT              |
-           			  +------------------------------------+
+                      +------------------+-----------------+
+                                         |
+                                         v
+                      +------------------+-----------------+
+                      |                User                |
+                      |            Receives Final          |
+                      |             Output from            |
+                      |            ManagerGPT              |
+                      +------------------------------------+
 ```
 
 Autogpt consists of 5 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
