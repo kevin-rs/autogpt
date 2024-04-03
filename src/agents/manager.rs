@@ -3,12 +3,17 @@ use crate::agents::architect::ArchitectGPT;
 use crate::agents::backend::BackendGPT;
 use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
+use crate::common::utils::strip_code_blocks;
 use crate::common::utils::Tasks;
-use crate::prompts::manager::MANAGER_PROMPT;
+use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT, MANAGER_PROMPT};
+use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
+use gems::Client;
+use std::env::var;
+use tracing::info;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum AgentType {
     Architect(ArchitectGPT),
     Backend(BackendGPT),
@@ -25,6 +30,14 @@ impl AgentType {
             AgentType::Designer(agent) => agent.execute(tasks, execute, max_tries).await,
         }
     }
+    fn position(&self) -> String {
+        match self {
+            AgentType::Architect(agent) => agent.agent().position().to_string(),
+            AgentType::Backend(agent) => agent.agent().position().to_string(),
+            AgentType::Frontend(agent) => agent.agent().position().to_string(),
+            _ => "Any".to_string(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -34,6 +47,7 @@ pub struct ManagerGPT {
     tasks: Tasks,
     language: &'static str,
     agents: Vec<AgentType>,
+    client: Client,
 }
 
 impl ManagerGPT {
@@ -43,11 +57,11 @@ impl ManagerGPT {
         request: &'static str,
         language: &'static str,
     ) -> Self {
-        let agent = AgentGPT::new_borrowed(position, objective);
+        let agent = AgentGPT::new_borrowed(objective, position);
 
         let agents: Vec<AgentType> = Vec::new();
 
-        let request = format!("{}\n\nUser Request: {}", MANAGER_PROMPT, request);
+        // let request = format!("{}\n\nUser Request: {}", MANAGER_PROMPT, request);
 
         let tasks: Tasks = Tasks {
             description: request.into(),
@@ -58,11 +72,19 @@ impl ManagerGPT {
             api_schema: None,
         };
 
+        let model = var("GEMINI_MODEL")
+            .unwrap_or("gemini-pro".to_string())
+            .to_owned();
+
+        let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
+        let client = Client::new(&api_key, &model);
+
         Self {
             agent,
             tasks,
             language,
             agents,
+            client,
         }
     }
 
@@ -91,13 +113,59 @@ impl ManagerGPT {
         )));
     }
 
-    pub async fn execute(&mut self, execute: bool, max_tries: u64) {
+    pub async fn execute_prompt(&self, prompt: String) -> Result<String> {
+        let gemini_response: String = match self.client.clone().generate_content(&prompt).await {
+            Ok(response) => strip_code_blocks(&response),
+            Err(_err) => Default::default(),
+        };
+
+        Ok(gemini_response)
+    }
+
+    pub async fn execute(&mut self, execute: bool, max_tries: u64) -> Result<()> {
+        info!(
+            "[*] {:?}: Executing task: {:?}",
+            self.agent.position(),
+            self.tasks.description.clone()
+        );
+
+        let language_request: String = format!(
+            "{}\n\nUser Request: {}",
+            LANGUAGE_MANAGER_PROMPT,
+            self.tasks.description.clone()
+        );
+
+        let framework_request: String = format!(
+            "{}\n\nUser Request: {}",
+            FRAMEWORK_MANAGER_PROMPT,
+            self.tasks.description.clone()
+        );
+
+        let language = self.execute_prompt(language_request).await?;
+        let framework = self.execute_prompt(framework_request).await?;
+
         if self.agents.is_empty() {
             self.spawn_default_agents();
         }
 
-        for agent in &mut self.agents {
+        for mut agent in self.agents.clone() {
+            let request_prompt = format!("{}\n\n\n\nUser Request: {}\n\nAgent Role: {}\nProgramming Language: {}\nFramework: {}\n",
+                MANAGER_PROMPT, self.tasks.description.clone(), agent.position(),language, framework);
+
+            let request = self.execute_prompt(request_prompt).await?;
+
+            self.tasks = Tasks {
+                description: request.into(),
+                scope: None,
+                urls: None,
+                frontend_code: None,
+                backend_code: None,
+                api_schema: None,
+            };
+
             let _agent_res = agent.execute(&mut self.tasks, execute, max_tries).await;
         }
+
+        Ok(())
     }
 }

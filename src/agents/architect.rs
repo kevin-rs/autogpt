@@ -10,9 +10,9 @@ use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
 use std::time::Duration;
-use tracing::info;
+use tracing::{debug, info};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArchitectGPT {
     agent: AgentGPT,
     client: Client,
@@ -57,7 +57,7 @@ impl ArchitectGPT {
 
         tasks.scope = Some(gemini_response);
         self.agent.update(Status::Completed);
-        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(gemini_response)
     }
@@ -71,7 +71,7 @@ impl ArchitectGPT {
         let gemini_response: Vec<Cow<'static, str>> =
             match self.client.generate_content(&request).await {
                 Ok(response) => {
-                    info!(
+                    debug!(
                         "[*] {:?}: Got Response {:?}",
                         self.agent.position(),
                         response
@@ -83,7 +83,7 @@ impl ArchitectGPT {
 
         tasks.urls = Some(gemini_response);
         self.agent.update(Status::InUnitTesting);
-        info!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
         Ok(())
     }
@@ -99,10 +99,16 @@ impl Functions for ArchitectGPT {
     }
 
     async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
+        info!(
+            "[*] {:?}: Executing tasks: {:?}",
+            self.agent.position(),
+            tasks.clone()
+        );
+
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
                 Status::InDiscovery => {
-                    info!("[*] {:?}: InDiscovery", self.agent.position());
+                    debug!("[*] {:?}: InDiscovery", self.agent.position());
 
                     let scope: Scope = self.get_scope(tasks).await?;
 
@@ -115,7 +121,10 @@ impl Functions for ArchitectGPT {
                 Status::InUnitTesting => {
                     let mut exclude: Vec<Cow<'static, str>> = Vec::new();
 
-                    let urls: &Vec<Cow<'static, str>> = tasks.urls.as_ref().expect("No URLS found");
+                    let urls: &Vec<Cow<'static, str>> = &tasks
+                        .urls
+                        .as_ref()
+                        .map_or_else(Vec::default, |url| url.to_vec());
 
                     for url in urls {
                         info!(
