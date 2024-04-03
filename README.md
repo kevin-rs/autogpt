@@ -1,6 +1,10 @@
 # 🤖 AutoGPT
 
+<div align="center">
+
 ![banner](https://github.com/kevin-rs/kevin/assets/62179149/91c83cbe-07b5-415e-bede-fec973a09d03)
+
+</div>
 
 AutoGPT is a groundbreaking framework that lets you easily create and manage agents for different jobs. It's blazingly fast and can handle lots of tasks. With AutoGPT, you can automate things quickly and efficiently.
 
@@ -13,6 +17,53 @@ AutoGPT is a groundbreaking framework that lets you easily create and manage age
 - **SDK Integration**: Software development kit for integrating AutoGPT into existing projects.
 
 ## 🔄 Workflow
+
+```sh
+                       +------------------------------------+
+                       |                User                |
+                       |             Provides               |
+                       |          Project Prompt            |
+                       +------------------+-----------------+
+                                          |
+                                          v
+                       +------------------+-----------------+
+                       |               ManagerGPT           |
+                       |            Distributes Tasks       |
+                       |          to Backend, Frontend,     |
+                       |           Designer, Architect      |
+                       +------------------+-----------------+
+                                          |
+                                          v
+   +--------------------------+-----------+----------+----------------------+
+   |                          |                      |                      |
+   |                          v                      v                      v
++--+---------+       +--------+--------+       +-----+-------+       +-----+-------+
+|  Backend   |       |    Frontend     |       |  Designer   |       |  Architect  |
+|    GPT     |       |      GPT        |<----->|    GPT      |       |  GPT        |
+|            |       |                 |       |             |       |             |
++--+---------+       +-----------------+       +-------------+       +-------------+
+   |                          |                       |                       |
+   v                          v                       v                       v
+Executes Assigned Tasks     Executes Assigned Tasks      Executes Assigned Tasks
+  (Backend Logic)          (Frontend Logic)                  (Architect Logic)
+   |                                                  |                       |
+   +-------------------------------------+------------+-----------------------+
+                                         |
+                                         v
+                      +------------------+-----------------+
+                      |               ManagerGPT           |
+                      |       Collects and Consolidates    |
+                      |        Results from Agents         |
+                      +------------------+-----------------+
+                                         |
+                                         v
+                      +------------------+-----------------+
+                      |                User                |
+                      |            Receives Final          |
+                      |             Output from            |
+                      |            ManagerGPT              |
+                      +------------------------------------+
+```
 
 - ✍️ **User Input**: Provide a project's goal (e.g. "Develop a full stack app that fetches today's weather. Use the axum web framework for the backend and the Yew rust framework for the frontend.").
   
@@ -47,53 +98,6 @@ autogpt run <agent-name>
 ## 🤖 Available Agents
 
 ![agent](https://github.com/kevin-rs/kevin/assets/62179149/abfb7e37-b1d0-45ec-916e-dc3032eafdb3)
-
-```sh
-                       +------------------------------------+
-                       |                User                |
-                       |             Provides               |
-                       |          Project Prompt            |
-                       +------------------+-----------------+
-                                          |
-                                          v
-                       +------------------+-----------------+
-                       |               ManagerGPT           |
-                       |            Distributes Tasks       |
-                       |          to Backend, Frontend,     |
-                       |           Designer, Architect      |
-                       +------------------+-----------------+
-                                          |
-                                          v
-   +--------------------------+-----------+----------+----------------------+
-   |                          |                      |                      |
-   |                          v                      v                      v
-+--+---------+       +--------+--------+       +-----+-------+       +-----+-------+
-|  Backend   |       |    Frontend     |       |  Designer   |       |  Architect  |
-|    GPT     |       |      GPT        |       |    GPT      |       |  GPT        |
-|            |       |                 |       |             |       |             |
-+--+---------+       +-----------------+       +-------------+       +-------------+
-   |                          |                       |                       |
-   v                          v                       v                       v
-Executes Assigned Tasks     Executes Assigned Tasks      Executes Assigned Tasks
-  (Backend Logic)          (Frontend Logic)                  (Architect Logic)
-   |                                                  |                       |
-   +-------------------------------------+------------+-----------------------+
-                                         |
-                                         v
-                      +------------------+-----------------+
-                      |               ManagerGPT           |
-                      |       Collects and Consolidates    |
-                      |        Results from Agents         |
-                      +------------------+-----------------+
-                                         |
-                                         v
-                      +------------------+-----------------+
-                      |                User                |
-                      |            Receives Final          |
-                      |             Output from            |
-                      |            ManagerGPT              |
-                      +------------------------------------+
-```
 
 Autogpt consists of 5 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
 
