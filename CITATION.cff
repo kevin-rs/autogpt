@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using these metadata.
+title: AutoGPT
+abstract: World's first, most capable, blazingly fast, and extremely flexible pure Rust agentic framework.
+authors:
+  - name: "Mahmoud Harmouch"
+version: v0.0.1
+date-released: "2024-04-06"
+license: MIT
+repository-code: "https://github.com/kevin-rs/autogpt"
