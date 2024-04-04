@@ -227,6 +227,8 @@ Upon receiving instructions from ManagerGPT, BackendGPT will:
 - Integrate external APIs or services to fetch real-time weather information.
 - Ensure data security and integrity, implementing authentication and authorization mechanisms as needed.
 
+![BackendGPT code](https://github.com/kevin-rs/kevin/assets/62179149/a9ec06e0-74be-4c0e-8e3a-751eb0389c90)
+
 ---
 
 ### 5. 🖥️ FrontendGPT
