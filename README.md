@@ -15,7 +15,7 @@
 [![Share On Meta](https://img.shields.io/badge/share%20on-meta-1976D2?logo=meta)](https://www.facebook.com/sharer/sharer.php?u=https://github.com/kevin-rs/autogpt)
 [![Share On Linkedin](https://img.shields.io/badge/share%20on-linkedin-3949AB?logo=linkedin)](https://www.linkedin.com/shareArticle?url=https://github.com/kevin-rs/autogpt&title=World%27s%20First%2C%20Multimodal%2C%20Zero%20Shot%2C%20Most%20General%2C%20Most%20Capable%2C%20Blazingly%20Fast%2C%20and%20Extremely%20Flexible%20Pure%20Rust%20AI%20Agentic%20Framework.)
 
-![banner](https://github.com/kevin-rs/kevin/assets/62179149/91c83cbe-07b5-415e-bede-fec973a09d03)
+![banner](https://github.com/kevin-rs/kevin/assets/62179149/8b54dea8-2231-4509-8c18-10ec414578d2)
 
 </div>
 
