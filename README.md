@@ -192,8 +192,10 @@ ArchitectGPT is responsible for designing the overall structure and architecture
 
 Upon receiving instructions from ManagerGPT, ArchitectGPT will:
 
-- Determine the technologies and frameworks needed to realize the project goals and arcitecture of the project using diagrams library.
+- Determine the technologies and frameworks needed to realize the project goals and arcitecture of the project using the [diagrams](https://github.com/mingrammer/diagrams) library.
 - Design the data flow and communication between backend and frontend components to ensure seamless operation.
+
+![weather_forecast_website_diagram](https://github.com/kevin-rs/kevin/assets/62179149/d94b852c-30d4-4699-a7b1-b8cc225d9bd3)
 
 ---
 
