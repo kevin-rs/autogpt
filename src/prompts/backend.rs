@@ -1,5 +1,7 @@
 pub(crate) const WEBSERVER_CODE_PROMPT: &str = r#"
-Your task is to generate backend code for a web server.
+Your task is to generate backend code for a web server. Generate all your code inside one single file/module.
+Don't assume there are module outside the main file, like "from .database import engine, get_db". Generate their
+implementation within the same module. So don't import anything from the current directory. Dont generate "from .module import function"
 
 Instructions:
 - The user will provide a project description and a code template for a website backend build.
@@ -37,7 +39,9 @@ async fn generate_content(
 "#;
 
 pub(crate) const IMPROVED_WEBSERVER_CODE_PROMPT: &str = r#"
-Your task is to improve the provided backend code for a web server.
+Your task is to improve the provided backend code for a web server. Generate all your code inside one single file/module.
+Don't assume there are module outside the main file, like "from .database import engine, get_db". Generate their
+implementation within the same module. So don't import anything from the current directory. Dont generate "from .module import function"
 
 Instructions:
 - The user will provide a project description and a code template for a website backend build.
@@ -50,7 +54,9 @@ Instructions:
 "#;
 
 pub(crate) const FIX_CODE_PROMPT: &str = r#"
-Your task is to fix the code with removed bugs.
+Your task is to fix the code with removed bugs. Generate all your code inside one single file/module.
+Don't assume there are module outside the main file, like "from .database import engine, get_db". Generate their
+implementation within the same module. So don't import anything from the current directory. Dont generate "from .module import function"
 
 Instructions:
 - The user will provide a broken code and the identified errors or bugs.

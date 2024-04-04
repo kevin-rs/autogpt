@@ -1,10 +1,9 @@
 #[cfg(feature = "mail")]
 use autogpt::agents::mailer::MailerGPT;
-use tracing::debug;
-use tracing_subscriber::{filter, fmt, prelude::*, reload};
-use autogpt::traits::functions::Functions;
 use autogpt::common::utils::Scope;
 use autogpt::common::utils::Tasks;
+use autogpt::traits::functions::Functions;
+use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
 #[cfg(feature = "mail")]
@@ -33,6 +32,5 @@ async fn test_mailer_gpt() {
         backend_code: None,
         api_schema: None,
     };
-
     let _ = mailer.execute(&mut tasks, true, 3).await;
 }

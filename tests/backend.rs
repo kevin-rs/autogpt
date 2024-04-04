@@ -1,5 +1,8 @@
+#![allow(unused)]
+
 use autogpt::agents::backend::BackendGPT;
 use autogpt::common::utils::{Scope, Tasks};
+use autogpt::traits::functions::Functions;
 use std::fs;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
@@ -17,7 +20,7 @@ async fn test_generate_backend_code() {
 
     let mut backend_gpt = BackendGPT::new(objective, position, "python");
     let mut tasks = Tasks {
-        description: "Generate a todo crud app using Axum.".into(),
+        description: "Generate a todo crud app using python FastAPI.".into(),
         scope: Some(Scope {
             crud: true,
             auth: true,
@@ -248,11 +251,10 @@ async fn tests_backend_dev_one() {
     let objective = "Expertise lies in writing backend code for web servers and JSON databases";
     let position = "Backend Developer";
 
-    let _backend_gpt = BackendGPT::new(objective, position, "python");
+    let mut backend_gpt = BackendGPT::new(objective, position, "python");
 
-    let _tasks = Tasks {
-        description:
-            "Build a website for an e-commerce platform with payment integration using Axum.".into(),
+    let mut tasks = Tasks {
+        description: "Generate a todo crud app using python FastAPI.".into(),
         scope: Some(Scope {
             crud: true,
             auth: true,

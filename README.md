@@ -19,7 +19,7 @@
 
 </div>
 
-AutoGPT is a groundbreaking framework that lets you easily create and manage agents for different jobs. It's blazingly fast and can handle lots of tasks. With AutoGPT, you can automate things quickly and efficiently.
+AutoGPT is a groundbreaking framework that lets you easily create and manage AI agents for different jobs. It's blazingly fast and can handle lots of tasks.
 
 ## 🚀 Features
 
@@ -100,6 +100,30 @@ cargo install autogpt
 
 ## 🛠️ CLI Usage
 
+The Command Line Interface (CLI) provides a convenient means to interact with the code generation system. Before utilizing the CLI effectively, it's essential to set up the necessary environment variables for seamless operation.
+
+### Environment Variables Setup
+
+To configure the CLI and or the SDK environment, follow these steps:
+
+1. Define Workspace Paths: Set up the paths for backend, frontend, and architect workspaces by setting the following environment variables:
+   
+   ```sh
+   export BACKEND_WORKSPACE=workspace/backend
+   export FRONTEND_WORKSPACE=workspace/frontend
+   export ARCHITECT_WORKSPACE=workspace/architect
+   ```
+
+   These variables guide the agents on where to generate the code within your project structure.
+
+1. API Key Configuration: Additionally, you need to set up the Gemini API key by setting the following environment variable:
+
+   ```sh
+   export GEMINI_API_KEY=<your_gemini_api_key>
+   ```
+
+   To obtain your API key, navigate to [Google AI Studio](https://aistudio.google.com/app/apikey) and generate it there. This key allows autogpt to communicate with Gemini API.
+
 ### Running Agents
 
 Execute agents to perform tasks using the `run` command:
@@ -120,12 +144,43 @@ ManagerGPT serves as the orchestrator of your project, directing the other agent
 
 #### How ManagerGPT Works?
 
-Let's say you want to develop a full-stack app that fetches today's weather in Python using FastAPI. ManagerGPT will break down this task into specific steps for each agent:
+Let's say you want to develop a full-stack app that fetches today's weather in Python using FastAPI. ManagerGPT simplifies this process by breaking it down into specific tasks for each specialized agent:
 
-- For ArchitectGPT: ManagerGPT will instruct ArchitectGPT to design the overall structure of the application, including backend and frontend components, using Python and FastAPI.
-- For DesignerGPT: ManagerGPT will guide DesignerGPT to create a user-friendly interface for displaying the weather forecast.
-- For BackendGPT: ManagerGPT will assign BackendGPT to implement the backend logic using FastAPI, fetching weather data from external sources.
-- For FrontendGPT: ManagerGPT will direct FrontendGPT to develop the frontend interface for users to interact with and visualize the weather data.
+- **ArchitectGPT**: ManagerGPT instructs ArchitectGPT to design the application's structure, encompassing both backend and frontend components, utilizing Python and FastAPI:
+
+```sh
+[*] "ManagerGPT": Executing task: "Develop a full stack app that fetches today's weather in python using FastAPI."
+```
+
+ManagerGPT articulates the project goal and communicates it to the ArchitectGPT through Gemini API, which then generates specific steps for architecting the application:
+
+```sh
+[*] "ArchitectGPT": Executing tasks: Tasks { description: "- Design the user interface for the weather app, including input fields for location and a display area for weather details.\n- Implement a function to fetch current weather data from a weather API in Python.\n- Create a FastAPI endpoint that calls the weather fetching function and returns the weather data in JSON format.\n- Integrate the FastAPI endpoint with the front end to display the fetched weather data on the user interface.\n- Handle error scenarios and provide appropriate user feedback.", scope: None, urls: None, frontend_code: None, backend_code: None, api_schema: None }
+```
+
+- **DesignerGPT**: ManagerGPT guides DesignerGPT in crafting a user-friendly interface tailored for presenting the weather forecast. 
+
+```sh
+[*] "DesignerGPT": Executing tasks: Tasks { description: "- Utilize FastAPI in Python to develop a user interface for the weather app, integrating a location input field and display section for weather data.\n- Step 1: Define the layout and structure of the user interface, ensuring it's user-friendly and visually appealing.\n- Step 2: Implement the location search functionality, enabling users to input their desired location and retrieve relevant weather information.", scope: None, urls: None, frontend_code: None, backend_code: None, api_schema: None }
+```
+
+- **BackendGPT**: ManagerGPT assigns BackendGPT to implement the backend logic using FastAPI, responsible for fetching weather data from external sources.
+
+```sh
+[*] "BackendGPT": Executing tasks: Tasks { description: "- Using FastAPI in Python, create a backend for a weather application featuring a user interface with a location input field and weather data display section.\n- Step 1: Design and develop the user interface, ensuring it's user-friendly and visually appealing.\n- Step 2: Implement the location search functionality, enabling users to input their desired location and retrieve relevant weather information.", scope: None, urls: None, frontend_code: None, backend_code: None, api_schema: None }
+```
+
+- **FrontendGPT**: ManagerGPT directs FrontendGPT to develop the frontend interface, enabling users to interact with and visualize the weather data.
+
+```sh
+[*] "FrontendGPT": Executing tasks: Tasks { description: "- Using FastAPI in Python, create a user interface for a weather application.\n- Step 1: Create a user-friendly layout for displaying weather information.\n- Step 2: Implement FastAPI endpoints to fetch and display weather data.", scope: None, urls: None, frontend_code: None, backend_code: None, api_schema: None }
+```
+
+Finally, ManagerGPT aggregates the outcomes from all GPTs, consolidating the generated tasks into a coherent project plan. Here's the summary of the completed tasks:
+
+```sh
+[*] "ManagerGPT": Completed Tasks: Tasks { description: "- Utilizing FastAPI and Python, develop a user-friendly UI for displaying weather data.\n- Step 1: Use HTML, CSS, and JavaScript to design and develop web pages that showcase weather data effectively.\n- Step 2: Define routes in FastAPI for weather data retrieval and display, ensuring seamless integration between frontend and backend.", scope: None, urls: None, frontend_code: Some("from fastapi import FastAPI, Request\nfrom fastapi.responses import JSONResponse\nimport requests\n\napp = FastAPI()\n\n@app.get(\"/weather/{city_name}\")\nasync def get_weather(city_name: str, request: Request):\n    url = f\"http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid=YOUR_API_KEY\"\n    response = requests.get(url)\n    if response.status_code == 200:\n        data = response.json()\n        return JSONResponse(content={\n            \"city_name\": data[\"name\"],\n            \"temperature\": data[\"main\"][\"temp\"] - 273.15,\n            \"humidity\": data[\"main\"][\"humidity\"],\n            \"wind_speed\": data[\"wind\"][\"speed\"]\n        })\n    else:\n        return JSONResponse(content={\"error\": \"Could not fetch weather data\"}, status_code=response.status_code)"), backend_code:  Some("from fastapi import FastAPI, Request, Form\nfrom fastapi.templating import Jinja2Templates\nfrom fastapi.responses import HTMLResponse\nimport requests\n\napp = FastAPI()\ntemplates = Jinja2Templates(directory=\"templates\")\n\n@app.get(\"/\", response_class=HTMLResponse)\nasync def index(request: Request):\n    return templates.TemplateResponse(\"index.html\", {\"request\": request})\n\n@app.post(\"/weather\", response_class=HTMLResponse)\nasync def weather(request: Request, city: str = Form(...)):\n    url = f\"https://api.openweathermap.org/data/2.5/weather?q={city}&appid=YOUR_API_KEY\"\n    response = requests.get(url)\n    data = response.json()\n    return templates.TemplateResponse(\"weather.html\", {\"request\": request, \"data\": data})"), api_schema: None }
+```
 
 ---
 
@@ -137,9 +192,8 @@ ArchitectGPT is responsible for designing the overall structure and architecture
 
 Upon receiving instructions from ManagerGPT, ArchitectGPT will:
 
-- Determine the technologies and frameworks needed to realize the project goals, such as Python and FastAPI.
+- Determine the technologies and frameworks needed to realize the project goals and arcitecture of the project using diagrams library.
 - Design the data flow and communication between backend and frontend components to ensure seamless operation.
-- Define the project's scope and establish a roadmap for development, breaking down tasks into manageable steps.
 
 ---
 
@@ -153,7 +207,7 @@ DesignerGPT transforms ideas into visually stunning designs. Whether it's crafti
 
 When tasked by ManagerGPT, DesignerGPT will:
 
-- Create mockups and wireframes of the application's interface, ensuring a user-friendly and intuitive design.
+- Create mockups and wireframes of the application's interface using imgget AI api, ensuring a user-friendly and intuitive design.
 - Select colors, fonts, and layouts that align with your project's branding and aesthetic.
 - TODO: Collaborate with other agents to integrate design elements seamlessly into the final product.
 
@@ -167,7 +221,7 @@ BackendGPT handles all things related to server-side logic and data processing. 
 
 Upon receiving instructions from ManagerGPT, BackendGPT will:
 
-- Develop the backend infrastructure using FastAPI, implementing endpoints for retrieving weather data and handling user requests.
+- Develop the backend using FastAPI, implementing endpoints for retrieving weather data and handling user requests.
 - Integrate external APIs or services to fetch real-time weather information.
 - Ensure data security and integrity, implementing authentication and authorization mechanisms as needed.
 
@@ -184,11 +238,12 @@ When prompted by ManagerGPT, FrontendGPT will:
 - Develop the frontend interface using modern web technologies such as HTML, CSS, and JavaScript, complementing the backend's functionality.
 - Implement responsive design principles to ensure a seamless experience across devices and screen sizes.
 - TODO: Collaborate with DesignerGPT to translate design mockups into code, bringing the application's visual identity to fruition.
+
 ---
 
 ### 6. 💌 MailerGPT (Optional) Feature Flag: `mail`
 
-MailerGPT streamlines your communication processes by automating the creation and distribution of emails. With its advanced capabilities, MailerGPT ensures that your messages are delivered effectively, saving time and resources while maintaining professionalism.
+MailerGPT streamlines your communication processes by automating the creation and distribution of emails.
 
 #### How MailerGPT Works
 
@@ -197,9 +252,9 @@ MailerGPT operates by:
 - Reading your emails and extracting relevant information based on the user input.
 - Generating and sending personalized email content tailored to specific recipients or target audiences.
 
-With Autogpt's team of specialized agents working together, your project is in capable hands. Simply provide a simple project goal, and let Autogpt handle the rest!
-
 ---
+
+With Autogpt's team of specialized agents working together, your project is in capable hands. Simply provide a simple project goal, and let Autogpt handle the rest!
 
 ## 📚 Documentation
 

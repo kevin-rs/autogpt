@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use crate::agents::agent::AgentGPT;
 use crate::agents::architect::ArchitectGPT;
 use crate::agents::backend::BackendGPT;
@@ -169,6 +171,12 @@ impl ManagerGPT {
 
             let _agent_res = agent.execute(&mut self.tasks, execute, max_tries).await;
         }
+
+        info!(
+            "[*] {:?}: Completed Tasks: {:?}",
+            self.agent.position(),
+            self.tasks.clone()
+        );
 
         Ok(())
     }

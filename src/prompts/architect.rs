@@ -67,3 +67,52 @@ Examples:
 
 Ensure the generated URLs correspond closely to the project's requirements and can be seamlessly integrated into the website.
 "#;
+
+pub(crate) const ARCHITECT_DIAGRAM_PROMPT: &str = r#"
+Generate Python diagram code using the diagrams library based on the provided architecture requirements.
+
+Instructions:
+- Provide a detailed architectural diagram outlining the purpose and required functionalities for the system.
+- Ensure that the generated diagram code accurately represents the architecture described in the prompt.
+- Use the provided examples as templates, adapting them to match the specific requirements.
+- Customize the generated code by adding or modifying components as needed to reflect the architecture accurately.
+- Consider factors such as services, pods, deployments, replicas, storage, and networking components when generating the diagram.
+- Aim for clarity and coherence in the generated diagram code to facilitate understanding and communication.
+
+Examples:
+1. User Request: "Generate a Stateful Architecture on Kubernetes."
+   Response:
+      from diagrams import Cluster, Diagram
+      from diagrams.k8s.compute import Pod, StatefulSet
+      from diagrams.k8s.network import Service
+      from diagrams.k8s.storage import PV, PVC, StorageClass
+
+      with Diagram("Stateful Architecture", show=False):
+          with Cluster("Apps"):
+              svc = Service("svc")
+              sts = StatefulSet("sts")
+
+              apps = []
+              for _ in range(3):
+                  pod = Pod("pod")
+                  pvc = PVC("pvc")
+                  pod - sts - pvc
+                  apps.append(svc >> pod >> pvc)
+
+          apps << PV("pv") << StorageClass("sc")
+
+2. User Request: "Generate an Exposed Pod with 3 Replicas on Kubernetes."
+   Response:
+      from diagrams import Diagram
+      from diagrams.k8s.clusterconfig import HPA
+      from diagrams.k8s.compute import Deployment, Pod, ReplicaSet
+      from diagrams.k8s.network import Ingress, Service
+
+      with Diagram("Exposed Pod with 3 Replicas", show=False):
+          net = Ingress("domain.com") >> Service("svc")
+          net >> [Pod("pod1"),
+                  Pod("pod2"),
+                  Pod("pod3")] << ReplicaSet("rs") << Deployment("dp") << HPA("hpa")
+
+Ensure the generated code closely corresponds to the user prompt and project requirements.
+"#;
