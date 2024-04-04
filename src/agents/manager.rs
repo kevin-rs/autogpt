@@ -1,6 +1,7 @@
 use crate::agents::agent::AgentGPT;
 use crate::agents::architect::ArchitectGPT;
 use crate::agents::backend::BackendGPT;
+#[cfg(feature = "img")]
 use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
 use crate::common::utils::strip_code_blocks;
@@ -18,6 +19,7 @@ enum AgentType {
     Architect(ArchitectGPT),
     Backend(BackendGPT),
     Frontend(FrontendGPT),
+    #[cfg(feature = "img")]
     Designer(DesignerGPT),
 }
 
@@ -27,6 +29,7 @@ impl AgentType {
             AgentType::Architect(agent) => agent.execute(tasks, execute, max_tries).await,
             AgentType::Backend(agent) => agent.execute(tasks, execute, max_tries).await,
             AgentType::Frontend(agent) => agent.execute(tasks, execute, max_tries).await,
+            #[cfg(feature = "img")]
             AgentType::Designer(agent) => agent.execute(tasks, execute, max_tries).await,
         }
     }
@@ -97,6 +100,7 @@ impl ManagerGPT {
             "Creates innovative website designs and user experiences",
             "Lead UX/UI Designer",
         )));
+        #[cfg(feature = "img")]
         self.add_agent(AgentType::Designer(DesignerGPT::new(
             "Creates innovative website designs and user experiences",
             "Web wireframes and web UIs",

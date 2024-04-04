@@ -53,12 +53,12 @@ AutoGPT is a groundbreaking framework that lets you easily create and manage age
 +--+---------+       +--------+--------+       +-----+-------+       +-----+-------+
 |  Backend   |       |    Frontend     |       |  Designer   |       |  Architect  |
 |    GPT     |       |      GPT        |<----->|    GPT      |       |  GPT        |
-|            |       |                 |       |             |       |             |
+|            |       |                 |       |  (Optional) |       |             |
 +--+---------+       +-----------------+       +-------------+       +-------------+
    |                          |                       |                       |
    v                          v                       v                       v
-Executes Assigned Tasks     Executes Assigned Tasks      Executes Assigned Tasks
-  (Backend Logic)          (Frontend Logic)                  (Architect Logic)
+Executes Assigned Tasks     Executes Assigned Tasks           Executes Assigned Tasks
+  (Backend Logic)          (Frontend Logic)                        (Architect Logic)
    |                                                  |                       |
    +-------------------------------------+------------+-----------------------+
                                          |
@@ -102,7 +102,7 @@ cargo install autogpt
 
 ### Running Agents
 
-Execute agents to perform tasks using the `run-agent` command:
+Execute agents to perform tasks using the `run` command:
 
 ```bash
 autogpt run <agent-name>
@@ -112,7 +112,7 @@ autogpt run <agent-name>
 
 ![agent](https://github.com/kevin-rs/kevin/assets/62179149/abfb7e37-b1d0-45ec-916e-dc3032eafdb3)
 
-Autogpt consists of 5 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
+Autogpt consists of 6 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
 
 ### 1. 🎩 ManagerGPT
 
@@ -143,9 +143,11 @@ Upon receiving instructions from ManagerGPT, ArchitectGPT will:
 
 ---
 
-### 3. 🎨 DesignerGPT
+### 3. 🎨 DesignerGPT (Optional) Feature Flag: `img`
 
 DesignerGPT transforms ideas into visually stunning designs. Whether it's crafting sleek user interfaces or designing captivating user experiences, DesignerGPT brings your project to life with style.
+
+![DesignerGPT sample output](https://github.com/kevin-rs/kevin/assets/62179149/356cec29-e779-4f95-81d8-498ef07c1f3a)
 
 #### How DesignerGPT Works
 
@@ -182,6 +184,18 @@ When prompted by ManagerGPT, FrontendGPT will:
 - Develop the frontend interface using modern web technologies such as HTML, CSS, and JavaScript, complementing the backend's functionality.
 - Implement responsive design principles to ensure a seamless experience across devices and screen sizes.
 - TODO: Collaborate with DesignerGPT to translate design mockups into code, bringing the application's visual identity to fruition.
+---
+
+### 6. 💌 MailerGPT (Optional) Feature Flag: `mail`
+
+MailerGPT streamlines your communication processes by automating the creation and distribution of emails. With its advanced capabilities, MailerGPT ensures that your messages are delivered effectively, saving time and resources while maintaining professionalism.
+
+#### How MailerGPT Works
+
+MailerGPT operates by:
+
+- Reading your emails and extracting relevant information based on the user input.
+- Generating and sending personalized email content tailored to specific recipients or target audiences.
 
 With Autogpt's team of specialized agents working together, your project is in capable hands. Simply provide a simple project goal, and let Autogpt handle the rest!
 

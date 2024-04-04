@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 use anyhow::Result;
+#[cfg(feature = "img")]
 use autogpt::agents::designer::DesignerGPT;
 use autogpt::common::utils::{Status, Tasks};
 use autogpt::traits::agent::Agent;
@@ -8,6 +9,7 @@ use autogpt::traits::functions::Functions;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
+#[cfg(feature = "img")]
 async fn test_generate_image_from_text() -> Result<()> {
     let filter = filter::LevelFilter::INFO;
     let (filter, _reload_handle) = reload::Layer::new(filter);
@@ -36,6 +38,7 @@ async fn test_generate_image_from_text() -> Result<()> {
 }
 
 #[tokio::test]
+#[cfg(feature = "img")]
 async fn test_generate_text_from_image() -> Result<()> {
     let objective = "Crafts stunning web design layouts";
     let position = "Web Designer";
@@ -48,6 +51,7 @@ async fn test_generate_text_from_image() -> Result<()> {
 }
 
 #[tokio::test]
+#[cfg(feature = "img")]
 async fn test_execute_agent() -> Result<()> {
     let objective = "Crafts stunning web design layouts";
     let position = "Web Designer";
