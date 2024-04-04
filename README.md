@@ -134,11 +134,11 @@ autogpt run <agent-name>
 
 ## 🤖 Available Agents
 
-![agent](https://github.com/kevin-rs/kevin/assets/62179149/abfb7e37-b1d0-45ec-916e-dc3032eafdb3)
-
 Autogpt consists of 6 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
 
 ### 1. 🎩 ManagerGPT
+
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/fc7fb72b-6f45-4c35-99ff-5c0f8e7d54cf" align="left" alt="manager" width="64" />
 
 ManagerGPT serves as the orchestrator of your project, directing the other agents to execute tasks based on your input. When you provide a project prompt, ManagerGPT divides it into tasks for BackendGPT, FrontendGPT, DesignerGPT, and ArchitectGPT.
 
@@ -186,6 +186,8 @@ Finally, ManagerGPT aggregates the outcomes from all GPTs, consolidating the gen
 
 ### 2. 👷‍♀️ ArchitectGPT
 
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/91a4868a-093f-4c96-89fc-5447e6f904f1" align="left" alt="architect" width="64" />
+
 ArchitectGPT is responsible for designing the overall structure and architecture of your application. ArchitectGPT will create the foundation upon which your app will be built.
 
 #### How ArchitectGPT Works
@@ -201,9 +203,9 @@ Upon receiving instructions from ManagerGPT, ArchitectGPT will:
 
 ### 3. 🎨 DesignerGPT (Optional) Feature Flag: `img`
 
-DesignerGPT transforms ideas into visually stunning designs. Whether it's crafting sleek user interfaces or designing captivating user experiences, DesignerGPT brings your project to life with style.
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/8f7ec0bd-392c-4263-a700-b3012d395479" align="left" alt="designer" width="64" />
 
-![DesignerGPT sample output](https://github.com/kevin-rs/kevin/assets/62179149/356cec29-e779-4f95-81d8-498ef07c1f3a)
+DesignerGPT transforms ideas into visually stunning designs. Whether it's crafting sleek user interfaces or designing captivating user experiences, DesignerGPT brings your project to life with style.
 
 #### How DesignerGPT Works
 
@@ -213,9 +215,13 @@ When tasked by ManagerGPT, DesignerGPT will:
 - Select colors, fonts, and layouts that align with your project's branding and aesthetic.
 - TODO: Collaborate with other agents to integrate design elements seamlessly into the final product.
 
+![DesignerGPT sample output](https://github.com/kevin-rs/kevin/assets/62179149/356cec29-e779-4f95-81d8-498ef07c1f3a)
+
 ---
 
 ### 4. ⚙️ BackendGPT
+
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/74819200-83d5-498a-9a43-658096145611" align="left" alt="backend" width="64" />
 
 BackendGPT handles all things related to server-side logic and data processing. From database management to API integration, BackendGPT ensures that your application's backend is robust and efficient.
 
@@ -233,6 +239,8 @@ Upon receiving instructions from ManagerGPT, BackendGPT will:
 
 ### 5. 🖥️ FrontendGPT
 
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/684da3ce-f36c-4e2e-a315-0a834ba39539" align="left" alt="frontend" width="64" />
+
 FrontendGPT will craft engaging and interactive experiences for your application's users. With a keen eye for design and a knack for coding, FrontendGPT brings your designs to life in the browser.
 
 #### How FrontendGPT Works
@@ -246,6 +254,8 @@ When prompted by ManagerGPT, FrontendGPT will:
 ---
 
 ### 6. 💌 MailerGPT (Optional) Feature Flag: `mail`
+
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/fedaf721-20b4-43e6-bdb9-ef3f87430ec3" align="left" alt="mailer" width="64" />
 
 MailerGPT streamlines your communication processes by automating the creation and distribution of emails.
 
