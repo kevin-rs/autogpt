@@ -1,6 +1,5 @@
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{similarity, Status, Tasks};
-use crate::prompts::designer::{STABILITY_PROMPT, WEB_DESIGNER_PROMPT};
+use crate::common::utils::{Status, Tasks};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
@@ -23,7 +22,9 @@ impl MailerGPT {
         let client_secret = var("NYLAS_CLIENT_SECRET").unwrap_or_default().to_owned();
         let access_token = var("NYLAS_ACCESS_TOKEN").unwrap_or_default().to_owned();
 
-        let nylas_client = Nylas::new(&client_id, &client_secret, Some(&access_token)).await.unwrap();
+        let nylas_client = Nylas::new(&client_id, &client_secret, Some(&access_token))
+            .await
+            .unwrap();
 
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro".to_string())
@@ -41,7 +42,6 @@ impl MailerGPT {
     }
 
     pub async fn get_latest_emails(&mut self) -> Result<Vec<Message>> {
-        // Call the all method to retrieve all messages
         let messages = self.nylas_client.messages().all().await.unwrap();
 
         info!(
@@ -50,7 +50,6 @@ impl MailerGPT {
             messages.len()
         );
 
-        // retrun last 5 msgs
         Ok(messages[95..].to_vec())
     }
 
@@ -58,10 +57,11 @@ impl MailerGPT {
         let emails = self.get_latest_emails().await.unwrap();
 
         // TODO: Parse emails bodies cz Gemini ain't geminiin'
-        let gemini_response: String = match self.client.generate_content(&format!(
-                "User Request:{}\n\nEmails:{:?}",
-                prompt, emails
-            )).await {
+        let gemini_response: String = match self
+            .client
+            .generate_content(&format!("User Request:{}\n\nEmails:{:?}", prompt, emails))
+            .await
+        {
             Ok(response) => response,
             Err(_err) => Default::default(),
         };
@@ -93,7 +93,8 @@ impl Functions for MailerGPT {
                 Status::InDiscovery => {
                     debug!("[*] {:?}: InDiscovery", self.agent.position());
 
-                    let generated_text = self.generate_text_from_emails(&tasks.description).await?;
+                    let _generated_text =
+                        self.generate_text_from_emails(&tasks.description).await?;
 
                     _count += 1;
                     self.agent.update(Status::Completed);

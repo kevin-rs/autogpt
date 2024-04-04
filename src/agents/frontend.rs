@@ -15,7 +15,7 @@ use std::io::Read;
 use std::process::Command;
 use std::process::Stdio;
 use std::time::Duration;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
 #[allow(unused)]
@@ -30,6 +30,49 @@ pub struct FrontendGPT {
 
 impl FrontendGPT {
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
+        let frontend_path = var("FRONTEND_WORKSPACE")
+            .unwrap_or("workspace/frontend".to_string())
+            .to_owned();
+
+        let npx_install = Command::new("npx")
+            .arg("create-react-app")
+            .arg(frontend_path.clone())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn();
+
+        match npx_install {
+            Ok(mut child) => match child.wait() {
+                Ok(status) => {
+                    if status.success() {
+                        debug!("React JS project initialized successfully!");
+                    } else {
+                        error!("Failed to initialize React JS project");
+                    }
+                }
+                Err(e) => {
+                    error!("Error waiting for process: {}", e);
+                }
+            },
+            Err(e) => {
+                error!("Error initializing React JS project: {}", e);
+            }
+        }
+
+        let cargo_new = Command::new("cargo")
+            .arg("new")
+            .arg(frontend_path.clone())
+            .spawn();
+
+        match cargo_new {
+            Ok(_) => debug!("Cargo project initialized successfully!"),
+            Err(e) => error!("Error initializing Cargo project: {}", e),
+        }
+
+        match fs::write(frontend_path.clone() + "/main.py", "") {
+            Ok(_) => debug!("File 'diagram.py' created successfully!"),
+            Err(e) => error!("Error creating file 'diagram.py': {}", e),
+        }
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro".to_string())
@@ -54,8 +97,8 @@ impl FrontendGPT {
     }
 
     pub async fn generate_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("FRONTEND_TEMPLATE_PATH")
-            .unwrap_or("frontend".to_string())
+        let path = var("FRONTEND_WORKSPACE")
+            .unwrap_or("workspace/frontend".to_string())
             .to_owned();
 
         let full_path = match self.language {
@@ -109,14 +152,14 @@ impl FrontendGPT {
     }
 
     pub async fn improve_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("FRONTEND_TEMPLATE_PATH")
-            .unwrap_or("frontend".to_string())
+        let path = var("FRONTEND_WORKSPACE")
+            .unwrap_or("workspace/frontend".to_string())
             .to_owned();
 
         let request: String = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
             IMPROVED_FRONTEND_CODE_PROMPT,
-            tasks.clone().frontend_code.unwrap(),
+            tasks.clone().frontend_code.unwrap_or_default(),
             tasks.description
         );
 
@@ -151,8 +194,8 @@ impl FrontendGPT {
     }
 
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("FRONTEND_TEMPLATE_PATH")
-            .unwrap_or("frontend".to_string())
+        let path = var("FRONTEND_WORKSPACE")
+            .unwrap_or("workspace/frontend".to_string())
             .to_owned();
 
         let request: String = format!(
@@ -210,8 +253,8 @@ impl Functions for FrontendGPT {
             self.agent.position(),
             tasks.clone()
         );
-        let path = var("FRONTEND_TEMPLATE_PATH")
-            .unwrap_or("frontend".to_string())
+        let path = var("FRONTEND_WORKSPACE")
+            .unwrap_or("workspace/frontend".to_string())
             .to_owned();
         while self.agent.status() != &Status::Completed {
             match &self.agent.status() {

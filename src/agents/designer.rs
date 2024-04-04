@@ -6,7 +6,8 @@ use crate::traits::functions::Functions;
 use anyhow::Result;
 use gems::utils::load_and_encode_image;
 use gems::Client;
-use getimg::{save_image, Client as ImgClient};
+use getimg::client::Client as ImgClient;
+use getimg::utils::save_image;
 use std::env::var;
 use tracing::{debug, info};
 
@@ -45,11 +46,20 @@ impl DesignerGPT {
     pub async fn generate_image_from_text(&mut self, tasks: &Tasks) -> Result<()> {
         let text_prompt: String =
             format!("{}\n\nUser Prompt: {}", STABILITY_PROMPT, tasks.description);
+        let negative_prompt = Some("Disfigured, cartoon, blurry");
 
         // Generate image from text prompt
         let text_response = self
             .img_client
-            .generate_image_from_text(&text_prompt, 1024, 1024, 4, "jpeg", Some(512))
+            .generate_image_from_text(
+                &text_prompt,
+                1024,
+                1024,
+                4,
+                "jpeg",
+                negative_prompt,
+                Some(512),
+            )
             .await?;
 
         // Save text response image to file

@@ -12,8 +12,9 @@ reqwest = { version = "0.12.2", features = ["json"] }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.115"
 tracing = "0.1.40"
-getimg = { path = "../getimg", optional = true }
+getimg = { version = "0.0.1", optional = true }
 nylas = { version = "0.0.8", optional = true }
+webbrowser = "0.8.13"
 
 [dev-dependencies]
 tokio = { version = "1.37.0", features = ["full"] }

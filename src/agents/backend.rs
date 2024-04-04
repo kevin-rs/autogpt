@@ -18,7 +18,8 @@ use std::borrow::Cow;
 use std::env::var;
 use std::fs;
 use std::time::Duration;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
+use webbrowser::{open_browser_with_options, Browser, BrowserOptions};
 
 #[derive(Debug, Clone)]
 pub struct BackendGPT {
@@ -32,6 +33,50 @@ pub struct BackendGPT {
 
 impl BackendGPT {
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
+        let backend_path = var("BACKEND_WORKSPACE")
+            .unwrap_or("workspace/backend".to_string())
+            .to_owned();
+
+        let npx_install = Command::new("npx")
+            .arg("create-react-app")
+            .arg(backend_path.clone())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn();
+
+        match npx_install {
+            Ok(mut child) => match child.wait() {
+                Ok(status) => {
+                    if status.success() {
+                        debug!("React JS project initialized successfully!");
+                    } else {
+                        error!("Failed to initialize React JS project");
+                    }
+                }
+                Err(e) => {
+                    error!("Error waiting for process: {}", e);
+                }
+            },
+            Err(e) => {
+                error!("Error initializing React JS project: {}", e);
+            }
+        }
+
+        let cargo_new = Command::new("cargo")
+            .arg("new")
+            .arg(backend_path.clone())
+            .spawn();
+
+        match cargo_new {
+            Ok(_) => debug!("Cargo project initialized successfully!"),
+            Err(e) => error!("Error initializing Cargo project: {}", e),
+        }
+
+        match fs::write(backend_path.clone() + "/main.py", "") {
+            Ok(_) => debug!("File 'diagram.py' created successfully!"),
+            Err(e) => error!("Error creating file 'diagram.py': {}", e),
+        }
+
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro".to_string())
@@ -56,8 +101,8 @@ impl BackendGPT {
     }
 
     pub async fn generate_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("BACKEND_TEMPLATE_PATH")
-            .unwrap_or("backend".to_string())
+        let path = var("BACKEND_WORKSPACE")
+            .unwrap_or("workspace/backend".to_string())
             .to_owned();
 
         let full_path = match self.language {
@@ -111,14 +156,14 @@ impl BackendGPT {
     }
 
     pub async fn improve_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("BACKEND_TEMPLATE_PATH")
-            .unwrap_or("backend".to_string())
+        let path = var("BACKEND_WORKSPACE")
+            .unwrap_or("workspace/backend".to_string())
             .to_owned();
 
         let request: String = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
             IMPROVED_WEBSERVER_CODE_PROMPT,
-            tasks.clone().backend_code.unwrap(),
+            tasks.clone().backend_code.unwrap_or_default(),
             tasks.description
         );
 
@@ -153,8 +198,8 @@ impl BackendGPT {
     }
 
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("BACKEND_TEMPLATE_PATH")
-            .unwrap_or("backend".to_string())
+        let path = var("BACKEND_WORKSPACE")
+            .unwrap_or("workspace/backend".to_string())
             .to_owned();
 
         let request: String = format!(
@@ -193,8 +238,8 @@ impl BackendGPT {
     }
 
     pub async fn get_routes_json(&mut self) -> Result<String> {
-        let path = var("BACKEND_TEMPLATE_PATH")
-            .unwrap_or("backend".to_string())
+        let path = var("BACKEND_WORKSPACE")
+            .unwrap_or("workspace/backend".to_string())
             .to_owned();
 
         let full_path = match self.language {
@@ -250,9 +295,18 @@ impl Functions for BackendGPT {
             self.agent.position(),
             tasks.clone()
         );
-        let path = var("BACKEND_TEMPLATE_PATH")
-            .unwrap_or("backend".to_string())
+
+        let backend_path = var("BACKEND_WORKSPACE")
+            .unwrap_or("workspace/backend".to_string())
             .to_owned();
+
+        if !execute {
+            let _ = open_browser_with_options(
+                Browser::Default,
+                "http://127.0.0.1:8000/docs",
+                BrowserOptions::new().with_suppress_output(false),
+            );
+        }
 
         while self.agent.status() != &Status::Completed {
             match &self.agent.status() {
@@ -296,7 +350,7 @@ impl Functions for BackendGPT {
                                     .arg("build")
                                     .arg("--release")
                                     .arg("--verbose")
-                                    .current_dir(&path);
+                                    .current_dir(&backend_path);
                                 let build_output = build_command
                                     .output()
                                     .expect("Failed to build the backend application");
@@ -308,7 +362,7 @@ impl Functions for BackendGPT {
                                         .arg("run")
                                         .arg("--release")
                                         .arg("--verbose")
-                                        .current_dir(&path)
+                                        .current_dir(&backend_path)
                                         .stdout(Stdio::piped())
                                         .stderr(Stdio::piped())
                                         .spawn()
@@ -323,7 +377,7 @@ impl Functions for BackendGPT {
                                     .arg(format!("{}s", 10))
                                     .arg("uvicorn")
                                     .arg("main:app")
-                                    .current_dir(&path)
+                                    .current_dir(&backend_path)
                                     .stdout(Stdio::piped())
                                     .stderr(Stdio::piped())
                                     .spawn()
@@ -335,7 +389,7 @@ impl Functions for BackendGPT {
                                     .arg(format!("{}s", 10))
                                     .arg("node")
                                     .arg("src/index.js")
-                                    .current_dir(&path)
+                                    .current_dir(&backend_path)
                                     .stdout(Stdio::piped())
                                     .stderr(Stdio::piped())
                                     .spawn()
@@ -344,7 +398,6 @@ impl Functions for BackendGPT {
                             }
                             _ => None,
                         };
-
                         if let Some(mut child) = result {
                             let _build_stdout =
                                 child.stdout.take().expect("Failed to capture build stdout");
@@ -419,7 +472,7 @@ impl Functions for BackendGPT {
 
                             let _ = child.kill();
 
-                            let backend_path = format!("{}/{}", path, "api.json");
+                            let backend_path = format!("{}/{}", backend_path, "api.json");
                             fs::write(backend_path, endpoints)?;
                             info!(
                             "[*] {:?}: Backend testing complete. Results written to 'api.json'...",
