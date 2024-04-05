@@ -98,11 +98,61 @@ Executes Assigned Tasks     Executes Assigned Tasks           Executes Assigned 
 
 ## 📦 Installation
 
-You can install AutoGPT cli using the following command:
+AutoGPT offers seamless integration with both Cargo and Docker for easy installation and usage.
+
+### ⚓ Using Cargo
+
+To install AutoGPT CLI via Cargo, execute the following command:
 
 ```bash
-cargo install autogpt --features=cli
+cargo install autogpt --all-features
 ```
+
+### 🐳 Using Docker
+
+To install and run the AutoGPT CLI via Docker, use the following command:
+
+```bash
+docker run -it --rm --name autogpt kevin-rs/autogpt:latest <agent-command>
+```
+
+## 📦 Build From Source
+
+Fork/Clone The Repo:
+
+```bash
+git clone https://github.com/kevin-rs/autogpt.git
+```
+
+Navigate to the autogpt directory:
+
+```bash
+cd autogpt
+```
+
+### ⚓ Using Cargo
+
+To run AutoGPT CLI via Cargo, execute:
+
+```bash
+cargo run --all-features -- <agent-name>
+```
+
+### 🐳 Using Docker
+
+Build the Docker container:
+
+```bash
+docker build -t autogpt .
+```
+
+Run the container:
+
+```bash
+docker run -i -t autogpt:latest
+```
+
+Utilizing Docker, you can encapsulate AutoGPT within a container, ensuring consistent and reproducible environments across all systems.
 
 ---
 
@@ -154,6 +204,12 @@ Execute agents to perform tasks using the `run` command:
 
 ```bash
 autogpt run <agent-name>
+```
+
+You can also run AutoGPT CLI using Docker:
+
+```bash
+docker run -it --rm --name autogpt kevin-rs/autogpt:latest <agent-name>
 ```
 
 ---
