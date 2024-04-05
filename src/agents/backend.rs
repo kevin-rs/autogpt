@@ -23,6 +23,7 @@ use webbrowser::{open_browser_with_options, Browser, BrowserOptions};
 
 #[derive(Debug, Clone)]
 pub struct BackendGPT {
+    workspace: Cow<'static, str>,
     agent: AgentGPT,
     client: Client,
     req_client: ReqClient,
@@ -33,13 +34,14 @@ pub struct BackendGPT {
 
 impl BackendGPT {
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
-        let backend_path = var("BACKEND_WORKSPACE")
-            .unwrap_or("workspace/backend".to_string())
-            .to_owned();
+        let workspace = var("AUTOGPT_WORKSPACE")
+            .unwrap_or("workspace/".to_string())
+            .to_owned()
+            + "backend";
 
         let npx_install = Command::new("npx")
             .arg("create-react-app")
-            .arg(backend_path.clone())
+            .arg(&workspace)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .spawn();
@@ -62,17 +64,14 @@ impl BackendGPT {
             }
         }
 
-        let cargo_new = Command::new("cargo")
-            .arg("new")
-            .arg(backend_path.clone())
-            .spawn();
+        let cargo_new = Command::new("cargo").arg("new").arg(&workspace).spawn();
 
         match cargo_new {
             Ok(_) => debug!("Cargo project initialized successfully!"),
             Err(e) => error!("Error initializing Cargo project: {}", e),
         }
 
-        match fs::write(backend_path.clone() + "/main.py", "") {
+        match fs::write(&(workspace.to_string() + "/main.py"), "") {
             Ok(_) => debug!("File 'diagram.py' created successfully!"),
             Err(e) => error!("Error creating file 'diagram.py': {}", e),
         }
@@ -91,6 +90,7 @@ impl BackendGPT {
             .unwrap();
 
         Self {
+            workspace: workspace.into(),
             agent,
             client,
             req_client,
@@ -101,9 +101,7 @@ impl BackendGPT {
     }
 
     pub async fn generate_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("BACKEND_WORKSPACE")
-            .unwrap_or("workspace/backend".to_string())
-            .to_owned();
+        let path = &self.workspace;
 
         let full_path = match self.language {
             "rust" => {
@@ -156,9 +154,7 @@ impl BackendGPT {
     }
 
     pub async fn improve_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("BACKEND_WORKSPACE")
-            .unwrap_or("workspace/backend".to_string())
-            .to_owned();
+        let path = &self.workspace;
 
         let request: String = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
@@ -198,7 +194,7 @@ impl BackendGPT {
     }
 
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("BACKEND_WORKSPACE")
+        let path = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/backend".to_string())
             .to_owned();
 
@@ -238,9 +234,7 @@ impl BackendGPT {
     }
 
     pub async fn get_routes_json(&mut self) -> Result<String> {
-        let path = var("BACKEND_WORKSPACE")
-            .unwrap_or("workspace/backend".to_string())
-            .to_owned();
+        let path = &self.workspace;
 
         let full_path = match self.language {
             "rust" => {
@@ -296,9 +290,7 @@ impl Functions for BackendGPT {
             tasks.clone()
         );
 
-        let backend_path = var("BACKEND_WORKSPACE")
-            .unwrap_or("workspace/backend".to_string())
-            .to_owned();
+        let path = &self.workspace.to_string();
 
         if !execute {
             let _ = open_browser_with_options(
@@ -350,7 +342,7 @@ impl Functions for BackendGPT {
                                     .arg("build")
                                     .arg("--release")
                                     .arg("--verbose")
-                                    .current_dir(&backend_path);
+                                    .current_dir(&path.to_string());
                                 let build_output = build_command
                                     .output()
                                     .expect("Failed to build the backend application");
@@ -362,7 +354,7 @@ impl Functions for BackendGPT {
                                         .arg("run")
                                         .arg("--release")
                                         .arg("--verbose")
-                                        .current_dir(&backend_path)
+                                        .current_dir(&path.to_string())
                                         .stdout(Stdio::piped())
                                         .stderr(Stdio::piped())
                                         .spawn()
@@ -377,7 +369,7 @@ impl Functions for BackendGPT {
                                     .arg(format!("{}s", 10))
                                     .arg("uvicorn")
                                     .arg("main:app")
-                                    .current_dir(&backend_path)
+                                    .current_dir(&path.to_string())
                                     .stdout(Stdio::piped())
                                     .stderr(Stdio::piped())
                                     .spawn()
@@ -389,7 +381,7 @@ impl Functions for BackendGPT {
                                     .arg(format!("{}s", 10))
                                     .arg("node")
                                     .arg("src/index.js")
-                                    .current_dir(&backend_path)
+                                    .current_dir(&path.to_string())
                                     .stdout(Stdio::piped())
                                     .stderr(Stdio::piped())
                                     .spawn()
@@ -472,8 +464,8 @@ impl Functions for BackendGPT {
 
                             let _ = child.kill();
 
-                            let backend_path = format!("{}/{}", backend_path, "api.json");
-                            fs::write(backend_path, endpoints)?;
+                            let backend_path = format!("{}/{}", path, "api.json");
+                            fs::write(&backend_path.to_string(), endpoints)?;
                             info!(
                             "[*] {:?}: Backend testing complete. Results written to 'api.json'...",
                             self.agent.position(),

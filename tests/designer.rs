@@ -45,7 +45,9 @@ async fn test_generate_text_from_image() -> Result<()> {
 
     let mut designer_agent = DesignerGPT::new(objective, position);
 
-    let _ = designer_agent.generate_text_from_image("img.jpg").await?;
+    let _ = designer_agent
+        .generate_text_from_image("workspace/designer/img.jpg")
+        .await?;
 
     Ok(())
 }

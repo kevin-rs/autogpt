@@ -20,6 +20,7 @@ use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
 pub struct ArchitectGPT {
+    workspace: Cow<'static, str>,
     agent: AgentGPT,
     client: Client,
     req_client: ReqClient,
@@ -27,20 +28,21 @@ pub struct ArchitectGPT {
 
 impl ArchitectGPT {
     pub fn new(objective: &'static str, position: &'static str) -> Self {
-        let architect_path = var("ARCHITECT_WORKSPACE")
-            .unwrap_or("workspace/architect".to_string())
-            .to_owned();
+        let workspace = var("AUTOGPT_WORKSPACE")
+            .unwrap_or("workspace/".to_string())
+            .to_owned()
+            + "architect";
 
-        if !Path::new(&architect_path).exists() {
-            match fs::create_dir_all(architect_path.clone()) {
-                Ok(_) => debug!("Directory '{}' created successfully!", architect_path),
-                Err(e) => error!("Error creating directory '{}': {}", architect_path, e),
+        if !Path::new(&workspace).exists() {
+            match fs::create_dir_all(workspace.clone()) {
+                Ok(_) => debug!("Directory '{}' created successfully!", workspace),
+                Err(e) => error!("Error creating directory '{}': {}", workspace, e),
             }
         } else {
-            debug!("Directory '{}' already exists.", architect_path);
+            debug!("Directory '{}' already exists.", workspace);
         }
 
-        match fs::write(architect_path.clone() + "/diagram.py", "") {
+        match fs::write(workspace.clone() + "/diagram.py", "") {
             Ok(_) => debug!("File 'diagram.py' created successfully!"),
             Err(e) => error!("Error creating file 'diagram.py': {}", e),
         }
@@ -59,6 +61,7 @@ impl ArchitectGPT {
             .unwrap();
 
         Self {
+            workspace: workspace.into(),
             agent,
             client,
             req_client,
@@ -145,9 +148,7 @@ impl Functions for ArchitectGPT {
             tasks.clone()
         );
 
-        let architect_path = var("ARCHITECT_WORKSPACE")
-            .unwrap_or("workspace/architect".to_string())
-            .to_owned();
+        let path = &(self.workspace.to_string() + "/diagram.py");
 
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
@@ -235,7 +236,7 @@ impl Functions for ArchitectGPT {
                     let python_code = self.generate_diagram(tasks).await?;
 
                     // Write the content to the file
-                    match fs::write(architect_path.clone() + "/diagram.py", python_code.clone()) {
+                    match fs::write(path, python_code.clone()) {
                         Ok(_) => debug!("File 'diagram.py' created successfully!"),
                         Err(e) => error!("Error creating file 'diagram.py': {}", e),
                     }
@@ -244,8 +245,8 @@ impl Functions for ArchitectGPT {
                         let run_python = Command::new("timeout")
                             .arg(format!("{}s", 10))
                             .arg("python3")
-                            .arg(architect_path.clone() + "/diagram.py")
-                            .current_dir(architect_path.clone())
+                            .arg(path)
+                            .current_dir(&(self.workspace.to_string()))
                             .stdout(Stdio::piped())
                             .stderr(Stdio::piped())
                             .spawn();
@@ -267,10 +268,7 @@ impl Functions for ArchitectGPT {
                                         .into();
                                     let python_code = self.generate_diagram(tasks).await?;
 
-                                    match fs::write(
-                                        architect_path.clone() + "/diagram.py",
-                                        python_code.clone(),
-                                    ) {
+                                    match fs::write(path, python_code.clone()) {
                                         Ok(_) => debug!("File 'diagram.py' created successfully!"),
                                         Err(e) => error!("Error creating file 'diagram.py': {}", e),
                                     }

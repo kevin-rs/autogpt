@@ -8,11 +8,15 @@ use gems::utils::load_and_encode_image;
 use gems::Client;
 use getimg::client::Client as ImgClient;
 use getimg::utils::save_image;
+use std::borrow::Cow;
 use std::env::var;
-use tracing::{debug, info};
+use std::fs;
+use std::path::Path;
+use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
 pub struct DesignerGPT {
+    workspace: Cow<'static, str>,
     agent: AgentGPT,
     img_client: ImgClient,
     client: Client,
@@ -20,8 +24,22 @@ pub struct DesignerGPT {
 
 impl DesignerGPT {
     pub fn new(objective: &'static str, position: &'static str) -> Self {
+        let workspace = var("AUTOGPT_WORKSPACE")
+            .unwrap_or("workspace/".to_string())
+            .to_owned()
+            + "designer";
+
+        if !Path::new(&workspace).exists() {
+            match fs::create_dir_all(workspace.clone()) {
+                Ok(_) => debug!("Directory '{}' created successfully!", workspace),
+                Err(e) => error!("Error creating directory '{}': {}", workspace, e),
+            }
+        } else {
+            debug!("Directory '{}' already exists.", workspace);
+        }
+
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
-        let getimg_api_key = var("GETIMG_APY_KEY").unwrap_or_default().to_owned();
+        let getimg_api_key = var("GETIMG_API_KEY").unwrap_or_default().to_owned();
         let getimg_model = var("GETIMG__MODEL")
             .unwrap_or("lcm-realistic-vision-v5-1".to_string())
             .to_owned();
@@ -37,6 +55,7 @@ impl DesignerGPT {
         info!("[*] {:?}: {:?}", position, agent);
 
         Self {
+            workspace: workspace.into(),
             agent,
             img_client,
             client,
@@ -44,6 +63,8 @@ impl DesignerGPT {
     }
 
     pub async fn generate_image_from_text(&mut self, tasks: &Tasks) -> Result<()> {
+        let img_path = self.workspace.to_string() + "/img.jpg";
+
         let text_prompt: String =
             format!("{}\n\nUser Prompt: {}", STABILITY_PROMPT, tasks.description);
         let negative_prompt = Some("Disfigured, cartoon, blurry");
@@ -55,7 +76,7 @@ impl DesignerGPT {
                 &text_prompt,
                 1024,
                 1024,
-                4,
+                5,
                 "jpeg",
                 negative_prompt,
                 Some(512),
@@ -63,12 +84,12 @@ impl DesignerGPT {
             .await?;
 
         // Save text response image to file
-        save_image(&text_response.image, "./img.jpg").unwrap();
+        save_image(&text_response.image, &img_path).unwrap();
 
         info!(
             "[*] {:?}: Image saved at {}",
             self.agent.position(),
-            "./img.jpg"
+            img_path
         );
 
         Ok(())

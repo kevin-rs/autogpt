@@ -20,6 +20,7 @@ use tracing::{debug, error, info};
 #[derive(Debug, Clone)]
 #[allow(unused)]
 pub struct FrontendGPT {
+    workspace: Cow<'static, str>,
     agent: AgentGPT,
     client: Client,
     req_client: ReqClient,
@@ -30,13 +31,14 @@ pub struct FrontendGPT {
 
 impl FrontendGPT {
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
-        let frontend_path = var("FRONTEND_WORKSPACE")
-            .unwrap_or("workspace/frontend".to_string())
-            .to_owned();
+        let workspace = var("AUTOGPT_WORKSPACE")
+            .unwrap_or("workspace/".to_string())
+            .to_owned()
+            + "frontend";
 
         let npx_install = Command::new("npx")
             .arg("create-react-app")
-            .arg(frontend_path.clone())
+            .arg(workspace.clone())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .spawn();
@@ -61,7 +63,7 @@ impl FrontendGPT {
 
         let cargo_new = Command::new("cargo")
             .arg("new")
-            .arg(frontend_path.clone())
+            .arg(workspace.clone())
             .spawn();
 
         match cargo_new {
@@ -69,7 +71,7 @@ impl FrontendGPT {
             Err(e) => error!("Error initializing Cargo project: {}", e),
         }
 
-        match fs::write(frontend_path.clone() + "/main.py", "") {
+        match fs::write(workspace.clone() + "/main.py", "") {
             Ok(_) => debug!("File 'diagram.py' created successfully!"),
             Err(e) => error!("Error creating file 'diagram.py': {}", e),
         }
@@ -87,6 +89,7 @@ impl FrontendGPT {
             .unwrap();
 
         Self {
+            workspace: workspace.into(),
             agent,
             client,
             req_client,
@@ -97,9 +100,7 @@ impl FrontendGPT {
     }
 
     pub async fn generate_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("FRONTEND_WORKSPACE")
-            .unwrap_or("workspace/frontend".to_string())
-            .to_owned();
+        let path = &self.workspace;
 
         let full_path = match self.language {
             "rust" => {
@@ -152,9 +153,7 @@ impl FrontendGPT {
     }
 
     pub async fn improve_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("FRONTEND_WORKSPACE")
-            .unwrap_or("workspace/frontend".to_string())
-            .to_owned();
+        let path = &self.workspace;
 
         let request: String = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
@@ -194,9 +193,7 @@ impl FrontendGPT {
     }
 
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("FRONTEND_WORKSPACE")
-            .unwrap_or("workspace/frontend".to_string())
-            .to_owned();
+        let path = &self.workspace;
 
         let request: String = format!(
             "{}\n\nBuggy Code: {}\nBugs: {}\n\nFix all bugs.",
@@ -253,9 +250,9 @@ impl Functions for FrontendGPT {
             self.agent.position(),
             tasks.clone()
         );
-        let path = var("FRONTEND_WORKSPACE")
-            .unwrap_or("workspace/frontend".to_string())
-            .to_owned();
+
+        let path = &self.workspace.to_string();
+
         while self.agent.status() != &Status::Completed {
             match &self.agent.status() {
                 Status::InDiscovery => {
@@ -300,7 +297,7 @@ impl Functions for FrontendGPT {
                                 .arg("cargo")
                                 .arg("build")
                                 .arg("--release")
-                                .current_dir(path.clone())
+                                .current_dir(&path.to_string())
                                 .stdout(Stdio::piped())
                                 .stderr(Stdio::piped())
                                 .spawn()
@@ -309,7 +306,7 @@ impl Functions for FrontendGPT {
                             .arg(format!("{}s", 10))
                             .arg("uvicorn")
                             .arg("main:app")
-                            .current_dir(path.clone())
+                            .current_dir(&path.to_string())
                             .stdout(Stdio::piped())
                             .stderr(Stdio::piped())
                             .spawn(),
@@ -318,7 +315,7 @@ impl Functions for FrontendGPT {
                             .arg("npm")
                             .arg("run")
                             .arg("build")
-                            .current_dir(path.clone())
+                            .current_dir(&path.to_string())
                             .stdout(Stdio::piped())
                             .stderr(Stdio::piped())
                             .spawn(),

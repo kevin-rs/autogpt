@@ -4,7 +4,7 @@
 
 [![Work In Progress](https://img.shields.io/badge/Work%20In%20Progress-red)](https://github.com/wiseaidev)
 [![made-with-rust](https://img.shields.io/badge/Made%20with-Rust-1f425f.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Rust](https://img.shields.io/badge/Rust-1.75.0%2B-blue.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/Rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/wiseaidev)
 [![Jupyter Notebook](https://img.shields.io/badge/Jupyter-Notebook-blue.svg?logo=Jupyter&logoColor=orange)](https://jupyter.org/)
@@ -19,7 +19,9 @@
 
 </div>
 
-AutoGPT is a groundbreaking framework that lets you easily create and manage AI agents for different jobs. It's blazingly fast and can handle lots of tasks.
+AutoGPT is an innovative framework that simplifies AI agent creation and management for various tasks. Its remarkable speed and versatility are complemented by a mesh of interconnected GPTs, ensuring exceptional performance and adaptability.
+
+---
 
 ## 🚀 Features
 
@@ -28,6 +30,8 @@ AutoGPT is a groundbreaking framework that lets you easily create and manage AI 
 - **Extensible**: Extend functionality by adding new agent types and task handling capabilities.
 - **CLI Interface**: Command-line interface for seamless interaction with the framework.
 - **SDK Integration**: Software development kit for integrating AutoGPT into existing projects.
+
+---
 
 ## 🔄 Workflow
 
@@ -90,6 +94,8 @@ Executes Assigned Tasks     Executes Assigned Tasks           Executes Assigned 
   
 - 🔄 **Feedback Loop**: Continuous feedback updates users on project progress and addresses issues.
   
+---
+
 ## 📦 Installation
 
 You can install AutoGPT via Cargo, the Rust package manager:
@@ -97,6 +103,8 @@ You can install AutoGPT via Cargo, the Rust package manager:
 ```bash
 cargo install autogpt
 ```
+
+---
 
 ## 🛠️ CLI Usage
 
@@ -106,15 +114,13 @@ The Command Line Interface (CLI) provides a convenient means to interact with th
 
 To configure the CLI and or the SDK environment, follow these steps:
 
-1. Define Workspace Paths: Set up the paths for backend, frontend, and architect workspaces by setting the following environment variables:
+1. Define Workspace Path: Set up the paths for designer, backend, frontend, and architect workspaces by setting the following environment variable:
    
    ```sh
-   export BACKEND_WORKSPACE=workspace/backend
-   export FRONTEND_WORKSPACE=workspace/frontend
-   export ARCHITECT_WORKSPACE=workspace/architect
+   export AUTOGPT_WORKSPACE=workspace/
    ```
 
-   These variables guide the agents on where to generate the code within your project structure.
+   This variable guide the agents on where to generate the code within your project structure.
 
 1. API Key Configuration: Additionally, you need to set up the Gemini API key by setting the following environment variable:
 
@@ -132,9 +138,11 @@ Execute agents to perform tasks using the `run` command:
 autogpt run <agent-name>
 ```
 
+---
+
 ## 🤖 Available Agents
 
-Autogpt consists of 6 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
+At the current release, Autogpt consists of 6 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
 
 ### 1. 🎩 ManagerGPT
 
@@ -182,8 +190,6 @@ Finally, ManagerGPT aggregates the outcomes from all GPTs, consolidating the gen
 [*] "ManagerGPT": Completed Tasks: Tasks { description: "- Utilizing FastAPI and Python, develop a user-friendly UI for displaying weather data.\n- Step 1: Use HTML, CSS, and JavaScript to design and develop web pages that showcase weather data effectively.\n- Step 2: Define routes in FastAPI for weather data retrieval and display, ensuring seamless integration between frontend and backend.", scope: None, urls: None, frontend_code: Some("from fastapi import FastAPI, Request\nfrom fastapi.responses import JSONResponse\nimport requests\n\napp = FastAPI()\n\n@app.get(\"/weather/{city_name}\")\nasync def get_weather(city_name: str, request: Request):\n    url = f\"http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid=YOUR_API_KEY\"\n    response = requests.get(url)\n    if response.status_code == 200:\n        data = response.json()\n        return JSONResponse(content={\n            \"city_name\": data[\"name\"],\n            \"temperature\": data[\"main\"][\"temp\"] - 273.15,\n            \"humidity\": data[\"main\"][\"humidity\"],\n            \"wind_speed\": data[\"wind\"][\"speed\"]\n        })\n    else:\n        return JSONResponse(content={\"error\": \"Could not fetch weather data\"}, status_code=response.status_code)"), backend_code:  Some("from fastapi import FastAPI, Request, Form\nfrom fastapi.templating import Jinja2Templates\nfrom fastapi.responses import HTMLResponse\nimport requests\n\napp = FastAPI()\ntemplates = Jinja2Templates(directory=\"templates\")\n\n@app.get(\"/\", response_class=HTMLResponse)\nasync def index(request: Request):\n    return templates.TemplateResponse(\"index.html\", {\"request\": request})\n\n@app.post(\"/weather\", response_class=HTMLResponse)\nasync def weather(request: Request, city: str = Form(...)):\n    url = f\"https://api.openweathermap.org/data/2.5/weather?q={city}&appid=YOUR_API_KEY\"\n    response = requests.get(url)\n    data = response.json()\n    return templates.TemplateResponse(\"weather.html\", {\"request\": request, \"data\": data})"), api_schema: None }
 ```
 
----
-
 ### 2. 👷‍♀️ ArchitectGPT
 
 <img src="https://github.com/kevin-rs/kevin/assets/62179149/91a4868a-093f-4c96-89fc-5447e6f904f1" align="left" alt="architect" width="64" />
@@ -198,8 +204,6 @@ Upon receiving instructions from ManagerGPT, ArchitectGPT will:
 - Design the data flow and communication between backend and frontend components to ensure seamless operation.
 
 ![weather_forecast_website_diagram](https://github.com/kevin-rs/kevin/assets/62179149/d94b852c-30d4-4699-a7b1-b8cc225d9bd3)
-
----
 
 ### 3. 🎨 DesignerGPT (Optional) Feature Flag: `img`
 
@@ -217,8 +221,6 @@ When tasked by ManagerGPT, DesignerGPT will:
 
 ![DesignerGPT sample output](https://github.com/kevin-rs/kevin/assets/62179149/356cec29-e779-4f95-81d8-498ef07c1f3a)
 
----
-
 ### 4. ⚙️ BackendGPT
 
 <img src="https://github.com/kevin-rs/kevin/assets/62179149/74819200-83d5-498a-9a43-658096145611" align="left" alt="backend" width="64" />
@@ -235,8 +237,6 @@ Upon receiving instructions from ManagerGPT, BackendGPT will:
 
 ![BackendGPT code](https://github.com/kevin-rs/kevin/assets/62179149/a9ec06e0-74be-4c0e-8e3a-751eb0389c90)
 
----
-
 ### 5. 🖥️ FrontendGPT
 
 <img src="https://github.com/kevin-rs/kevin/assets/62179149/684da3ce-f36c-4e2e-a315-0a834ba39539" align="left" alt="frontend" width="64" />
@@ -251,8 +251,6 @@ When prompted by ManagerGPT, FrontendGPT will:
 - Implement responsive design principles to ensure a seamless experience across devices and screen sizes.
 - TODO: Collaborate with DesignerGPT to translate design mockups into code, bringing the application's visual identity to fruition.
 
----
-
 ### 6. 💌 MailerGPT (Optional) Feature Flag: `mail`
 
 <img src="https://github.com/kevin-rs/kevin/assets/62179149/fedaf721-20b4-43e6-bdb9-ef3f87430ec3" align="left" alt="mailer" width="64" />
@@ -266,18 +264,24 @@ MailerGPT operates by:
 - Reading your emails and extracting relevant information based on the user input.
 - Generating and sending personalized email content tailored to specific recipients or target audiences.
 
----
-
 With Autogpt's team of specialized agents working together, your project is in capable hands. Simply provide a simple project goal, and let Autogpt handle the rest!
+
+---
 
 ## 📚 Documentation
 
 For detailed usage instructions and API documentation, refer to the [AutoGPT Documentation](https://docs.rs/autogpt).
 
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! See the [Contribution Guidelines](CONTRIBUTING.md) for more information on how to get started.
 
+---
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
