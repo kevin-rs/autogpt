@@ -12,7 +12,7 @@ fn test_create_agent() {
 
     assert_eq!(*agent.objective(), *objective);
     assert_eq!(*agent.position(), *position);
-    assert_eq!(*agent.status(), Status::InDiscovery);
+    assert_eq!(*agent.status(), Status::Idle);
     assert!(agent.memory().is_empty());
 }
 

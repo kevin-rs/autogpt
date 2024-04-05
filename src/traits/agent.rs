@@ -1,3 +1,55 @@
+//! # `Agent` trait.
+//!
+//! This trait defines basic functionalities for agents.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use autogpt::common::utils::{Communication, Status};
+//! use autogpt::traits::agent::Agent;
+//! use std::borrow::Cow;
+//!
+//! /// A simple agent implementation.
+//! #[derive(Debug)]
+//! struct SimpleAgent {
+//!     objective: Cow<'static, str>,
+//!     position: Cow<'static, str>,
+//!     status: Status,
+//!     memory: Vec<Communication>,
+//! }
+//!
+//! impl Agent for SimpleAgent {
+//!     fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
+//!         SimpleAgent {
+//!             objective,
+//!             position,
+//!             status: Status::Idle,
+//!             memory: Vec::new(),
+//!         }
+//!     }
+//!
+//!     fn update(&mut self, status: Status) {
+//!         self.status = status;
+//!     }
+//!
+//!     fn objective(&self) -> &Cow<'static, str> {
+//!         &self.objective
+//!     }
+//!
+//!     fn position(&self) -> &Cow<'static, str> {
+//!         &self.position
+//!     }
+//!
+//!     fn status(&self) -> &Status {
+//!         &self.status
+//!     }
+//!
+//!     fn memory(&self) -> &Vec<Communication> {
+//!         &self.memory
+//!     }
+//! }
+//!
+
 use crate::common::utils::{Communication, Status};
 use std::borrow::Cow;
 use std::fmt::Debug;

@@ -1,4 +1,4 @@
-// ! # `ArchitectGPT` agent.
+//! # `ArchitectGPT` agent.
 //!
 //! This module provides functionality for creating innovative website designs
 //! and architectural diagrams based on prompts using Gemini API and diagrams library.
@@ -320,8 +320,8 @@ impl Functions for ArchitectGPT {
 
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
-                Status::InDiscovery => {
-                    debug!("[*] {:?}: InDiscovery", self.agent.position());
+                Status::Idle => {
+                    debug!("[*] {:?}: Idle", self.agent.position());
 
                     let scope: Scope = self.get_scope(tasks).await?;
 

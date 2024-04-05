@@ -532,7 +532,7 @@ impl Functions for BackendGPT {
 
         while self.agent.status() != &Status::Completed {
             match &self.agent.status() {
-                Status::InDiscovery => {
+                Status::Idle => {
                     let _ = self.generate_backend_code(tasks).await;
                     self.agent.update(Status::Active);
                     continue;

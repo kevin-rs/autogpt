@@ -1,4 +1,4 @@
-//! #`FrontendGPT` agent.
+//! # `FrontendGPT` agent.
 //!
 //! This module provides functionality for generating frontend code based on prompts
 //! using Gemini API. The `FrontendGPT` agent is capable of understanding user requests
@@ -463,7 +463,7 @@ impl Functions for FrontendGPT {
 
         while self.agent.status() != &Status::Completed {
             match &self.agent.status() {
-                Status::InDiscovery => {
+                Status::Idle => {
                     let _ = self.generate_frontend_code(tasks).await;
                     self.agent.update(Status::Active);
                     continue;

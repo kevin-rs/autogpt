@@ -1,5 +1,8 @@
 #![allow(unused)]
 
+//! # `ManagerGPT` agent.
+//!
+
 use crate::agents::agent::AgentGPT;
 use crate::agents::architect::ArchitectGPT;
 use crate::agents::backend::BackendGPT;
