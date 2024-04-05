@@ -16,16 +16,41 @@ use gems::Client;
 use std::env::var;
 use tracing::info;
 
+/// Enum representing different types of GPT agents.
 #[derive(Debug, Clone)]
 enum AgentType {
+    /// Architect GPT agent.
     Architect(ArchitectGPT),
+    /// Backend GPT agent.
     Backend(BackendGPT),
+    /// Frontend GPT agent.
     Frontend(FrontendGPT),
+    /// Designer GPT agent.
     #[cfg(feature = "img")]
     Designer(DesignerGPT),
 }
 
 impl AgentType {
+    /// Asynchronously executes tasks associated with the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - A mutable reference to tasks to be executed.
+    /// * `execute` - A boolean indicating whether to execute the tasks.
+    /// * `max_tries` - Maximum number of attempts to execute tasks.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating success or failure of task execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there's a failure in executing tasks.
+    ///
+    /// # Business Logic
+    ///
+    /// - Executes tasks associated with the agent based on its type.
+    ///
     async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
         match self {
             AgentType::Architect(agent) => agent.execute(tasks, execute, max_tries).await,
@@ -35,6 +60,17 @@ impl AgentType {
             AgentType::Designer(agent) => agent.execute(tasks, execute, max_tries).await,
         }
     }
+
+    /// Retrieves the position of the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`String`): The position of the agent.
+    ///
+    /// # Business Logic
+    ///
+    /// - Retrieves the position of the agent based on its type.
+    ///
     fn position(&self) -> String {
         match self {
             AgentType::Architect(agent) => agent.agent().position().to_string(),
@@ -45,17 +81,43 @@ impl AgentType {
     }
 }
 
+/// Struct representing a ManagerGPT, responsible for managing different types of GPT agents.
 #[derive(Debug)]
 #[allow(unused)]
 pub struct ManagerGPT {
+    /// Represents the GPT agent associated with the manager.
     agent: AgentGPT,
+    /// Represents the tasks to be executed by the manager.
     tasks: Tasks,
+    /// Represents the programming language used in the tasks.
     language: &'static str,
+    /// Represents a collection of GPT agents managed by the manager.
     agents: Vec<AgentType>,
+    /// Represents a client for interacting with external services.
     client: Client,
 }
 
 impl ManagerGPT {
+    /// Constructor function to create a new instance of ManagerGPT.
+    ///
+    /// # Arguments
+    ///
+    /// * `objective` - Objective description for ManagerGPT.
+    /// * `position` - Position description for ManagerGPT.
+    /// * `request` - Description of the user's request.
+    /// * `language` - Programming language used in the tasks.
+    ///
+    /// # Returns
+    ///
+    /// (`ManagerGPT`): A new instance of ManagerGPT.
+    ///
+    /// # Business Logic
+    ///
+    /// - Initializes the GPT agent with the given objective and position.
+    /// - Initializes an empty collection of agents.
+    /// - Initializes tasks with the provided description.
+    /// - Initializes a Gemini client for interacting with Gemini API.
+    ///
     pub fn new(
         objective: &'static str,
         position: &'static str,
@@ -93,6 +155,16 @@ impl ManagerGPT {
         }
     }
 
+    /// Adds an agent to the manager.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent` - The agent to be added.
+    ///
+    /// # Business Logic
+    ///
+    /// - Adds the specified agent to the collection of agents managed by the manager.
+    ///
     fn add_agent(&mut self, agent: AgentType) {
         self.agents.push(agent);
     }
@@ -119,6 +191,12 @@ impl ManagerGPT {
         )));
     }
 
+    /// Spawns default agents if the collection is empty.
+    ///
+    /// # Business Logic
+    ///
+    /// - Adds default agents to the collection if it is empty.
+    ///
     pub async fn execute_prompt(&self, prompt: String) -> Result<String> {
         let gemini_response: String = match self.client.clone().generate_content(&prompt).await {
             Ok(response) => strip_code_blocks(&response),
@@ -128,6 +206,26 @@ impl ManagerGPT {
         Ok(gemini_response)
     }
 
+    /// Asynchronously executes the tasks described by the user request.
+    ///
+    /// # Arguments
+    ///
+    /// * `execute` - A boolean indicating whether to execute the tasks.
+    /// * `max_tries` - Maximum number of attempts to execute tasks.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating success or failure of task execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there's a failure in executing tasks.
+    ///
+    /// # Business Logic
+    ///
+    /// - Executes tasks described by the user request using the collection of agents managed by the manager.
+    /// - Manages retries and error handling during task execution.
+    ///
     pub async fn execute(&mut self, execute: bool, max_tries: u64) -> Result<()> {
         info!(
             "[*] {:?}: Executing task: {:?}",

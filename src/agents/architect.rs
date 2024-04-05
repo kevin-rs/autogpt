@@ -1,3 +1,39 @@
+// ! # `ArchitectGPT` agent.
+//!
+//! This module provides functionality for creating innovative website designs
+//! and architectural diagrams based on prompts using Gemini API and diagrams library.
+//! The `ArchitectGPT` agent understands user requirements and generates architectural diagrams
+//! for your web applications.
+//!
+//! # Example - Generating website designs:
+//!
+//! ```rust
+//! use autogpt::agents::architect::ArchitectGPT;
+//! use autogpt::common::utils::Tasks;
+//! use autogpt::traits::functions::Functions;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let mut architect_agent = ArchitectGPT::new(
+//!         "Create innovative website designs",
+//!         "Web wireframes and UIs",
+//!     );
+//!
+//!     let mut tasks = Tasks {
+//!         description: "Design an architectural diagram for a modern chat application".into(),
+//!         scope: None,
+//!         urls: None,
+//!         frontend_code: None,
+//!         backend_code: None,
+//!         api_schema: None,
+//!     };
+//!
+//!     if let Err(err) = architect_agent.execute(&mut tasks, true, 3).await {
+//!         eprintln!("Error executing architect tasks: {:?}", err);
+//!     }
+//! }
+//! ```
+
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::{extract_array, extract_json_string};
 use crate::common::utils::{strip_code_blocks, Scope, Status, Tasks};
@@ -18,15 +54,38 @@ use std::process::Stdio;
 use std::time::Duration;
 use tracing::{debug, error, info};
 
+/// Struct representing an ArchitectGPT, which orchestrates tasks related to architectural design using GPT.
 #[derive(Debug, Clone)]
 pub struct ArchitectGPT {
+    /// Represents the workspace directory path for ArchitectGPT.
     workspace: Cow<'static, str>,
+    /// Represents the GPT agent responsible for handling architectural tasks.
     agent: AgentGPT,
+    /// Represents a Gemini client for interacting with Gemini API.
     client: Client,
+    /// Represents a client for making HTTP requests.
     req_client: ReqClient,
 }
 
 impl ArchitectGPT {
+    /// Creates a new instance of `ArchitectGPT`.
+    ///
+    /// # Arguments
+    ///
+    /// * `objective` - The objective of the agent.
+    /// * `position` - The position of the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`ArchitectGPT`): A new instance of ArchitectGPT.
+    ///
+    /// # Business Logic
+    ///
+    /// - Constructs the workspace directory path for ArchitectGPT.
+    /// - Creates the workspace directory if it does not exist.
+    /// - Initializes the GPT agent with the given objective and position.
+    /// - Creates clients for interacting with Gemini API and making HTTP requests.
+    ///
     pub fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())
@@ -68,6 +127,28 @@ impl ArchitectGPT {
         }
     }
 
+    /// Retrieves the scope based on tasks description.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - The tasks to be performed.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<Scope>`): The scope generated based on the tasks description.
+    ///
+    /// # Side Effects
+    ///
+    /// - Updates the agent status to `Status::Completed` upon successful completion.
+    ///
+    /// # Business Logic
+    ///
+    /// - Constructs a request based on the provided tasks.
+    /// - Sends the request to the Gemini API to generate content.
+    /// - Parses the response into a Scope object.
+    /// - Updates the tasks with the retrieved scope.
+    /// - Updates the agent status to 'Completed'.
+    ///
     pub async fn get_scope(&mut self, tasks: &mut Tasks) -> Result<Scope> {
         let request: String = format!(
             "{}\n\nHere is the User Request:{}",
@@ -89,6 +170,28 @@ impl ArchitectGPT {
         Ok(gemini_response)
     }
 
+    /// Retrieves URLs based on tasks description.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - The tasks to be performed.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating success or failure of the operation.
+    ///
+    /// # Side Effects
+    ///
+    /// - Updates the agent status to `Status::InUnitTesting` upon successful completion.
+    ///
+    /// # Business Logic
+    ///
+    /// - Constructs a request based on the provided tasks.
+    /// - Sends the request to the GPT client to generate content.
+    /// - Parses the response into a vector of URLs.
+    /// - Updates the tasks with the retrieved URLs.
+    /// - Updates the agent status to 'InUnitTesting'.
+    ///
     pub async fn get_urls(&mut self, tasks: &mut Tasks) -> Result<()> {
         let request: String = format!(
             "{}\n\nHere is the Project Description:{}",
@@ -115,6 +218,24 @@ impl ArchitectGPT {
         Ok(())
     }
 
+    /// Generates a diagram based on tasks description.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - The tasks to be performed.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<String>`): The generated diagram content.
+    ///
+    /// # Business Logic
+    ///
+    /// - Constructs a request based on the provided tasks.
+    /// - Constructs a request based on the provided tasks.
+    /// - Sends the request to the GPT client to generate content.
+    /// - Processes the response to strip code blocks.
+    /// - Updates the agent status.
+    ///
     pub async fn generate_diagram(&mut self, tasks: &mut Tasks) -> Result<String> {
         let request: String = format!(
             "{}\n\nUser Request:{}",
@@ -131,16 +252,63 @@ impl ArchitectGPT {
         Ok(gemini_response)
     }
 
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
+    /// # Business Logic
+    /// - Provides access to the agent associated with the ArchitectGPT instance.
+    ///
     pub fn agent(&self) -> &AgentGPT {
         &self.agent
     }
 }
 
+/// Implementation of the trait `Functions` for `ArchitectGPT`.
+/// Contains additional methods related to architectural tasks.
+///
+/// This trait provides methods for:
+/// - Retrieving the agent associated with `ArchitectGPT`.
+/// - Executing tasks asynchronously.
+///
+/// # Business Logic
+///
+/// - Provides access to the agent associated with the `ArchitectGPT` instance.
+/// - Executes tasks asynchronously based on the current status of the agent.
+/// - Handles task execution including scope retrieval, URL retrieval, and diagram generation.
+/// - Manages retries in case of failures during task execution.
+///
 impl Functions for ArchitectGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
     fn get_agent(&self) -> &AgentGPT {
         &self.agent
     }
 
+    /// Executes tasks asynchronously.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - The tasks to be executed.
+    /// * `execute` - Flag indicating whether to execute the tasks.
+    /// * `max_tries` - Maximum number of retry attempts.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating success or failure of the operation.
+    ///
+    /// # Business Logic
+    ///
+    /// - Executes tasks asynchronously based on the current status of the agent.
+    /// - Handles task execution including scope retrieval, URL retrieval, and diagram generation.
+    /// - Manages retries in case of failures during task execution.
+    ///
     async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, max_tries: u64) -> Result<()> {
         info!(
             "[*] {:?}: Executing tasks: {:?}",

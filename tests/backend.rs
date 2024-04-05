@@ -243,7 +243,7 @@ async fn test_get_routes_json() {
     let result = backend_gpt.get_routes_json().await;
 
     assert!(result.is_ok());
-    fs::write::<&str, String>("backend/api.json", result.unwrap()).unwrap();
+    fs::write::<&str, String>("workspace/backend/api.json", result.unwrap()).unwrap();
 }
 
 #[tokio::test]
