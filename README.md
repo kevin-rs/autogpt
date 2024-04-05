@@ -19,7 +19,7 @@
 
 </div>
 
-AutoGPT is an innovative framework that simplifies AI agent creation and management for various tasks. Its remarkable speed and versatility are complemented by a mesh of interconnected GPTs, ensuring exceptional performance and adaptability.
+AutoGPT is a pure rust framework that simplifies AI agent creation and management for various tasks. Its remarkable speed and versatility are complemented by a mesh of built-in interconnected GPTs, ensuring exceptional performance and adaptability.
 
 ---
 
@@ -98,23 +98,23 @@ Executes Assigned Tasks     Executes Assigned Tasks           Executes Assigned 
 
 ## 📦 Installation
 
-You can install AutoGPT via Cargo, the Rust package manager:
+You can install AutoGPT cli using the following command:
 
 ```bash
-cargo install autogpt
+cargo install autogpt --features=cli
 ```
 
 ---
 
 ## 🛠️ CLI Usage
 
-The Command Line Interface (CLI) provides a convenient means to interact with the code generation system. Before utilizing the CLI effectively, it's essential to set up the necessary environment variables for seamless operation.
+The CLI provides a convenient means to interact with the code generation ecosystem. Before utilizing the CLI and or the SDK, your need to set up the necessary environment variables.
 
 ### Environment Variables Setup
 
 To configure the CLI and or the SDK environment, follow these steps:
 
-1. Define Workspace Path: Set up the paths for designer, backend, frontend, and architect workspaces by setting the following environment variable:
+1. **Define Workspace Path**: Set up the paths for designer, backend, frontend, and architect workspaces by setting the following environment variable:
    
    ```sh
    export AUTOGPT_WORKSPACE=workspace/
@@ -122,13 +122,31 @@ To configure the CLI and or the SDK environment, follow these steps:
 
    This variable guide the agents on where to generate the code within your project structure.
 
-1. API Key Configuration: Additionally, you need to set up the Gemini API key by setting the following environment variable:
+1. **API Key Configuration**: Additionally, you need to set up the Gemini API key by setting the following environment variable:
 
    ```sh
    export GEMINI_API_KEY=<your_gemini_api_key>
    ```
 
    To obtain your API key, navigate to [Google AI Studio](https://aistudio.google.com/app/apikey) and generate it there. This key allows autogpt to communicate with Gemini API.
+
+1. **DesignerGPT Setup (Optional)**: To enable DesignerGPT, you will need to set up the following environment variable:
+   
+     ```sh
+     export GETIMG_API_KEY=<your_getimg_api_key>
+     ```
+
+     Generate an API key from your [GetImg Dashboard](https://dashboard.getimg.ai/api-keys).
+
+1. **MailerGPT Setup (Optional)**: To enable MailerGPT, in addition to these environment variables, you will need to set up the environment:
+   
+     ```sh
+     export NYLAS_SYSTEM_TOKEN=<Your_Nylas_System_Token>
+     export NYLAS_CLIENT_ID=<Your_Nylas_Client_ID>
+     export NYLAS_CLIENT_SECRET=<Your_Nylas_Client_Secret>
+     ```
+
+     Follow [this tutorial](NYLAS.md) for a guide on how to obtain these values.
 
 ### Running Agents
 

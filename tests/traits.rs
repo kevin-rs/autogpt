@@ -15,7 +15,7 @@ impl MockAgent {
         Self {
             objective,
             position,
-            status: Status::InDiscovery,
+            status: Status::Idle,
             memory: Vec::new(),
         }
     }
@@ -55,7 +55,7 @@ fn test_agent_creation() {
 
     assert_eq!(*agent.objective(), *objective);
     assert_eq!(*agent.position(), *position);
-    assert_eq!(*agent.status(), Status::InDiscovery);
+    assert_eq!(*agent.status(), Status::Idle);
     assert!(agent.memory().is_empty());
 }
 

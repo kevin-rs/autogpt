@@ -1,3 +1,69 @@
+//! # Utils module.
+//!
+//! This module provides various utility functions and common structures that can be used across different parts of the project.
+//!
+//! ## Structures
+//!
+//! - `Communication`: Represents a communication messages between agents.
+//! - `Status`: Represents the status of an agent.
+//! - `Route`: Represents a route object.
+//! - `Scope`: Represents the scope of a project.
+//! - `Tasks`: Represents a fact tasks.
+//!
+//! ## Functions
+//!
+//! - `extract_json_string`: Extracts a JSON string from the provided text.
+//! - `extract_array`: Extracts an array from the provided text.
+//! - `similarity`: Calculates the similarity between two strings using Levenshtein distance.
+//! - `strip_code_blocks`: Strips code blocks from the provided text.
+//!
+//! # Examples
+//!
+//! ```
+//! use autogpt::common::utils::{Communication, Status, Route, Scope, Tasks, extract_json_string, extract_array, similarity, strip_code_blocks};
+//!
+//! let communication = Communication {
+//!     role: "Sender".into(),
+//!     content: "Hello, how are you?".into(),
+//! };
+//!
+//! let status = Status::Idle;
+//!
+//! let route = Route {
+//!     dynamic: "Yes".into(),
+//!     method: "GET".into(),
+//!     body: serde_json::json!({}),
+//!     response: serde_json::json!({}),
+//!     path: "/api".into(),
+//! };
+//!
+//! let scope = Scope {
+//!     crud: true,
+//!     auth: true,
+//!     external: false,
+//! };
+//!
+//! let tasks = Tasks {
+//!     description: "This is a task description.".into(),
+//!     scope: Some(scope),
+//!     urls: Some(vec!["https://kevin-rs.dev".into()]),
+//!     frontend_code: None,
+//!     backend_code: None,
+//!     api_schema: None,
+//! };
+//!
+//! let json_string = "{ \"crud\": true }";
+//! let extracted_json = extract_json_string(json_string);
+//!
+//! let text = "[\"item1\", \"item2\"]";
+//! let extracted_array = extract_array(text);
+//!
+//! let similarity = similarity("hello", "helo");
+//!
+//! let code_with_blocks = "```\nSome code here\n```";
+//! let stripped_code = strip_code_blocks(code_with_blocks);
+//! ```
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -16,7 +82,7 @@ pub struct Communication {
 pub enum Status {
     /// Agent is in the discovery phase.
     #[default]
-    InDiscovery,
+    Idle,
     /// Agent is actively working.
     Active,
     /// Agent is in the unit testing phase.

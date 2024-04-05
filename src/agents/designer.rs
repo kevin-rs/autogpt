@@ -195,7 +195,7 @@ impl DesignerGPT {
     /// - Returns the generated text description of the image.
     ///
     pub async fn generate_text_from_image(&mut self, image_path: &str) -> Result<String> {
-        let base64_image_data = match load_and_encode_image(&image_path) {
+        let base64_image_data = match load_and_encode_image(image_path) {
             Ok(data) => data,
             Err(_) => {
                 debug!("[*] {:?}: Error loading image!", self.agent.position());
@@ -242,7 +242,7 @@ impl DesignerGPT {
         let getimg_prompt = &tasks.description;
 
         let similarity_threshold = 0.8;
-        let similarity = similarity(&getimg_prompt, &generated_text);
+        let similarity = similarity(getimg_prompt, generated_text);
 
         if similarity >= similarity_threshold {
             return Ok(true);
@@ -309,17 +309,17 @@ impl Functions for DesignerGPT {
         let mut _count = 0;
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
-                Status::InDiscovery => {
-                    debug!("[*] {:?}: InDiscovery", self.agent.position());
+                Status::Idle => {
+                    debug!("[*] {:?}: Idle", self.agent.position());
 
-                    let _generated_image = self.generate_image_from_text(tasks).await?;
+                    self.generate_image_from_text(tasks).await?;
                     // let generated_text = self.generate_text_from_image("./img.jpg").await?;
 
                     // let text_similarity = self
                     //     .compare_text_and_image_prompts(tasks, &generated_text)
                     //     .await?;
                     // debug!(
-                    //     "[*] {:?}: InDiscovery: {}",
+                    //     "[*] {:?}: Idle: {}",
                     //     self.agent.position(),
                     //     text_similarity
                     // );

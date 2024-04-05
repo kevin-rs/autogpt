@@ -1,4 +1,4 @@
-// ! # `MailerGPT` agent.
+//! # `MailerGPT` agent.
 //!
 //! This module provides functionality for utilizing emails to generate text-based
 //! content based on prompts using Nylas and Gemini APIs. The `MailerGPT` agent
@@ -196,8 +196,8 @@ impl Functions for MailerGPT {
         let mut _count = 0;
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
-                Status::InDiscovery => {
-                    debug!("[*] {:?}: InDiscovery", self.agent.position());
+                Status::Idle => {
+                    debug!("[*] {:?}: Idle", self.agent.position());
 
                     let _generated_text =
                         self.generate_text_from_emails(&tasks.description).await?;

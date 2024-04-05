@@ -1,3 +1,6 @@
+//! # `AgentGPT` agent.
+//!
+
 use crate::common::utils::{Communication, Status};
 use crate::traits::agent::Agent;
 use std::borrow::Cow;

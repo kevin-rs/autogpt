@@ -1,3 +1,8 @@
+//! # Agents module.
+//!
+//! This module contains sub-modules representing different built-in AutoGPT agents.
+//!
+
 pub mod agent;
 pub mod architect;
 pub mod backend;
