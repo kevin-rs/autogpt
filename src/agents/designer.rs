@@ -1,6 +1,43 @@
+//! # `DesignerGPT` agent.
+//!
+//! This module provides functionality for creating innovative website designs
+//! and user experiences based on prompts using Gemini API. The `DesignerGPT` agent
+//! understands user requirements and generates wireframes and user interfaces (UIs)
+//! for web applications using the GetIMG API.
+//!
+//! # Example - Generating website designs:
+//!
+//! ```rust
+//! use autogpt::agents::designer::DesignerGPT;
+//! use autogpt::common::utils::Tasks;
+//! use autogpt::traits::functions::Functions;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let mut designer_agent = DesignerGPT::new(
+//!         "Create innovative website designs",
+//!         "UIs",
+//!     );
+//!
+//!     let mut tasks = Tasks {
+//!         description: "Design a modern and minimalist homepage design layout for a tech company".into(),
+//!         scope: None,
+//!         urls: None,
+//!         frontend_code: None,
+//!         backend_code: None,
+//!         api_schema: None,
+//!     };
+//!
+//!     if let Err(err) = designer_agent.execute(&mut tasks, true, 3).await {
+//!         eprintln!("Error executing designer tasks: {:?}", err);
+//!     }
+//! }
+//! ```
+//!
+
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::{similarity, Status, Tasks};
-use crate::prompts::designer::{STABILITY_PROMPT, WEB_DESIGNER_PROMPT};
+use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
@@ -14,15 +51,37 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, error, info};
 
+/// Struct representing a DesignerGPT, which manages design-related tasks using Gemini API.
 #[derive(Debug, Clone)]
 pub struct DesignerGPT {
+    /// Represents the workspace directory path for DesignerGPT.
     workspace: Cow<'static, str>,
+    /// Represents the GPT agent responsible for handling design tasks.
     agent: AgentGPT,
+    /// Represents a GetIMG client for generating images from text prompts.
     img_client: ImgClient,
+    /// Represents a Gemini client for interacting with Gemini API.
     client: Client,
 }
 
 impl DesignerGPT {
+    /// Constructor function to create a new instance of `DesignerGPT`.
+    ///
+    /// # Arguments
+    ///
+    /// * `objective` - Objective description for `DesignerGPT`.
+    /// * `position` - Position description for `DesignerGPT`.
+    ///
+    /// # Returns
+    ///
+    /// (`DesignerGPT`): A new instance of `DesignerGPT`.
+    ///
+    /// # Business Logic
+    ///
+    /// - Constructs the workspace directory path for `DesignerGPT`.
+    /// - Initializes the GPT agent with the given objective and position.
+    /// - Creates clients for generating images and interacting with Gemini API.
+    ///
     pub fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())
@@ -62,11 +121,31 @@ impl DesignerGPT {
         }
     }
 
+    /// Asynchronously generates an image from a text prompt.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - A reference to tasks containing the description for image generation.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating success or failure of image generation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there's a failure in generating the image.
+    ///
+    /// # Business Logic
+    ///
+    /// - Constructs a text prompt based on the description from tasks.
+    /// - Generates an image from the text prompt using the getimg client.
+    /// - Saves the generated image to the workspace directory.
+    ///
     pub async fn generate_image_from_text(&mut self, tasks: &Tasks) -> Result<()> {
         let img_path = self.workspace.to_string() + "/img.jpg";
 
         let text_prompt: String =
-            format!("{}\n\nUser Prompt: {}", STABILITY_PROMPT, tasks.description);
+            format!("{}\n\nUser Prompt: {}", IMGGET_PROMPT, tasks.description);
         let negative_prompt = Some("Disfigured, cartoon, blurry");
 
         // Generate image from text prompt
@@ -95,6 +174,26 @@ impl DesignerGPT {
         Ok(())
     }
 
+    /// Asynchronously generates text from an image.
+    ///
+    /// # Arguments
+    ///
+    /// * `image_path` - Path to the image file for text generation.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<String>`): Result containing the generated text from the image.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there's a failure in generating text from the image.
+    ///
+    /// # Business Logic
+    ///
+    /// - Loads and encodes the image from the specified file path.
+    /// - Sends the image data to the Gemini API to generate text.
+    /// - Returns the generated text description of the image.
+    ///
     pub async fn generate_text_from_image(&mut self, image_path: &str) -> Result<String> {
         let base64_image_data = match load_and_encode_image(&image_path) {
             Ok(data) => data,
@@ -119,15 +218,31 @@ impl DesignerGPT {
         Ok(response)
     }
 
+    /// Compares text prompts to determine similarity.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - A mutable reference to tasks containing the GetIMG AI prompt.
+    /// * `generated_text` - The generated text to compare with the GetIMG AI prompt.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<bool>`): Result indicating whether the generated text is similar to the prompt.
+    ///
+    /// # Business Logic
+    ///
+    /// - Compares the generated text with the GetIMG AI prompt.
+    /// - Returns true if similarity meets a predefined threshold, otherwise false.
+    ///
     pub async fn compare_text_and_image_prompts(
         &mut self,
         tasks: &mut Tasks,
         generated_text: &str,
     ) -> Result<bool> {
-        let stability_ai_prompt = &tasks.description;
+        let getimg_prompt = &tasks.description;
 
-        let similarity_threshold = 0.2;
-        let similarity = similarity(&stability_ai_prompt, &generated_text);
+        let similarity_threshold = 0.8;
+        let similarity = similarity(&getimg_prompt, &generated_text);
 
         if similarity >= similarity_threshold {
             return Ok(true);
@@ -137,11 +252,54 @@ impl DesignerGPT {
     }
 }
 
+/// Implementation of the trait Functions for `DesignerGPT`.
+/// Contains additional methods related to design tasks.
+///
+/// This trait provides methods for:
+///
+/// - Retrieving the agent associated with `DesignerGPT`.
+/// - Executing tasks asynchronously.
+///
+/// # Business Logic
+///
+/// - Provides access to the agent associated with the `DesignerGPT` instance.
+/// - Executes tasks asynchronously based on the current status of the agent.
+/// - Handles task execution including image generation, text generation, and comparison.
+/// - Manages retries and error handling during task execution.
+///
 impl Functions for DesignerGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
     fn get_agent(&self) -> &AgentGPT {
         &self.agent
     }
 
+    /// Asynchronously executes tasks associated with DesignerGPT.
+    ///
+    /// # Arguments
+    ///
+    /// * `tasks` - A mutable reference to tasks to be executed.
+    /// * `execute` - A boolean indicating whether to execute the tasks (TODO).
+    /// * `max_tries` - Maximum number of attempts to execute tasks (TODO).
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating success or failure of task execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there's a failure in executing tasks.
+    ///
+    /// # Business Logic
+    ///
+    /// - Executes tasks asynchronously based on the current status of the agent.
+    /// - Handles task execution including image generation, text generation, and comparison.
+    /// - Manages retries and error handling during task execution.
+    ///
     async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
         info!(
             "[*] {:?}: Executing tasks: {:?}",

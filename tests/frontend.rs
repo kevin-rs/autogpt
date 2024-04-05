@@ -11,12 +11,12 @@ async fn test_generate_frontend_code() {
         .with(fmt::Layer::default())
         .init();
 
-    let objective = "Expertise lies in writing frontend code for Yew rust framework";
+    let objective = "Expertise lies in writing frontend code";
     let position = "Frontend Developer";
 
-    let mut frontend_gpt = FrontendGPT::new(objective, position, "javascript");
+    let mut frontend_gpt = FrontendGPT::new(objective, position, "python");
     let mut tasks = Tasks {
-        description: "Generate a todo crud app using Yew rust framework.".into(),
+        description: "Generate a todo crud app using fastapi python framework.".into(),
         scope: Some(Scope {
             crud: true,
             auth: true,
@@ -36,12 +36,12 @@ async fn test_generate_frontend_code() {
 
 #[tokio::test]
 async fn test_improve_frontend_code() {
-    let objective = "Expertise lies in writing frontend code for Yew rust framework";
+    let objective = "Expertise lies in writing frontend code";
     let position = "Frontend Developer";
 
-    let mut frontend_gpt = FrontendGPT::new(objective, position, "javascript");
+    let mut frontend_gpt = FrontendGPT::new(objective, position, "rust");
     let mut tasks = Tasks {
-        description: "Generate a todo crud app using Axum.".into(),
+        description: "Generate a todo crud app using Yew Rust framework.".into(),
         scope: Some(Scope {
             crud: true,
             auth: true,
@@ -54,55 +54,26 @@ async fn test_improve_frontend_code() {
     };
     tasks.frontend_code = Some(
         r#"
-use serde::Deserialize;
-use serde_json::json;
-use tokio::sync::Mutex;
-use axum::{
-    http::StatusCode,
-    routing::{get, post},
-    Json, Router,
-};
-use std::collections::HashMap;
-use std::sync::Arc;
+use gloo_net::http::Request;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use wasm_bindgen_futures::spawn_local;
+use web_sys::HtmlInputElement;
+use yew::prelude::*;
 
-#[derive(Deserialize)]
-struct CreateMessageRequest {
-    message: String,
+const BASE_URL: &str = "http://127.0.0.1:8080";
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+struct Item {
+    id: u8,
+    completed: bool,
+    description: String,
+    editing: bool,
 }
 
-type Messages = Arc<Mutex<HashMap<String, String>>>;
-
-async fn create_message(
-    Json(payload): Json<CreateMessageRequest>,
-    messages: Messages,
-) -> (StatusCode, Json<serde_json::Value>) {
-    let id = uuid::Uuid::new_v4().to_string();
-    messages.lock().await.insert(id.clone(), payload.message);
-    (StatusCode::OK, Json(json!({"id": id})))
-}
-
-async fn get_message(
-    Json(payload): Json<HashMap<String, String>>,
-    messages: Messages,
-) -> (StatusCode, Json<serde_json::Value>) {
-    match messages.lock().await.get(&payload["id"]) {
-        Some(message) => (StatusCode::OK, Json(json!({"message": message}))),
-        None => (StatusCode::NOT_FOUND, Json(json!({"error": "Message not found"}))),
-    }
-}
-
-#[tokio::main]
-async fn main() {
-    let messages = Arc::new(Mutex::new(HashMap::new()));
-    let app = Router::new()
-        .route("/create-message", post(create_message))
-        .route("/get-message", get(get_message))
-        .with_state(messages);
-
-    axum::Server::bind(&"127.0.0.1:3000".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+#[function_component(CrudItems)]
+fn crud_items() -> Html {
+    html! {}
 }
 "#
         .into(),
@@ -116,12 +87,12 @@ async fn main() {
 
 #[tokio::test]
 async fn test_fix_code_bugs() {
-    let objective = "Expertise lies in writing frontend code for Yew rust framework";
+    let objective = "Expertise lies in writing frontend code";
     let position = "Frontend Developer";
 
-    let mut frontend_gpt = FrontendGPT::new(objective, position, "javascript");
+    let mut frontend_gpt = FrontendGPT::new(objective, position, "rust");
     let mut tasks = Tasks {
-        description: "Generate a todo crud app using Axum.".into(),
+        description: "Generate a todo crud app using Yew web framework.".into(),
         scope: Some(Scope {
             crud: true,
             auth: true,
@@ -409,14 +380,14 @@ error[E0425]: cannot find function `render_item` in this scope
 
 #[tokio::test]
 async fn tests_frontend_dev_one() {
-    let objective = "Expertise lies in writing frontend code for Yew rust framework";
+    let objective = "Expertise lies in writing frontend code.";
     let position = "Frontend Developer";
 
-    let _frontend_gpt = FrontendGPT::new(objective, position, "javascript");
+    let _frontend_gpt = FrontendGPT::new(objective, position, "rust");
 
     let _tasks = Tasks {
         description:
-            "Build a website for an e-commerce platform with payment integration using Axum.".into(),
+            "Build a website for an e-commerce platform with payment integration using rust yew framework.".into(),
         scope: Some(Scope {
             crud: true,
             auth: true,

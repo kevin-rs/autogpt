@@ -13,7 +13,7 @@ Example:
   Description: "The web design features a modern layout with a prominent hero section showcasing a beach scene. The navigation bar is minimalist, and the content sections are organized with clean typography and ample whitespace."
 "#;
 
-pub(crate) const STABILITY_PROMPT: &str = r#"
+pub(crate) const IMGGET_PROMPT: &str = r#"
 Your task is to generate a web design based on the provided description.
 
 Instructions:
