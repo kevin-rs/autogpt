@@ -47,13 +47,13 @@ cargo run --all-features --
 Build the Docker container:
 
 ```sh
-docker build -t autogpt -n autogpt .
+docker build -t autogpt .
 ```
 
 Run the container:
 
 ```sh
-docker run -i -e GEMINI_API_KEY=<your_gemini_api_key> -v workspace:/workspace -t autogpt:latest
+docker run -i -e GEMINI_API_KEY=<your_gemini_api_key> -t autogpt:latest
 ```
 
 Now, you can attach to the container:
