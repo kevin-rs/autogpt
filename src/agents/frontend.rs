@@ -108,7 +108,7 @@ impl FrontendGPT {
         match language {
             "rust" => {
                 let cargo_new = Command::new("cargo")
-                    .arg("new")
+                    .arg("init")
                     .arg(workspace.clone())
                     .spawn();
 

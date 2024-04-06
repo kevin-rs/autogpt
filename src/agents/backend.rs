@@ -111,7 +111,7 @@ impl BackendGPT {
 
         match language {
             "rust" => {
-                let cargo_new = Command::new("cargo").arg("new").arg(&workspace).spawn();
+                let cargo_new = Command::new("cargo").arg("init").arg(&workspace).spawn();
 
                 match cargo_new {
                     Ok(_) => debug!("Cargo project initialized successfully!"),
