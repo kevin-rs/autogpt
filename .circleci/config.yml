@@ -11,8 +11,7 @@ jobs:
       - checkout
       - run:
           name: Run Tests
-          command: |
-            cargo test --all-features
+          command: cargo test --all-features
 
 workflows:
   version: 2
