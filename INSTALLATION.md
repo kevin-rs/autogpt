@@ -17,7 +17,7 @@ cargo install autogpt --all-features
 To install and run the AutoGPT CLI via Docker, use the following command:
 
 ```sh
-docker run -it --rm --name autogpt kevin-rs/autogpt:latest
+docker run -it -e GEMINI_API_KEY=<your_gemini_api_key> --rm --name autogpt kevinrsdev/autogpt:0.0.1
 ```
 
 ## 📦 Build From Source
@@ -39,7 +39,7 @@ cd autogpt
 To run AutoGPT CLI via Cargo, execute:
 
 ```sh
-cargo run --all-features --
+cargo run --all-features
 ```
 
 ### 🐳 Using Docker
@@ -141,7 +141,7 @@ autogpt
 You can also run AutoGPT CLI using Docker:
 
 ```sh
-docker run -it --rm --name autogpt kevin-rs/autogpt:latest
+docker run -it -e GEMINI_API_KEY=<your_gemini_api_key> --rm --name autogpt kevinrsdev/autogpt:0.0.1
 ```
 
 ---

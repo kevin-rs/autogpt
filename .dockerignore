@@ -3,5 +3,6 @@
 Dockerfile
 tests/
 workspace/
+examples/
 debug/
 target/
