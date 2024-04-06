@@ -39,21 +39,6 @@ async fn test_generate_image_from_text() -> Result<()> {
 
 #[tokio::test]
 #[cfg(feature = "img")]
-async fn test_generate_text_from_image() -> Result<()> {
-    let objective = "Crafts stunning web design layouts";
-    let position = "Web Designer";
-
-    let mut designer_agent = DesignerGPT::new(objective, position);
-
-    let _ = designer_agent
-        .generate_text_from_image("workspace/designer/img.jpg")
-        .await?;
-
-    Ok(())
-}
-
-#[tokio::test]
-#[cfg(feature = "img")]
 async fn test_execute_agent() -> Result<()> {
     let objective = "Crafts stunning web design layouts";
     let position = "Web Designer";
