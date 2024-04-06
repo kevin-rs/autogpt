@@ -2,6 +2,11 @@
 
 <div align="center">
 
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/kevin-rs/autogpt/tree/main.svg?style=svg&circle-token=CCIPRJ_PifnErxs6Ze2XWpjmUeRV1_4e84825e0f6a366716a77c2dbbe93c3bd3e507fa)](https://dl.circleci.com/status-badge/redirect/gh/kevin-rs/autogpt/tree/main)
+[![Github](https://img.shields.io/badge/launch-Github-181717.svg?logo=github&logoColor=white)](./examples/basic.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/kevin-rs/autogpt/main?filepath=examples/basic.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kevin-rs/autogpt/blob/main/examples/basic.ipynb)
+
 ![banner](https://github.com/kevin-rs/kevin/assets/62179149/8b54dea8-2231-4509-8c18-10ec414578d2)
 
 [![Work In Progress](https://img.shields.io/badge/Work%20In%20Progress-red)](https://github.com/wiseaidev)
@@ -38,6 +43,9 @@ AutoGPT is a pure rust framework that simplifies AI agent creation and managemen
 ## 📦 Installation
 
 Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, running, and/or building the CLI from source using either Cargo or Docker.
+
+> [!NOTE]
+> For optimal performance and compatibility, we strongly advise utilizing a Linux operating system to install this CLI.
 
 ## 🔄 Workflow
 
