@@ -1,7 +1,19 @@
 [package]
 name = "autogpt"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+description = """
+🦀 A Pure Rust Framework For Building AGIs.
+"""
+authors = ["Mahmoud Harmouch <oss@wiseai.dev>"]
+license = "MIT"
+documentation = "https://docs.rs/autogpt"
+repository = "https://github.com/kevin-rs/autogpt"
+homepage = "https://kevin-rs.dev"
+readme = "README.md"
+categories = ["science"]
+keywords = ["agi", "ai", "machine-learning", "llm", "stable-diffusion"]
+exclude = ["/workspace", "/examples"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -28,3 +40,16 @@ default = []
 img = ["getimg"]
 mail = ["nylas"]
 cli = ["clap", "tracing-subscriber"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = "thin"
+strip = "symbols"
+
+[badges]
+maintenance = { status = "actively-developed" }
