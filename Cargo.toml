@@ -15,12 +15,16 @@ tracing = "0.1.40"
 getimg = { version = "0.0.1", optional = true }
 nylas = { version = "0.0.8", optional = true }
 webbrowser = "0.8.13"
+clap = { version = "4.5.4", features = ["derive"], optional = true }
+tokio = { version = "1.37.0", default-features = false }
+tracing-subscriber = { version = "0.3.18", features = ["std"], optional = true }
+colored = "2.1.0"
 
 [dev-dependencies]
 tokio = { version = "1.37.0", features = ["full"] }
-tracing-subscriber = { version = "0.3.18", features = ["std"] }
 
 [features]
 default = []
 img = ["getimg"]
 mail = ["nylas"]
+cli = ["clap", "tracing-subscriber"]

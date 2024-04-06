@@ -44,6 +44,7 @@ use crate::prompts::frontend::{
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
+use colored::*;
 use gems::Client;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
@@ -53,7 +54,7 @@ use std::io::Read;
 use std::process::Command;
 use std::process::Stdio;
 use std::time::Duration;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Struct representing a `FrontendGPT`, which manages frontend code generation and testing using Gemini API.
 #[derive(Debug, Clone)]
@@ -99,6 +100,10 @@ impl FrontendGPT {
             .unwrap_or("workspace/".to_string())
             .to_owned()
             + "frontend";
+
+        if let Err(e) = fs::create_dir_all(workspace.clone()) {
+            error!("Error creating directory '{}': {}", workspace, e);
+        }
 
         match language {
             "rust" => {
@@ -164,7 +169,13 @@ impl FrontendGPT {
             .to_owned();
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);
-        info!("[*] {:?}: {:?}", position, agent);
+
+        info!(
+            "{}",
+            format!("[*] {:?}: 🛠️  Getting ready!", agent.position(),)
+                .bright_white()
+                .bold()
+        );
 
         let req_client: ReqClient = ReqClient::builder()
             .timeout(Duration::from_secs(3))
@@ -454,10 +465,16 @@ impl Functions for FrontendGPT {
     ///
     async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
         info!(
-            "[*] {:?}: Executing tasks: {:?}",
-            self.agent.position(),
-            tasks.clone()
+            "{}",
+            format!("[*] {:?}: Executing task:", self.agent.position(),)
+                .bright_white()
+                .bold()
         );
+        for task in tasks.clone().description.clone().split("- ") {
+            if !task.trim().is_empty() {
+                info!("{} {}", "•".bright_white().bold(), task.trim().cyan());
+            }
+        }
 
         let path = &self.workspace.to_string();
 
@@ -481,21 +498,36 @@ impl Functions for FrontendGPT {
 
                 Status::InUnitTesting => {
                     info!(
-                "[*] {:?}: Frontend Code Unit Testing: Awaiting user confirmation for code safety...",
-                self.agent.position(),
-            );
+                        "{}",
+                        format!(
+                            "[*] {:?}: Frontend Code Unit Testing...",
+                            self.agent.position(),
+                        )
+                        .bright_white()
+                        .bold()
+                    );
 
                     if !execute {
-                        info!(
-                    "[*] {:?}: It seems the code isn't safe to proceed. Consider revising or seeking assistance...",
-                    self.agent.position(),
-                );
+                        warn!(
+                            "{}",
+                            format!(
+                                "[*] {:?}: It seems the code isn't safe to proceed...",
+                                self.agent.position(),
+                            )
+                            .bright_yellow()
+                            .bold()
+                        );
                     }
 
                     info!(
-                "[*] {:?}: Frontend Code Unit Testing: Building and running the frontend project...",
-                self.agent.position(),
-            );
+                        "{}",
+                        format!(
+                            "[*] {:?}: Building and running the frontend project...",
+                            self.agent.position(),
+                        )
+                        .bright_white()
+                        .bold()
+                    );
 
                     let result = match self.language {
                         "rust" => {
@@ -541,10 +573,15 @@ impl Functions for FrontendGPT {
                                 .read_to_string(&mut stderr_output)
                                 .expect("Failed to read build stderr");
                             if self.nb_bugs > max_tries {
-                                info!(
-                                        "[*] {:?}: Frontend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
+                                error!(
+                                    "{}",
+                                    format!(
+                                        "[*] {:?}: Too many bugs found in the code. Consider debugging...",
                                         self.agent.position(),
-                                    );
+                                    )
+                                    .bright_red()
+                                    .bold()
+                                );
                                 break;
                             } else {
                                 self.agent.update(Status::Active);
@@ -553,13 +590,28 @@ impl Functions for FrontendGPT {
                                 self.bugs = Some(stderr_output.into());
                             } else {
                                 info!(
-                                    "[*] {:?}: Frontend Code Unit Testing: Frontend server build successful...",
-                                    self.agent.position(),
+                                    "{}",
+                                    format!(
+                                        "[*] {:?}: Frontend build successful...",
+                                        self.agent.position(),
+                                    )
+                                    .bright_green()
+                                    .bold()
                                 );
                             }
                         }
                         Err(err) => {
-                            panic!("Failed to execute command: {}", err);
+                            error!(
+                                "{}",
+                                format!(
+                                    "[*] {:?}: Failed to execute command: {}",
+                                    self.agent.position(),
+                                    err
+                                )
+                                .bright_red()
+                                .bold()
+                            );
+                            panic!();
                         }
                     }
                 }

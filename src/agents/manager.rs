@@ -15,6 +15,8 @@ use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT,
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
+use colored::*;
+use colored::*;
 use gems::Client;
 use std::env::var;
 use tracing::info;
@@ -124,7 +126,7 @@ impl ManagerGPT {
     pub fn new(
         objective: &'static str,
         position: &'static str,
-        request: &'static str,
+        request: &str,
         language: &'static str,
     ) -> Self {
         let agent = AgentGPT::new_borrowed(objective, position);
@@ -134,13 +136,20 @@ impl ManagerGPT {
         // let request = format!("{}\n\nUser Request: {}", MANAGER_PROMPT, request);
 
         let tasks: Tasks = Tasks {
-            description: request.into(),
+            description: request.to_string().into(),
             scope: None,
             urls: None,
             frontend_code: None,
             backend_code: None,
             api_schema: None,
         };
+
+        info!(
+            "{}",
+            format!("[*] {:?}: 🛠️  Getting ready!", agent.position(),)
+                .bright_white()
+                .bold()
+        );
 
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro".to_string())
@@ -175,21 +184,21 @@ impl ManagerGPT {
     fn spawn_default_agents(&mut self) {
         self.add_agent(AgentType::Architect(ArchitectGPT::new(
             "Creates innovative website designs and user experiences",
-            "Lead UX/UI Designer",
+            "ArchitectGPT",
         )));
         #[cfg(feature = "img")]
         self.add_agent(AgentType::Designer(DesignerGPT::new(
             "Creates innovative website designs and user experiences",
-            "Web wireframes and web UIs",
+            "DesignerGPT",
         )));
         self.add_agent(AgentType::Backend(BackendGPT::new(
             "Expertise lies in writing backend code for web servers and JSON databases",
-            "Backend Developer",
+            "BackendGPT",
             self.language,
         )));
         self.add_agent(AgentType::Frontend(FrontendGPT::new(
             "Expertise lies in writing frontend code for Yew rust framework",
-            "Frontend Developer",
+            "FrontendGPT",
             self.language,
         )));
     }
@@ -231,9 +240,14 @@ impl ManagerGPT {
     ///
     pub async fn execute(&mut self, execute: bool, max_tries: u64) -> Result<()> {
         info!(
-            "[*] {:?}: Executing task: {:?}",
-            self.agent.position(),
-            self.tasks.description.clone()
+            "{}",
+            format!(
+                "[*] {:?}: Executing task: {:?}",
+                self.agent.position(),
+                self.tasks.description.clone()
+            )
+            .bright_white()
+            .bold()
         );
 
         let language_request: String = format!(
@@ -272,11 +286,11 @@ impl ManagerGPT {
 
             let _agent_res = agent.execute(&mut self.tasks, execute, max_tries).await;
         }
-
         info!(
-            "[*] {:?}: Completed Tasks: {:?}",
-            self.agent.position(),
-            self.tasks.clone()
+            "{}",
+            format!("[*] {:?}: Completed Tasks:", self.agent.position())
+                .bright_white()
+                .bold()
         );
 
         Ok(())

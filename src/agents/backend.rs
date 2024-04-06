@@ -50,13 +50,14 @@ use std::process::Stdio;
 use std::thread::sleep;
 
 use anyhow::Result;
+use colored::*;
 use gems::Client;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
 use std::fs;
 use std::time::Duration;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use webbrowser::{open_browser_with_options, Browser, BrowserOptions};
 
 /// Struct representing a BackendGPT, which manages backend development tasks using GPT.
@@ -103,6 +104,10 @@ impl BackendGPT {
             .unwrap_or("workspace/".to_string())
             .to_owned()
             + "backend";
+
+        if let Err(e) = fs::create_dir_all(workspace.clone()) {
+            error!("Error creating directory '{}': {}", workspace, e);
+        }
 
         match language {
             "rust" => {
@@ -166,7 +171,12 @@ impl BackendGPT {
             .to_owned();
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);
-        info!("[*] {:?}: {:?}", position, agent);
+        info!(
+            "{}",
+            format!("[*] {:?}: 🛠️  Getting ready!", agent.position(),)
+                .bright_white()
+                .bold()
+        );
 
         let req_client: ReqClient = ReqClient::builder()
             .timeout(Duration::from_secs(3))
@@ -514,15 +524,21 @@ impl Functions for BackendGPT {
     ///
     async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
         info!(
-            "[*] {:?}: Executing tasks: {:?}",
-            self.agent.position(),
-            tasks.clone()
+            "{}",
+            format!("[*] {:?}: Executing task:", self.agent.position(),)
+                .bright_white()
+                .bold()
         );
+        for task in tasks.clone().description.clone().split("- ") {
+            if !task.trim().is_empty() {
+                info!("{} {}", "•".bright_white().bold(), task.trim().cyan());
+            }
+        }
 
         let path = &self.workspace.to_string();
 
         // TODO: add a func argument for webbrowser
-        if !execute {
+        if execute {
             let _ = open_browser_with_options(
                 Browser::Default,
                 "http://127.0.0.1:8000/docs",
@@ -550,19 +566,33 @@ impl Functions for BackendGPT {
 
                 Status::InUnitTesting => {
                     info!(
-                        "[*] {:?}: Backend Code Unit Testing: Awaiting user confirmation for code safety...",
-                        self.agent.position(),
-                    );
-
-                    if !execute {
-                        info!(
-                            "[*] {:?}: It seems the code isn't safe to proceed. Consider revising or seeking assistance...",
+                        "{}",
+                        format!(
+                            "[*] {:?}: Backend Code Unit Testing...",
                             self.agent.position(),
+                        )
+                        .bright_white()
+                        .bold()
+                    );
+                    if !execute {
+                        warn!(
+                            "{}",
+                            format!(
+                                "[*] {:?}: It seems the code isn't safe to proceed...",
+                                self.agent.position(),
+                            )
+                            .bright_yellow()
+                            .bold()
                         );
                     } else {
                         info!(
-                            "[*] {:?}: Backend Code Unit Testing: Building and running the backend project...",
-                            self.agent.position(),
+                            "{}",
+                            format!(
+                                "[*] {:?}: Building and running the backend project...",
+                                self.agent.position(),
+                            )
+                            .bright_white()
+                            .bold()
                         );
 
                         let result = match self.language {
@@ -634,9 +664,14 @@ impl Functions for BackendGPT {
                                 self.bugs = Some(stderr_output.into());
 
                                 if self.nb_bugs > max_tries {
-                                    info!(
-                                        "[*] {:?}: Backend Code Unit Testing: Too many bugs found in the code. Consider debugging...",
-                                        self.agent.position(),
+                                    error!(
+                                        "{}",
+                                        format!(
+                                            "[*] {:?}: Too many bugs found in the code. Consider debugging...",
+                                            self.agent.position(),
+                                        )
+                                        .bright_red()
+                                        .bold()
                                     );
                                     break;
                                 }
@@ -646,8 +681,13 @@ impl Functions for BackendGPT {
                             } else {
                                 self.nb_bugs = 0;
                                 info!(
-                                    "[*] {:?}: Backend Code Unit Testing: Backend server build successful...",
-                                    self.agent.position(),
+                                    "{}",
+                                    format!(
+                                        "[*] {:?}: Backend server build successful...",
+                                        self.agent.position(),
+                                    )
+                                    .bright_white()
+                                    .bold()
                                 );
                             }
 
@@ -667,16 +707,26 @@ impl Functions for BackendGPT {
                                 .collect();
 
                             tasks.api_schema = Some(filtered_endpoints.clone());
-
                             info!(
-                                "[*] {:?}: Backend Code Unit Testing: Starting the web server to test endpoints...",
-                                self.agent.position(),
+                                "{}",
+                                format!(
+                                    "[*] {:?}: Starting the web server to test endpoints...",
+                                    self.agent.position(),
+                                )
+                                .bright_white()
+                                .bold()
                             );
+
                             for endpoint in filtered_endpoints {
                                 info!(
-                                    "[*] {:?}: Testing endpoint: {}",
-                                    self.agent.position(),
-                                    endpoint.path
+                                    "{}",
+                                    format!(
+                                        "[*] {:?}: Testing endpoint: {}",
+                                        self.agent.position(),
+                                        endpoint.path
+                                    )
+                                    .bright_white()
+                                    .bold()
                                 );
 
                                 let url = format!("http://127.0.0.1:8080{}", endpoint.path);
@@ -685,9 +735,14 @@ impl Functions for BackendGPT {
 
                                 if status_code != 200 {
                                     info!(
+                                    "{}",
+                                    format!(
                                     "[*] {:?}: Failed to fetch the backend endpoint: {}. Further investigation needed...",
                                     self.agent.position(),
                                     endpoint.path
+                                    )
+                                    .bright_white()
+                                    .bold()
                                 );
                                 }
                             }
@@ -697,14 +752,24 @@ impl Functions for BackendGPT {
                             let backend_path = format!("{}/{}", path, "api.json");
                             fs::write(&backend_path, endpoints)?;
                             info!(
-                            "[*] {:?}: Backend testing complete. Results written to 'api.json'...",
-                            self.agent.position(),
-                        );
+                                    "{}",
+                                    format!(
+                                    "[*] {:?}: Backend testing complete. Results written to 'api.json'...",
+                                    self.agent.position(),
+                                    )
+                                    .bright_white()
+                                    .bold()
+                                );
                         } else {
-                            info!(
-                            "[*] {:?}: Backend Code Unit Testing: Failed to build or run the backend project",
-                            self.agent.position(),
-                        );
+                            error!(
+                                "{}",
+                                format!(
+                                    "[*] {:?}: Failed to build or run the backend project...",
+                                    self.agent.position(),
+                                )
+                                .bright_red()
+                                .bold()
+                            );
                             break;
                         }
                     }

@@ -1,0 +1,7 @@
+.git
+.env
+Dockerfile
+tests/
+workspace/
+debug/
+target/
