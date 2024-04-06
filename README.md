@@ -2,6 +2,8 @@
 
 <div align="center">
 
+![banner](https://github.com/kevin-rs/kevin/assets/62179149/8b54dea8-2231-4509-8c18-10ec414578d2)
+
 [![Work In Progress](https://img.shields.io/badge/Work%20In%20Progress-red)](https://github.com/wiseaidev)
 [![made-with-rust](https://img.shields.io/badge/Made%20with-Rust-1f425f.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
@@ -15,7 +17,7 @@
 [![Share On Meta](https://img.shields.io/badge/share%20on-meta-1976D2?logo=meta)](https://www.facebook.com/sharer/sharer.php?u=https://github.com/kevin-rs/autogpt)
 [![Share On Linkedin](https://img.shields.io/badge/share%20on-linkedin-3949AB?logo=linkedin)](https://www.linkedin.com/shareArticle?url=https://github.com/kevin-rs/autogpt&title=World%27s%20First%2C%20Multimodal%2C%20Zero%20Shot%2C%20Most%20General%2C%20Most%20Capable%2C%20Blazingly%20Fast%2C%20and%20Extremely%20Flexible%20Pure%20Rust%20AI%20Agentic%20Framework.)
 
-![banner](https://github.com/kevin-rs/kevin/assets/62179149/8b54dea8-2231-4509-8c18-10ec414578d2)
+<video src="https://github.com/kevin-rs/kevin/assets/62179149/00e95a77-b7b1-4103-a6b7-6eba3448f534"></video>
 
 </div>
 
@@ -32,6 +34,10 @@ AutoGPT is a pure rust framework that simplifies AI agent creation and managemen
 - **SDK Integration**: Software development kit for integrating AutoGPT into existing projects.
 
 ---
+
+## 📦 Installation
+
+Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, running, and/or building the CLI from source using either Cargo or Docker.
 
 ## 🔄 Workflow
 
@@ -94,124 +100,6 @@ Executes Assigned Tasks     Executes Assigned Tasks           Executes Assigned 
   
 - 🔄 **Feedback Loop**: Continuous feedback updates users on project progress and addresses issues.
   
----
-
-## 📦 Installation
-
-AutoGPT offers seamless integration with both Cargo and Docker for easy installation and usage.
-
-### ⚓ Using Cargo
-
-To install AutoGPT CLI via Cargo, execute the following command:
-
-```bash
-cargo install autogpt --all-features
-```
-
-### 🐳 Using Docker
-
-To install and run the AutoGPT CLI via Docker, use the following command:
-
-```bash
-docker run -it --rm --name autogpt kevin-rs/autogpt:latest <agent-command>
-```
-
-## 📦 Build From Source
-
-Fork/Clone The Repo:
-
-```bash
-git clone https://github.com/kevin-rs/autogpt.git
-```
-
-Navigate to the autogpt directory:
-
-```bash
-cd autogpt
-```
-
-### ⚓ Using Cargo
-
-To run AutoGPT CLI via Cargo, execute:
-
-```bash
-cargo run --all-features -- <agent-name>
-```
-
-### 🐳 Using Docker
-
-Build the Docker container:
-
-```bash
-docker build -t autogpt .
-```
-
-Run the container:
-
-```bash
-docker run -i -t autogpt:latest
-```
-
-Utilizing Docker, you can encapsulate AutoGPT within a container, ensuring consistent and reproducible environments across all systems.
-
----
-
-## 🛠️ CLI Usage
-
-The CLI provides a convenient means to interact with the code generation ecosystem. Before utilizing the CLI and or the SDK, your need to set up the necessary environment variables.
-
-### Environment Variables Setup
-
-To configure the CLI and or the SDK environment, follow these steps:
-
-1. **Define Workspace Path**: Set up the paths for designer, backend, frontend, and architect workspaces by setting the following environment variable:
-   
-   ```sh
-   export AUTOGPT_WORKSPACE=workspace/
-   ```
-
-   This variable guide the agents on where to generate the code within your project structure.
-
-1. **API Key Configuration**: Additionally, you need to set up the Gemini API key by setting the following environment variable:
-
-   ```sh
-   export GEMINI_API_KEY=<your_gemini_api_key>
-   ```
-
-   To obtain your API key, navigate to [Google AI Studio](https://aistudio.google.com/app/apikey) and generate it there. This key allows autogpt to communicate with Gemini API.
-
-1. **DesignerGPT Setup (Optional)**: To enable DesignerGPT, you will need to set up the following environment variable:
-   
-     ```sh
-     export GETIMG_API_KEY=<your_getimg_api_key>
-     ```
-
-     Generate an API key from your [GetImg Dashboard](https://dashboard.getimg.ai/api-keys).
-
-1. **MailerGPT Setup (Optional)**: To enable MailerGPT, in addition to these environment variables, you will need to set up the environment:
-   
-     ```sh
-     export NYLAS_SYSTEM_TOKEN=<Your_Nylas_System_Token>
-     export NYLAS_CLIENT_ID=<Your_Nylas_Client_ID>
-     export NYLAS_CLIENT_SECRET=<Your_Nylas_Client_Secret>
-     ```
-
-     Follow [this tutorial](NYLAS.md) for a guide on how to obtain these values.
-
-### Running Agents
-
-Execute agents to perform tasks using the `run` command:
-
-```bash
-autogpt run <agent-name>
-```
-
-You can also run AutoGPT CLI using Docker:
-
-```bash
-docker run -it --rm --name autogpt kevin-rs/autogpt:latest <agent-name>
-```
-
 ---
 
 ## 🤖 Available Agents

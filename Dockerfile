@@ -14,6 +14,18 @@ FROM alpine:3.19
 RUN addgroup -S kevin && \
     adduser -S -G kevin kevin
 
-USER kevin
+RUN apk add --no-cache sudo
+
+RUN addgroup -S sudo
+
+RUN addgroup kevin sudo
+
+RUN echo "%sudo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+WORKDIR /home/kevin
+
 COPY --from=builder /kevin/target/release/autogpt /usr/local/bin/autogpt
+
+USER kevin
+
 ENTRYPOINT [ "/usr/local/bin/autogpt" ]

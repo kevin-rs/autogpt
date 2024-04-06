@@ -43,6 +43,7 @@ use crate::prompts::architect::{
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
+use colored::*;
 use gems::Client;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
@@ -112,7 +113,12 @@ impl ArchitectGPT {
             .to_owned();
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);
-        info!("[*] {:?}: {:?}", position, agent);
+        info!(
+            "{}",
+            format!("[*] {:?}: 🛠️  Getting ready!", agent.position(),)
+                .bright_white()
+                .bold()
+        );
 
         let req_client: ReqClient = ReqClient::builder()
             .timeout(Duration::from_secs(3))
@@ -311,10 +317,16 @@ impl Functions for ArchitectGPT {
     ///
     async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, max_tries: u64) -> Result<()> {
         info!(
-            "[*] {:?}: Executing tasks: {:?}",
-            self.agent.position(),
-            tasks.clone()
+            "{}",
+            format!("[*] {:?}: Executing task:", self.agent.position(),)
+                .bright_white()
+                .bold()
         );
+        for task in tasks.clone().description.clone().split("- ") {
+            if !task.trim().is_empty() {
+                info!("{} {}", "•".bright_white().bold(), task.trim().cyan());
+            }
+        }
 
         let path = &(self.workspace.to_string() + "/diagram.py");
 
@@ -327,8 +339,8 @@ impl Functions for ArchitectGPT {
 
                     if scope.external {
                         let _ = self.get_urls(tasks).await;
-                        self.agent.update(Status::InUnitTesting);
                     }
+                    self.agent.update(Status::InUnitTesting);
                 }
 
                 Status::InUnitTesting => {
@@ -341,9 +353,14 @@ impl Functions for ArchitectGPT {
 
                     for url in urls {
                         info!(
-                            "[*] {:?}: Testing URL Endpoint: {}",
-                            self.agent.position(),
-                            url
+                            "{}",
+                            format!(
+                                "[*] {:?}: Testing URL Endpoint: {}",
+                                self.agent.position(),
+                                url
+                            )
+                            .bright_white()
+                            .bold()
                         );
 
                         // ping url
@@ -357,11 +374,16 @@ impl Functions for ArchitectGPT {
                                 }
                             }
                             Err(err) => {
-                                info!(
-                                    "[*] {:?}: Error sending request for URL {}: {:?}",
-                                    self.agent.position(),
-                                    url,
-                                    err
+                                error!(
+                                    "{}",
+                                    format!(
+                                        "[*] {:?}: Error sending request for URL {}: {:?}",
+                                        self.agent.position(),
+                                        url,
+                                        err
+                                    )
+                                    .bright_red()
+                                    .bold()
                                 );
                             }
                         }
@@ -397,8 +419,25 @@ impl Functions for ArchitectGPT {
                     let pip_install = Command::new("pip").arg("install").arg("diagrams").spawn();
 
                     match pip_install {
-                        Ok(_) => debug!("Diagrams installed successfully!"),
-                        Err(e) => error!("Error installing Diagrams: {}", e),
+                        Ok(_) => info!(
+                            "{}",
+                            format!(
+                                "[*] {:?}: Diagrams installed successfully!",
+                                self.agent.position(),
+                            )
+                            .bright_white()
+                            .bold()
+                        ),
+                        Err(e) => error!(
+                            "{}",
+                            format!(
+                                "[*] {:?}: Error installing Diagrams: {}!",
+                                self.agent.position(),
+                                e
+                            )
+                            .bright_red()
+                            .bold()
+                        ),
                     }
 
                     let python_code = self.generate_diagram(tasks).await?;

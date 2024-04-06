@@ -9,6 +9,7 @@ use crate::common::utils::{Status, Tasks};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
+use colored::*;
 use gems::Client;
 use nylas::client::Nylas;
 use nylas::messages::Message;
@@ -59,7 +60,12 @@ impl MailerGPT {
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);
 
-        info!("[*] {:?}: {:?}", position, agent);
+        info!(
+            "{}",
+            format!("[*] {:?}: 🛠️  Getting ready!", agent.position(),)
+                .bright_white()
+                .bold()
+        );
 
         Self {
             agent,
@@ -189,10 +195,16 @@ impl Functions for MailerGPT {
     ///
     async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
         info!(
-            "[*] {:?}: Executing tasks: {:?}",
-            self.agent.position(),
-            tasks.clone()
+            "{}",
+            format!("[*] {:?}: Executing task:", self.agent.position(),)
+                .bright_white()
+                .bold()
         );
+        for task in tasks.clone().description.clone().split("- ") {
+            if !task.trim().is_empty() {
+                info!("{} {}", "•".bright_white().bold(), task.trim().cyan());
+            }
+        }
         let mut _count = 0;
         while self.agent.status() != &Status::Completed {
             match self.agent.status() {
