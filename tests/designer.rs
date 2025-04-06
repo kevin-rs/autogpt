@@ -33,6 +33,9 @@ async fn test_generate_image_from_text() -> Result<()> {
     };
 
     let _ = designer_agent.generate_image_from_text(&mut tasks).await?;
+    assert_eq!(designer_agent.get_agent().memory().len(), 3);
+    assert_eq!(designer_agent.get_agent().memory()[0].role, "user");
+    assert_eq!(designer_agent.get_agent().memory()[1].role, "assistant");
 
     Ok(())
 }
@@ -55,6 +58,9 @@ async fn test_execute_agent() -> Result<()> {
     };
 
     let _ = designer_agent.execute(&mut tasks, true, 3).await?;
+    assert_eq!(designer_agent.get_agent().memory().len(), 3);
+    assert_eq!(designer_agent.get_agent().memory()[0].role, "user");
+    assert_eq!(designer_agent.get_agent().memory()[1].role, "assistant");
 
     Ok(())
 }

@@ -38,7 +38,7 @@ async fn test_get_scope() {
         }
     );
 
-    assert_eq!(architect_agent.agent().status(), &Status::Completed);
+    assert_eq!(architect_agent.get_agent().status(), &Status::Completed);
 }
 
 #[tokio::test]
@@ -62,9 +62,13 @@ async fn test_get_urls() {
     };
 
     let _ = architect_agent.get_urls(&mut tasks).await;
+    // 1 msg from user and 1 msg from assistant -> 2
+    assert_eq!(architect_agent.get_agent().memory().len(), 2);
+    assert_eq!(architect_agent.get_agent().memory()[0].role, "user");
+    assert_eq!(architect_agent.get_agent().memory()[1].role, "assistant");
 
     assert!(tasks.urls.unwrap().len() >= 1);
-    assert_eq!(architect_agent.agent().status(), &Status::InUnitTesting);
+    assert_eq!(architect_agent.get_agent().status(), &Status::InUnitTesting);
 }
 
 #[tokio::test]
@@ -88,8 +92,11 @@ async fn test_architect_agent() {
     };
 
     architect_agent.execute(&mut tasks, true, 3).await.unwrap();
+    assert_eq!(architect_agent.get_agent().memory().len(), 6);
+    assert_eq!(architect_agent.get_agent().memory()[0].role, "user");
+    assert_eq!(architect_agent.get_agent().memory()[1].role, "assistant");
 
-    assert!(tasks.scope != None);
+    assert!(tasks.scope.is_some());
     assert!(tasks.urls.is_some());
 
     dbg!(tasks);

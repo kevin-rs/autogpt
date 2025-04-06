@@ -36,7 +36,7 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{similarity, Status, Tasks};
+use crate::common::utils::{similarity, Communication, Status, Tasks};
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
@@ -126,7 +126,6 @@ impl DesignerGPT {
             client,
         }
     }
-
     /// Asynchronously generates an image from a text prompt.
     ///
     /// # Arguments
@@ -144,9 +143,9 @@ impl DesignerGPT {
     /// # Business Logic
     ///
     /// - Constructs a text prompt based on the description from tasks.
+    /// - Adds communication logs to the agent memory for traceability.
     /// - Generates an image from the text prompt using the getimg client.
     /// - Saves the generated image to the workspace directory.
-    ///
     pub async fn generate_image_from_text(&mut self, tasks: &Tasks) -> Result<()> {
         let img_path = self.workspace.to_string() + "/img.jpg";
 
@@ -154,7 +153,16 @@ impl DesignerGPT {
             format!("{}\n\nUser Prompt: {}", IMGGET_PROMPT, tasks.description);
         let negative_prompt = Some("Disfigured, cartoon, blurry");
 
-        // Generate image from text prompt
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: tasks.description.clone(),
+        });
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(format!("Generating image with prompt: '{}'", text_prompt)),
+        });
+
         let text_response = self
             .img_client
             .generate_image_from_text(
@@ -168,8 +176,12 @@ impl DesignerGPT {
             )
             .await?;
 
-        // Save text response image to file
         save_image(&text_response.image, &img_path).unwrap();
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("system"),
+            content: Cow::Owned(format!("Image saved at {}", img_path)),
+        });
 
         info!(
             "[*] {:?}: Image saved at {}",
@@ -197,23 +209,48 @@ impl DesignerGPT {
     /// # Business Logic
     ///
     /// - Loads and encodes the image from the specified file path.
+    /// - Logs communication between the user, assistant, and system.
     /// - Sends the image data to the Gemini API to generate text.
     /// - Returns the generated text description of the image.
-    ///
     pub async fn generate_text_from_image(&mut self, image_path: &str) -> Result<String> {
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(format!(
+                "Requesting text generation from image at path: {}",
+                image_path
+            )),
+        });
+
         let base64_image_data = match load_and_encode_image(image_path) {
             Ok(data) => data,
             Err(_) => {
+                let error_msg = format!("Failed to load or encode image at path: {}", image_path);
+
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("system"),
+                    content: Cow::Owned(error_msg.clone()),
+                });
+
                 debug!("[*] {:?}: Error loading image!", self.agent.position());
-                "".to_string()
+                return Ok("".to_string());
             }
         };
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned("Generating description from uploaded image...".to_string()),
+        });
 
         let response = self
             .client
             .generate_content_with_image(WEB_DESIGNER_PROMPT, &base64_image_data)
             .await
             .unwrap();
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(format!("Generated image description: {}", response)),
+        });
 
         debug!(
             "[*] {:?}: Got Image Description: {:?}",

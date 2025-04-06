@@ -5,7 +5,7 @@
 //! understands email contents and produces textual responses tailored to user requirements.
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{Status, Tasks};
+use crate::common::utils::{Communication, Status, Tasks};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
@@ -13,6 +13,7 @@ use colored::*;
 use gems::Client;
 use nylas::client::Nylas;
 use nylas::messages::Message;
+use std::borrow::Cow;
 use std::env::var;
 use tracing::{debug, info};
 
@@ -101,7 +102,6 @@ impl MailerGPT {
 
         Ok(messages[95..].to_vec())
     }
-
     /// Asynchronously generates text from the latest emails.
     ///
     /// # Arguments
@@ -119,22 +119,61 @@ impl MailerGPT {
     /// # Business Logic
     ///
     /// - Retrieves the latest emails.
+    /// - Logs communications for user input and assistant response.
     /// - Constructs a request for generating text based on email content and the provided prompt.
     /// - Sends the request to the Gemini client to generate text.
     /// - Returns the generated text.
-    ///
     pub async fn generate_text_from_emails(&mut self, prompt: &str) -> Result<String> {
-        let emails = self.get_latest_emails().await.unwrap();
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(format!(
+                "Requested to generate text based on emails with prompt: '{}'",
+                prompt
+            )),
+        });
 
-        // TODO: Parse emails bodies cz Gemini ain't geminiin'
-        let gemini_response: String = match self
+        let emails = match self.get_latest_emails().await {
+            Ok(e) => e,
+            Err(err) => {
+                let error_msg = format!("Failed to fetch latest emails: {}", err);
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("system"),
+                    content: Cow::Owned(error_msg.clone()),
+                });
+                return Err(anyhow::anyhow!(error_msg));
+            }
+        };
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(
+                "Analyzing latest emails and generating text based on provided prompt..."
+                    .to_string(),
+            ),
+        });
+
+        let gemini_response = match self
             .client
             .generate_content(&format!("User Request:{}\n\nEmails:{:?}", prompt, emails))
             .await
         {
             Ok(response) => response,
-            Err(_err) => Default::default(),
+            Err(err) => {
+                let error_msg = format!("Failed to generate content from emails: {}", err);
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("system"),
+                    content: Cow::Owned(error_msg.clone()),
+                });
+                return Err(anyhow::anyhow!(error_msg));
+            }
         };
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(
+                "Generated text from emails based on the given prompt.".to_string(),
+            ),
+        });
 
         info!(
             "[*] {:?}: Got Response: {:?}",

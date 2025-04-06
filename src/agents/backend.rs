@@ -37,8 +37,8 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::Route;
-use crate::common::utils::{strip_code_blocks, Status, Tasks};
+use crate::common::utils::strip_code_blocks;
+use crate::common::utils::{Communication, Route, Status, Tasks};
 use crate::prompts::backend::{
     API_ENDPOINTS_PROMPT, FIX_CODE_PROMPT, IMPROVED_WEBSERVER_CODE_PROMPT, WEBSERVER_CODE_PROMPT,
 };
@@ -194,7 +194,7 @@ impl BackendGPT {
         }
     }
 
-    /// Asynchronously generates backend code based on tasks.
+    /// Asynchronously generates backend code based on tasks and logs the interaction.
     ///
     /// # Arguments
     ///
@@ -206,30 +206,25 @@ impl BackendGPT {
     ///
     /// # Errors
     ///
-    /// Returns an error if there's a failure in generating the backend code.
+    /// Returns an error if there's a failure in reading the template file,
+    /// generating content via the Gemini API, or writing the output file.
     ///
     /// # Business Logic
     ///
     /// - Determines the file path based on the specified language.
     /// - Reads the template code from the specified file.
-    /// - Constructs a request based on the template code and project description.
-    /// - Sends the request to the Gemini API to generate content.
-    /// - Writes the generated backend code to the appropriate file.
-    /// - Updates tasks and agent status accordingly.
-    ///
+    /// - Constructs a request using the template code and project description.
+    /// - Sends the request to the Gemini API to generate backend code.
+    /// - Logs the user request and assistant response as communication history in the agent's memory.
+    /// - Writes the generated backend code to the appropriate file based on language.
+    /// - Updates the task's backend code and the agent's status to `Completed`.
     pub async fn generate_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = &self.workspace;
 
         let full_path = match self.language {
-            "rust" => {
-                format!("{}/{}", path, "src/main.rs")
-            }
-            "python" => {
-                format!("{}/{}", path, "main.py")
-            }
-            "javascript" => {
-                format!("{}/{}", path, "src/index.js")
-            }
+            "rust" => format!("{}/{}", path, "src/main.rs"),
+            "python" => format!("{}/{}", path, "main.py"),
+            "javascript" => format!("{}/{}", path, "src/index.js"),
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
@@ -242,21 +237,36 @@ impl BackendGPT {
             WEBSERVER_CODE_PROMPT, template, tasks.description
         );
 
-        let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => Default::default(),
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        let gemini_response_result = self.client.generate_content(&request).await;
+
+        let gemini_response = match gemini_response_result {
+            Ok(response) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response.clone()),
+                });
+
+                strip_code_blocks(&response)
+            }
+            Err(err) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Error generating backend code: {}", err)),
+                });
+
+                Default::default()
+            }
         };
 
         let backend_path = match self.language {
-            "rust" => {
-                format!("{}/{}", path, "src/main.rs")
-            }
-            "python" => {
-                format!("{}/{}", path, "main.py")
-            }
-            "javascript" => {
-                format!("{}/{}", path, "src/index.js")
-            }
+            "rust" => format!("{}/{}", path, "src/main.rs"),
+            "python" => format!("{}/{}", path, "main.py"),
+            "javascript" => format!("{}/{}", path, "src/index.js"),
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
@@ -270,7 +280,8 @@ impl BackendGPT {
         Ok(gemini_response)
     }
 
-    /// Asynchronously improves existing backend code based on tasks.
+    /// Asynchronously improves existing backend code based on tasks,
+    /// while logging communication between the agent and the AI.
     ///
     /// # Arguments
     ///
@@ -287,10 +298,11 @@ impl BackendGPT {
     /// # Business Logic
     ///
     /// - Constructs a request based on the existing backend code and project description.
-    /// - Sends the request to the Gemini API to generate content.
+    /// - Logs the user's request as a `Communication`.
+    /// - Sends the request to the Gemini API to generate improved code.
+    /// - Logs the AI's response as a `Communication`.
     /// - Writes the improved backend code to the appropriate file.
     /// - Updates tasks and agent status accordingly.
-    ///
     pub async fn improve_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = &self.workspace;
 
@@ -301,21 +313,36 @@ impl BackendGPT {
             tasks.description
         );
 
-        let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => Default::default(),
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        let gemini_response_result = self.client.generate_content(&request).await;
+
+        let gemini_response = match gemini_response_result {
+            Ok(response) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response.clone()),
+                });
+
+                strip_code_blocks(&response)
+            }
+            Err(err) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Error improving backend code: {}", err)),
+                });
+
+                Default::default()
+            }
         };
 
         let backend_path = match self.language {
-            "rust" => {
-                format!("{}/{}", path, "src/main.rs")
-            }
-            "python" => {
-                format!("{}/{}", path, "main.py")
-            }
-            "javascript" => {
-                format!("{}/{}", path, "src/index.js")
-            }
+            "rust" => format!("{}/{}", path, "src/main.rs"),
+            "python" => format!("{}/{}", path, "main.py"),
+            "javascript" => format!("{}/{}", path, "src/index.js"),
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
@@ -331,7 +358,8 @@ impl BackendGPT {
         Ok(gemini_response)
     }
 
-    /// Asynchronously fixes bugs in the backend code based on tasks.
+    /// Asynchronously fixes bugs in the backend code based on tasks,
+    /// while logging communication between the agent and the AI.
     ///
     /// # Arguments
     ///
@@ -348,37 +376,51 @@ impl BackendGPT {
     /// # Business Logic
     ///
     /// - Constructs a request based on the buggy backend code and project description.
+    /// - Logs the request as a user `Communication`.
     /// - Sends the request to the Gemini API to generate content for fixing bugs.
+    /// - Logs the response or any errors as assistant `Communication`s.
     /// - Writes the fixed backend code to the appropriate file.
     /// - Updates tasks and agent status accordingly.
-    ///
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = var("AUTOGPT_WORKSPACE")
-            .unwrap_or("workspace/backend".to_string())
-            .to_owned();
+        let path = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace/backend".to_string());
 
         let request: String = format!(
             "{}\n\nBuggy Code: {}\nBugs: {}\n\nFix all bugs.",
             FIX_CODE_PROMPT,
-            tasks.clone().backend_code.unwrap(),
-            self.bugs.clone().unwrap()
+            tasks.clone().backend_code.unwrap_or_default(),
+            self.bugs.clone().unwrap_or_default()
         );
 
-        let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => Default::default(),
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        let gemini_response_result = self.client.generate_content(&request).await;
+
+        let gemini_response = match gemini_response_result {
+            Ok(response) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response.clone()),
+                });
+
+                strip_code_blocks(&response)
+            }
+            Err(err) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                });
+
+                Default::default()
+            }
         };
 
         let backend_path = match self.language {
-            "rust" => {
-                format!("{}/{}", path, "src/main.rs")
-            }
-            "python" => {
-                format!("{}/{}", path, "main.py")
-            }
-            "javascript" => {
-                format!("{}/{}", path, "src/index.js")
-            }
+            "rust" => format!("{}/{}", path, "src/main.rs"),
+            "python" => format!("{}/{}", path, "main.py"),
+            "javascript" => format!("{}/{}", path, "src/index.js"),
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
@@ -392,7 +434,8 @@ impl BackendGPT {
         Ok(gemini_response)
     }
 
-    /// Asynchronously retrieves routes JSON from the backend code.
+    /// Asynchronously retrieves routes JSON from the backend code,
+    /// while logging communication between the agent and the AI.
     ///
     /// # Returns
     ///
@@ -406,22 +449,17 @@ impl BackendGPT {
     ///
     /// - Reads the backend code from the appropriate file.
     /// - Constructs a request with the backend code.
-    /// - Sends the request to the Gemini API to generate content.
+    /// - Logs the user's request as a `Communication`.
+    /// - Sends the request to the Gemini API to generate content for routes JSON.
+    /// - Logs the AI's response as a `Communication`.
     /// - Updates agent status accordingly.
-    ///
     pub async fn get_routes_json(&mut self) -> Result<String> {
         let path = &self.workspace;
 
         let full_path = match self.language {
-            "rust" => {
-                format!("{}/{}", path, "src/main.rs")
-            }
-            "python" => {
-                format!("{}/{}", path, "main.py")
-            }
-            "javascript" => {
-                format!("{}/{}", path, "src/index.js")
-            }
+            "rust" => format!("{}/{}", path, "src/main.rs"),
+            "python" => format!("{}/{}", path, "main.py"),
+            "javascript" => format!("{}/{}", path, "src/index.js"),
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
 
@@ -434,9 +472,30 @@ impl BackendGPT {
             API_ENDPOINTS_PROMPT, backend_code
         );
 
-        let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => Default::default(),
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        let gemini_response_result = self.client.generate_content(&request).await;
+
+        let gemini_response = match gemini_response_result {
+            Ok(response) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response.clone()),
+                });
+
+                strip_code_blocks(&response)
+            }
+            Err(err) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Error retrieving routes JSON: {}", err)),
+                });
+
+                Default::default()
+            }
         };
 
         self.agent.update(Status::Completed);

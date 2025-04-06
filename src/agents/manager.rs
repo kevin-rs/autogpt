@@ -10,14 +10,14 @@ use crate::agents::backend::BackendGPT;
 use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
 use crate::common::utils::strip_code_blocks;
-use crate::common::utils::Tasks;
+use crate::common::utils::{Communication, Tasks};
 use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT, MANAGER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
 use colored::*;
-use colored::*;
 use gems::Client;
+use std::borrow::Cow;
 use std::env::var;
 use tracing::info;
 
@@ -217,7 +217,6 @@ impl ManagerGPT {
 
         Ok(gemini_response)
     }
-
     /// Asynchronously executes the tasks described by the user request.
     ///
     /// # Arguments
@@ -236,9 +235,17 @@ impl ManagerGPT {
     /// # Business Logic
     ///
     /// - Executes tasks described by the user request using the collection of agents managed by the manager.
+    /// - Logs user request, system decisions, and assistant responses.
     /// - Manages retries and error handling during task execution.
-    ///
     pub async fn execute(&mut self, execute: bool, max_tries: u64) -> Result<()> {
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(format!(
+                "Execute tasks with description: '{}'",
+                self.tasks.description.clone()
+            )),
+        });
+
         info!(
             "{}",
             format!(
@@ -250,33 +257,68 @@ impl ManagerGPT {
             .bold()
         );
 
-        let language_request: String = format!(
+        let language_request = format!(
             "{}\n\nUser Request: {}",
             LANGUAGE_MANAGER_PROMPT,
             self.tasks.description.clone()
         );
 
-        let framework_request: String = format!(
+        let framework_request = format!(
             "{}\n\nUser Request: {}",
             FRAMEWORK_MANAGER_PROMPT,
             self.tasks.description.clone()
         );
 
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(
+                "Analyzing user request to determine programming language and framework..."
+                    .to_string(),
+            ),
+        });
+
         let language = self.execute_prompt(language_request).await?;
         let framework = self.execute_prompt(framework_request).await?;
 
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(format!(
+                "Identified Language: '{}', Framework: '{}'",
+                language, framework
+            )),
+        });
+
         if self.agents.is_empty() {
             self.spawn_default_agents();
+            self.agent.add_communication(Communication {
+                role: Cow::Borrowed("system"),
+                content: Cow::Borrowed("No agents were available. Spawned default agents."),
+            });
         }
 
         for mut agent in self.agents.clone() {
-            let request_prompt = format!("{}\n\n\n\nUser Request: {}\n\nAgent Role: {}\nProgramming Language: {}\nFramework: {}\n",
-                MANAGER_PROMPT, self.tasks.description.clone(), agent.position(),language, framework);
+            let request_prompt = format!(
+            "{}\n\n\n\nUser Request: {}\n\nAgent Role: {}\nProgramming Language: {}\nFramework: {}\n",
+            MANAGER_PROMPT,
+            self.tasks.description.clone(),
+            agent.position(),
+            language,
+            framework
+        );
 
-            let request = self.execute_prompt(request_prompt).await?;
+            let refined_task = self.execute_prompt(request_prompt).await?;
+
+            self.agent.add_communication(Communication {
+                role: Cow::Borrowed("assistant"),
+                content: Cow::Owned(format!(
+                    "Refined task for '{}': {}",
+                    agent.position(),
+                    refined_task
+                )),
+            });
 
             self.tasks = Tasks {
-                description: request.into(),
+                description: refined_task.into(),
                 scope: None,
                 urls: None,
                 frontend_code: None,
@@ -286,6 +328,12 @@ impl ManagerGPT {
 
             let _agent_res = agent.execute(&mut self.tasks, execute, max_tries).await;
         }
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Borrowed("Task execution completed by all agents."),
+        });
+
         info!(
             "{}",
             format!("[*] {:?}: Completed Tasks:", self.agent.position())

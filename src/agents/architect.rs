@@ -35,8 +35,8 @@
 //! ```
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{extract_array, extract_json_string};
-use crate::common::utils::{strip_code_blocks, Scope, Status, Tasks};
+use crate::common::utils::{extract_array, extract_json_string, strip_code_blocks};
+use crate::common::utils::{Communication, Scope, Status, Tasks};
 use crate::prompts::architect::{
     ARCHITECT_DIAGRAM_PROMPT, ARCHITECT_ENDPOINTS_PROMPT, ARCHITECT_SCOPE_PROMPT,
 };
@@ -164,7 +164,7 @@ impl ArchitectGPT {
         }
     }
 
-    /// Retrieves the scope based on tasks description.
+    /// Retrieves the scope based on tasks description and logs the interaction in agent memory.
     ///
     /// # Arguments
     ///
@@ -177,28 +177,47 @@ impl ArchitectGPT {
     /// # Side Effects
     ///
     /// - Updates the agent status to `Status::Completed` upon successful completion.
+    /// - Adds both the user prompt and AI response (or error message) to the agent's communication memory.
     ///
     /// # Business Logic
     ///
     /// - Constructs a request based on the provided tasks.
     /// - Sends the request to the Gemini API to generate content.
+    /// - Logs the request as a user communication.
     /// - Parses the response into a Scope object.
+    /// - Logs the response (or error) as an assistant communication.
     /// - Updates the tasks with the retrieved scope.
-    /// - Updates the agent status to 'Completed'.
-    ///
+    /// - Updates the agent status to `Completed`.
     pub async fn get_scope(&mut self, tasks: &mut Tasks) -> Result<Scope> {
         let request: String = format!(
             "{}\n\nHere is the User Request:{}",
             ARCHITECT_SCOPE_PROMPT, tasks.description
         );
 
-        // use prompts scope
-        let gemini_response: Scope = match self.client.generate_content(&request).await {
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        let gemini_response_result = self.client.generate_content(&request).await;
+
+        let gemini_response = match gemini_response_result {
             Ok(response) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response.clone()),
+                });
+
                 serde_json::from_str(&extract_json_string(&response).unwrap_or_default())?
             }
             Err(err) => {
                 error!("[*] {:?}: {:?}", self.agent.position(), err);
+
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Error generating content: {}", err)),
+                });
+
                 Default::default()
             }
         };
@@ -210,7 +229,7 @@ impl ArchitectGPT {
         Ok(gemini_response)
     }
 
-    /// Retrieves URLs based on tasks description.
+    /// Retrieves URLs based on tasks description and logs the interaction in agent memory.
     ///
     /// # Arguments
     ///
@@ -223,36 +242,56 @@ impl ArchitectGPT {
     /// # Side Effects
     ///
     /// - Updates the agent status to `Status::InUnitTesting` upon successful completion.
+    /// - Adds both the user prompt and AI response (or error message) to the agent's communication memory.
     ///
     /// # Business Logic
     ///
     /// - Constructs a request based on the provided tasks.
     /// - Sends the request to the GPT client to generate content.
+    /// - Logs the request as a user communication.
     /// - Parses the response into a vector of URLs.
+    /// - Logs the response (or error) as an assistant communication.
     /// - Updates the tasks with the retrieved URLs.
-    /// - Updates the agent status to 'InUnitTesting'.
-    ///
+    /// - Updates the agent status to `InUnitTesting`.
     pub async fn get_urls(&mut self, tasks: &mut Tasks) -> Result<()> {
         let request: String = format!(
             "{}\n\nHere is the Project Description:{}",
             ARCHITECT_ENDPOINTS_PROMPT, tasks.description
         );
 
-        let gemini_response: Vec<Cow<'static, str>> =
-            match self.client.generate_content(&request).await {
-                Ok(response) => {
-                    debug!(
-                        "[*] {:?}: Got Response {:?}",
-                        self.agent.position(),
-                        response
-                    );
-                    serde_json::from_str(&extract_array(&response).unwrap_or_default())?
-                }
-                Err(err) => {
-                    error!("[*] {:?}: {:?}", self.agent.position(), err);
-                    Default::default()
-                }
-            };
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        let gemini_response_result = self.client.generate_content(&request).await;
+
+        let gemini_response: Vec<Cow<'static, str>> = match gemini_response_result {
+            Ok(response) => {
+                debug!(
+                    "[*] {:?}: Got Response {:?}",
+                    self.agent.position(),
+                    response
+                );
+
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response.clone()),
+                });
+
+                serde_json::from_str(&extract_array(&response).unwrap_or_default())?
+            }
+            Err(err) => {
+                error!("[*] {:?}: {:?}", self.agent.position(), err);
+
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Error getting URLs: {}", err)),
+                });
+
+                Default::default()
+            }
+        };
 
         tasks.urls = Some(gemini_response);
         self.agent.update(Status::InUnitTesting);
@@ -261,7 +300,7 @@ impl ArchitectGPT {
         Ok(())
     }
 
-    /// Generates a diagram based on tasks description.
+    /// Generates a diagram based on tasks description and logs the interaction in agent memory.
     ///
     /// # Arguments
     ///
@@ -271,23 +310,48 @@ impl ArchitectGPT {
     ///
     /// (`Result<String>`): The generated diagram content.
     ///
+    /// # Side Effects
+    ///
+    /// - Adds both the user prompt and AI response (or error message) to the agent's communication memory.
+    ///
     /// # Business Logic
     ///
     /// - Constructs a request based on the provided tasks.
-    /// - Constructs a request based on the provided tasks.
     /// - Sends the request to the GPT client to generate content.
+    /// - Logs the request as a user communication.
+    /// - Logs the response (or error) as an assistant communication.
     /// - Processes the response to strip code blocks.
-    /// - Updates the agent status.
-    ///
+    /// - Returns the cleaned-up diagram content.
     pub async fn generate_diagram(&mut self, tasks: &mut Tasks) -> Result<String> {
         let request: String = format!(
             "{}\n\nUser Request:{}",
             ARCHITECT_DIAGRAM_PROMPT, tasks.description
         );
 
-        let gemini_response: String = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => Default::default(),
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        let gemini_response_result = self.client.generate_content(&request).await;
+
+        let gemini_response = match gemini_response_result {
+            Ok(response) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response.clone()),
+                });
+
+                strip_code_blocks(&response)
+            }
+            Err(err) => {
+                self.agent.add_communication(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Error generating diagram: {}", err)),
+                });
+
+                Default::default()
+            }
         };
 
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
@@ -411,13 +475,21 @@ impl Functions for ArchitectGPT {
                                 }
                             }
                             Err(err) => {
+                                let url = err
+                                    .url()
+                                    .map(|u| u.to_string())
+                                    .unwrap_or_else(|| "unknown URL".to_string());
+                                let msg = format!(
+                                    " Failed to retrieve data from '{}'. Please check the URL or your internet connection.",
+                                    url
+                                );
                                 error!(
                                     "{}",
                                     format!(
                                         "[*] {:?}: Error sending request for URL {}: {:?}",
                                         self.agent.position(),
                                         url,
-                                        err
+                                        msg
                                     )
                                     .bright_red()
                                     .bold()
@@ -465,7 +537,7 @@ impl Functions for ArchitectGPT {
                             .arg(format!("{}s", 10))
                             .arg("python3")
                             .arg(path)
-                            .current_dir(&(self.workspace.to_string()))
+                            .current_dir(self.workspace.to_string())
                             .stdout(Stdio::piped())
                             .stderr(Stdio::piped())
                             .spawn();
