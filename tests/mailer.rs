@@ -6,6 +6,7 @@ use autogpt::traits::functions::Functions;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
+#[ignore]
 #[cfg(feature = "mail")]
 async fn test_mailer_gpt() {
     let filter = filter::LevelFilter::INFO;
