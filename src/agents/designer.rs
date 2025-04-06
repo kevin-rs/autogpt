@@ -107,7 +107,7 @@ impl DesignerGPT {
         let img_client = ImgClient::new(&getimg_api_key, &getimg_model);
 
         let model = var("GEMINI_MODEL")
-            .unwrap_or("gemini-pro-vision".to_string())
+            .unwrap_or("gemini-2.0-flash-vision".to_string())
             .to_owned();
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);

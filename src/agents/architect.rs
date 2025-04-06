@@ -140,7 +140,7 @@ impl ArchitectGPT {
 
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
         let model = var("GEMINI_MODEL")
-            .unwrap_or("gemini-pro".to_string())
+            .unwrap_or("gemini-2.0-flash".to_string())
             .to_owned();
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);
@@ -197,7 +197,10 @@ impl ArchitectGPT {
             Ok(response) => {
                 serde_json::from_str(&extract_json_string(&response).unwrap_or_default())?
             }
-            Err(_err) => Default::default(),
+            Err(err) => {
+                error!("[*] {:?}: {:?}", self.agent.position(), err);
+                Default::default()
+            }
         };
 
         tasks.scope = Some(gemini_response);
@@ -245,7 +248,10 @@ impl ArchitectGPT {
                     );
                     serde_json::from_str(&extract_array(&response).unwrap_or_default())?
                 }
-                Err(_err) => Default::default(),
+                Err(err) => {
+                    error!("[*] {:?}: {:?}", self.agent.position(), err);
+                    Default::default()
+                }
             };
 
         tasks.urls = Some(gemini_response);
