@@ -194,6 +194,7 @@ async fn main() -> Result<()> {
                 Commands::Back => {}
                 Commands::Design => {}
                 Commands::Mail => {}
+                Commands::Git => {}
             };
         }
     }

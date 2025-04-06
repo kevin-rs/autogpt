@@ -9,6 +9,8 @@ pub mod backend;
 #[cfg(feature = "img")]
 pub mod designer;
 pub mod frontend;
+#[cfg(feature = "git")]
+pub mod git;
 #[cfg(feature = "mail")]
 pub mod mailer;
 pub mod manager;
