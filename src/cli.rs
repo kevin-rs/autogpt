@@ -72,7 +72,10 @@ EXAMPLES:
   6. Automate emails:
       autogpt mail
 
-  7. Get help with a specific subcommand:
+  7. Automate Git Commit hell:
+      autogpt git
+
+  8. Get help with a specific subcommand:
       autogpt man --help
       autogpt arch --help
 "#
@@ -110,4 +113,7 @@ pub enum Commands {
 
     #[clap(name = "mail", about = "Manage AI agent for email automation.")]
     Mail,
+
+    #[clap(name = "git", about = "Manage AI agent for git commit automation.")]
+    Git,
 }

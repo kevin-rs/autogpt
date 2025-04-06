@@ -20,7 +20,7 @@ ManagerGPT articulates the project goal and communicates it to the ArchitectGPT 
 [*] "ArchitectGPT": Executing tasks: Tasks { description: "- Design the user interface for the weather app, including input fields for location and a display area for weather details.\n- Implement a function to fetch current weather data from a weather API in Python.\n- Create a FastAPI endpoint that calls the weather fetching function and returns the weather data in JSON format.\n- Integrate the FastAPI endpoint with the front end to display the fetched weather data on the user interface.\n- Handle error scenarios and provide appropriate user feedback.", scope: None, urls: None, frontend_code: None, backend_code: None, api_schema: None }
 ```
 
-- **DesignerGPT**: ManagerGPT guides DesignerGPT in crafting a user-friendly interface tailored for presenting the weather forecast. 
+- **DesignerGPT**: ManagerGPT guides DesignerGPT in crafting a user-friendly interface tailored for presenting the weather forecast.
 
 ```sh
 [*] "DesignerGPT": Executing tasks: Tasks { description: "- Utilize FastAPI in Python to develop a user interface for the weather app, integrating a location input field and display section for weather data.\n- Step 1: Define the layout and structure of the user interface, ensuring it's user-friendly and visually appealing.\n- Step 2: Implement the location search functionality, enabling users to input their desired location and retrieve relevant weather information.", scope: None, urls: None, frontend_code: None, backend_code: None, api_schema: None }
@@ -117,6 +117,36 @@ MailerGPT operates by:
 
 - Reading your emails and extracting relevant information based on the user input.
 - Generating and sending personalized email content tailored to specific recipients or target audiences.
+
+### 7. 📝 GitGPT
+
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/91a4868a-093f-4c96-89fc-5447e6f904f1" align="left" alt="gitgpt" width="64" />
+
+GitGPT is responsible for managing version control tasks inside your workspace. It stages and commits files automatically based on task descriptions, turning completed agents actions into traceable, atomic Git commits.
+
+#### How GitGPT Works
+
+Upon receiving a task from ManagerGPT, GitGPT will:
+
+- Monitor the agent's status to determine if changes are ready to be committed.
+- Automatically stage all files in the workspace directory.
+- Generate a Git commit using the task description as the message and the agent's position as the author signature.
+- Log and report commit actions with color-coded console output for visibility.
+
+This makes GitGPT perfect for keeping a clean Git history without manual intervention; Ideal for autonomous or quasi-autonomous workflows.
+
+> **Example Commit Message**
+>
+> commit cc448377fae752ba28847c873751ba1170d19fc0 (HEAD -> master)
+> Author: GitGPT <gitgpt@kevin-rs.dev>
+> Date: Mon Apr 7 00:25:59 2025 +0300
+>
+>     User Request: Project Goal: "Develop a patient management system encompassing appointment scheduling, patient records, and billing features.", Agent Role: "frontend", programming language: "Python", framework: "FastAPI"
+>     Output:
+>     - Implementing FastAPI, construct a frontend in Python for a patient management system encompassing appointment scheduling, patient records, and billing features.
+>     - Step 1: Develop the user interface components for appointment scheduling and display.
+>     - Step 2: Build the UI for managing and displaying patient records.
+>     - Step 3: Create the billing interface for generating and displaying invoices.
 
 With Autogpt's team of specialized agents working together, your project is in capable hands. Simply provide a simple project goal, and let Autogpt handle the rest!
 

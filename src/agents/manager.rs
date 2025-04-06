@@ -9,6 +9,7 @@ use crate::agents::backend::BackendGPT;
 #[cfg(feature = "img")]
 use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
+use crate::agents::git::GitGPT;
 use crate::common::utils::strip_code_blocks;
 use crate::common::utils::{Communication, Tasks};
 use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT, MANAGER_PROMPT};
@@ -33,6 +34,9 @@ enum AgentType {
     /// Designer GPT agent.
     #[cfg(feature = "img")]
     Designer(DesignerGPT),
+    /// Git GPT agent.
+    #[cfg(feature = "git")]
+    Git(GitGPT),
 }
 
 impl AgentType {
@@ -63,6 +67,8 @@ impl AgentType {
             AgentType::Frontend(agent) => agent.execute(tasks, execute, max_tries).await,
             #[cfg(feature = "img")]
             AgentType::Designer(agent) => agent.execute(tasks, execute, max_tries).await,
+            #[cfg(feature = "git")]
+            AgentType::Git(agent) => agent.execute(tasks, execute, max_tries).await,
         }
     }
 
@@ -78,9 +84,10 @@ impl AgentType {
     ///
     fn position(&self) -> String {
         match self {
-            AgentType::Architect(agent) => agent.agent().position().to_string(),
-            AgentType::Backend(agent) => agent.agent().position().to_string(),
-            AgentType::Frontend(agent) => agent.agent().position().to_string(),
+            AgentType::Architect(agent) => agent.get_agent().position().to_string(),
+            AgentType::Backend(agent) => agent.get_agent().position().to_string(),
+            AgentType::Frontend(agent) => agent.get_agent().position().to_string(),
+            AgentType::Git(agent) => agent.get_agent().position().to_string(),
             _ => "Any".to_string(),
         }
     }
@@ -200,6 +207,10 @@ impl ManagerGPT {
             "Expertise lies in writing frontend code for Yew rust framework",
             "FrontendGPT",
             self.language,
+        )));
+        self.add_agent(AgentType::Git(GitGPT::new(
+            "Handles git operations like staging and committing code",
+            "GitGPT",
         )));
     }
 
