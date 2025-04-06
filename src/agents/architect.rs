@@ -107,6 +107,37 @@ impl ArchitectGPT {
             Err(e) => error!("Error creating file 'diagram.py': {}", e),
         }
 
+        let create_venv = Command::new("python3")
+            .arg("-m")
+            .arg("venv")
+            .arg(workspace.clone() + "/.venv")
+            .status();
+
+        if let Ok(status) = create_venv {
+            if status.success() {
+                let pip_path = format!("{}/bin/pip", workspace.clone() + "/.venv");
+                let pip_install = Command::new(pip_path)
+                    .arg("install")
+                    .arg("diagrams")
+                    .spawn();
+
+                match pip_install {
+                    Ok(_) => info!(
+                        "{}",
+                        format!("[*] {:?}: Diagrams installed successfully!", position)
+                            .bright_white()
+                            .bold()
+                    ),
+                    Err(e) => error!(
+                        "{}",
+                        format!("[*] {:?}: Error installing Diagrams: {}!", position, e)
+                            .bright_red()
+                            .bold()
+                    ),
+                }
+            }
+        }
+
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
         let model = var("GEMINI_MODEL")
             .unwrap_or("gemini-pro".to_string())
@@ -414,31 +445,6 @@ impl Functions for ArchitectGPT {
                     //     Ok(_) => debug!("Graphviz installed successfully!"),
                     //     Err(e) => error!("Error installing Graphviz: {}", e),
                     // }
-
-                    // Command to install diagrams using pip
-                    let pip_install = Command::new("pip").arg("install").arg("diagrams").spawn();
-
-                    match pip_install {
-                        Ok(_) => info!(
-                            "{}",
-                            format!(
-                                "[*] {:?}: Diagrams installed successfully!",
-                                self.agent.position(),
-                            )
-                            .bright_white()
-                            .bold()
-                        ),
-                        Err(e) => error!(
-                            "{}",
-                            format!(
-                                "[*] {:?}: Error installing Diagrams: {}!",
-                                self.agent.position(),
-                                e
-                            )
-                            .bright_red()
-                            .bold()
-                        ),
-                    }
 
                     let python_code = self.generate_diagram(tasks).await?;
 
