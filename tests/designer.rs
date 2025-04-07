@@ -57,7 +57,7 @@ async fn test_execute_agent() -> Result<()> {
         api_schema: None,
     };
 
-    let _ = designer_agent.execute(&mut tasks, true, 3).await?;
+    let _ = designer_agent.execute(&mut tasks, true, false, 3).await?;
     assert_eq!(designer_agent.get_agent().memory().len(), 3);
     assert_eq!(designer_agent.get_agent().memory()[0].role, "user");
     assert_eq!(designer_agent.get_agent().memory()[1].role, "assistant");

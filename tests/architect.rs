@@ -91,7 +91,10 @@ async fn test_architect_agent() {
         api_schema: None,
     };
 
-    architect_agent.execute(&mut tasks, true, 3).await.unwrap();
+    architect_agent
+        .execute(&mut tasks, true, false, 3)
+        .await
+        .unwrap();
     assert_eq!(architect_agent.get_agent().memory().len(), 6);
     assert_eq!(architect_agent.get_agent().memory()[0].role, "user");
     assert_eq!(architect_agent.get_agent().memory()[1].role, "assistant");

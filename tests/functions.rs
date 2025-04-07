@@ -17,7 +17,13 @@ impl Functions for MockFunctions {
         &self.agent
     }
 
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        _execute: bool,
+        _browse: bool,
+        _max_tries: u64,
+    ) -> Result<()> {
         info!(
             "[*] {:?}: Executing tasks: {:?}",
             self.agent.position(),
@@ -75,7 +81,7 @@ async fn test_functions_execution() {
 
     let mut functions = MockFunctions { agent };
 
-    let result = functions.execute(&mut tasks, true, 3).await;
+    let result = functions.execute(&mut tasks, true, false, 3).await;
 
     assert!(result.is_ok());
 }

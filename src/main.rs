@@ -8,12 +8,13 @@ use anyhow::Result;
 async fn main() -> Result<()> {
     #[cfg(feature = "cli")]
     {
-        use tracing_subscriber::{filter, fmt};
-
-        let filter = filter::LevelFilter::INFO;
         use autogpt::agents::architect::ArchitectGPT;
+        use autogpt::agents::backend::BackendGPT;
         use autogpt::agents::frontend::FrontendGPT;
+        use autogpt::agents::git::GitGPT;
         use autogpt::agents::manager::ManagerGPT;
+        use autogpt::common::utils::ask_to_run_backend;
+        use autogpt::common::utils::setup_logging;
         use autogpt::common::utils::Scope;
         use autogpt::common::utils::Tasks;
         use autogpt::traits::functions::Functions;
@@ -21,24 +22,25 @@ async fn main() -> Result<()> {
         use autogpt::cli::{Cli, Commands};
         use clap::Parser;
         use colored::*;
-        use tracing::{info, warn};
+        use std::env::var;
+        use tracing::{error, info, warn};
 
-        // Start configuring a `fmt` subscriber
-        let subscriber = fmt()
-            .compact()
-            .with_max_level(filter)
-            .with_file(false)
-            .with_line_number(false)
-            .with_thread_ids(false)
-            .with_target(false)
-            .finish();
-        tracing::subscriber::set_global_default(subscriber)?;
+        setup_logging()?;
         let args: Cli = Cli::parse();
         info!(
             "{}",
             "[*] \"AGI\": 🌟 Welcome! What would you like to work on today?".bright_green()
         );
 
+        let mut git_agent = GitGPT::new("Commit all changes", "GitGPT");
+
+        let objective = "Expertise at managing projects at scale";
+        let position = "ManagerGPT";
+        let language = "python";
+
+        let workspace = var("AUTOGPT_WORKSPACE")
+            .unwrap_or("workspace/".to_string())
+            .to_owned();
         if args.command.is_none() {
             loop {
                 let mut input = String::new();
@@ -49,22 +51,16 @@ async fn main() -> Result<()> {
                 input = input.trim().to_string();
 
                 if !input.is_empty() {
-                    let input = input.clone();
+                    let mut manager = ManagerGPT::new(objective, position, &input, language);
                     info!(
                         "{}",
-                        "[*] \"AGI\": 🚀 Roger! Executing your command..."
+                        "[*] \"AGI\": 🫡 Roger! Executing your command..."
                             .bright_yellow()
                             .bold()
                     );
 
-                    let objective = "Expertise at managing projects at scale";
-                    let position = "ManagerGPT";
-                    let language = "python";
-
-                    let mut manager = ManagerGPT::new(objective, position, &input, language);
-
-                    let _ = manager.execute(true, 3).await;
-                    info!("{}", "[*] \"AGI\": ✅ Done! What would you like to build next? Perhaps you'd like to improve the app?".green().bold());
+                    let _ = manager.execute(true, false, 3).await;
+                    info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
                 } else {
                     warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
                                             .bright_yellow()
@@ -82,116 +78,268 @@ async fn main() -> Result<()> {
                     input = input.trim().to_string();
 
                     if !input.is_empty() {
-                        let input = input.clone();
-                        info!(
-                            "{}",
-                            "[*] \"AGI\": 🚀 Roger! Executing your command..."
-                                .bright_yellow()
-                                .bold()
-                        );
-
-                        let objective = "Expertise at managing projects at scale";
-                        let position = "ManagerGPT";
-                        let language = "python";
-
                         let mut manager = ManagerGPT::new(objective, position, &input, language);
-
-                        let _ = manager.execute(true, 3).await;
-                        info!("{}", "[*] \"AGI\": ✅ Done! What would you like to build next? Perhaps you'd like to improve the app?".green().bold());
-                    } else {
-                        warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
-                                            .bright_yellow()
-                                            .bold());
-                    }
-                },
-                Commands::Arch => loop {
-                    let mut input = String::new();
-                    std::io::stdin()
-                        .read_line(&mut input)
-                        .expect("Failed to read line");
-
-                    input = input.trim().to_string();
-
-                    if !input.is_empty() {
-                        let input = input.clone();
                         info!(
                             "{}",
-                            "[*] \"AGI\": 🚀 Roger! Executing your command..."
+                            "[*] \"AGI\": 🫡 Roger! Executing your command..."
                                 .bright_yellow()
                                 .bold()
                         );
 
-                        let objective = "Expertise at managing projects at scale";
-                        let position = "ArchitectGPT";
-
-                        let mut architect_agent = ArchitectGPT::new(objective, position);
-
-                        let mut tasks = Tasks {
-                            description: input.into(),
-                            scope: Some(Scope {
-                                crud: true,
-                                auth: false,
-                                external: true,
-                            }),
-                            urls: None,
-                            frontend_code: None,
-                            backend_code: None,
-                            api_schema: None,
-                        };
-
-                        architect_agent.execute(&mut tasks, true, 3).await.unwrap();
-                        info!("{}", "[*] \"AGI\": ✅ Done! What would you like to build next? Perhaps you'd like to improve the app?".green().bold());
+                        let _ = manager.execute(true, false, 3).await;
+                        info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
                     } else {
                         warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
                                             .bright_yellow()
                                             .bold());
                     }
                 },
-                Commands::Front => loop {
-                    let mut input = String::new();
-                    std::io::stdin()
-                        .read_line(&mut input)
-                        .expect("Failed to read line");
+                Commands::Arch => {
+                    let objective = "Expertise at managing projects at scale";
+                    let position = "ArchitectGPT";
 
-                    input = input.trim().to_string();
+                    let mut architect_agent = ArchitectGPT::new(objective, position);
 
-                    if !input.is_empty() {
-                        let input = input.clone();
-                        info!(
-                            "{}",
-                            "[*] \"AGI\": 🚀 Roger! Executing your command..."
-                                .bright_yellow()
-                                .bold()
-                        );
+                    let workspace = workspace + "architect";
+                    loop {
+                        let mut input = String::new();
+                        std::io::stdin()
+                            .read_line(&mut input)
+                            .expect("Failed to read line");
 
-                        let objective = "Expertise lies in writing frontend code";
-                        let position = "FrontendGPT";
-                        let language = "python";
+                        input = input.trim().to_string();
 
-                        let mut frontend_agent = FrontendGPT::new(objective, position, language);
+                        if !input.is_empty() {
+                            let input = input.clone();
+                            info!(
+                                "{}",
+                                "[*] \"AGI\": 🫡 Roger! Executing your command..."
+                                    .bright_yellow()
+                                    .bold()
+                            );
+                            let mut tasks = Tasks {
+                                description: input.into(),
+                                scope: Some(Scope {
+                                    crud: true,
+                                    auth: false,
+                                    external: true,
+                                }),
+                                urls: None,
+                                frontend_code: None,
+                                backend_code: None,
+                                api_schema: None,
+                            };
 
-                        let mut tasks = Tasks {
-                            description: input.into(),
-                            scope: Some(Scope {
-                                crud: true,
-                                auth: false,
-                                external: true,
-                            }),
-                            urls: None,
-                            frontend_code: None,
-                            backend_code: None,
-                            api_schema: None,
-                        };
+                            architect_agent
+                                .execute(&mut tasks, true, false, 3)
+                                .await
+                                .unwrap();
+                            info!(
+                                "{}",
+                                "[*] \"AGI\": Committing the new code to Git..."
+                                    .green()
+                                    .bold()
+                            );
+                            let _ = git_agent.execute(&mut tasks, true, false, 1).await;
+                            info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
 
-                        frontend_agent.execute(&mut tasks, true, 3).await.unwrap();
-                        info!("{}", "[*] \"AGI\": ✅ Done! What would you like to build next? Perhaps you'd like to improve the app?".green().bold());
-                    } else {
-                        warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
+                            if let Err(e) = ask_to_run_backend(
+                                architect_agent.get_agent().clone(),
+                                language,
+                                &workspace,
+                            )
+                            .await
+                            {
+                                error!(
+                                    "{}",
+                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                );
+                                break;
+                            }
+                        } else {
+                            warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
                                             .bright_yellow()
                                             .bold());
+
+                            if let Err(e) = ask_to_run_backend(
+                                architect_agent.get_agent().clone(),
+                                language,
+                                &workspace,
+                            )
+                            .await
+                            {
+                                error!(
+                                    "{}",
+                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                );
+                                break;
+                            }
+                        }
                     }
-                },
-                Commands::Back => {}
+                }
+                Commands::Front => {
+                    let objective = "Expertise lies in writing frontend code";
+                    let position = "FrontendGPT";
+
+                    let workspace = workspace + "frontend";
+                    let mut frontend_agent = FrontendGPT::new(objective, position, language);
+                    loop {
+                        let mut input = String::new();
+                        std::io::stdin()
+                            .read_line(&mut input)
+                            .expect("Failed to read line");
+
+                        input = input.trim().to_string();
+
+                        if !input.is_empty() {
+                            let input = input.clone();
+                            info!(
+                                "{}",
+                                "[*] \"AGI\": 🫡 Roger! Executing your command..."
+                                    .bright_yellow()
+                                    .bold()
+                            );
+
+                            let mut tasks = Tasks {
+                                description: input.into(),
+                                scope: Some(Scope {
+                                    crud: true,
+                                    auth: false,
+                                    external: true,
+                                }),
+                                urls: None,
+                                frontend_code: None,
+                                backend_code: None,
+                                api_schema: None,
+                            };
+
+                            frontend_agent
+                                .execute(&mut tasks, true, false, 3)
+                                .await
+                                .unwrap();
+                            info!(
+                                "{}",
+                                "[*] \"AGI\": Committing the new code to Git..."
+                                    .green()
+                                    .bold()
+                            );
+                            let _ = git_agent.execute(&mut tasks, true, false, 1).await;
+                            info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
+
+                            if let Err(e) = ask_to_run_backend(
+                                frontend_agent.get_agent().clone(),
+                                language,
+                                &workspace,
+                            )
+                            .await
+                            {
+                                error!(
+                                    "{}",
+                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                );
+                                break;
+                            }
+                        } else {
+                            warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
+                                            .bright_yellow()
+                                            .bold());
+                            if let Err(e) = ask_to_run_backend(
+                                frontend_agent.get_agent().clone(),
+                                language,
+                                &workspace,
+                            )
+                            .await
+                            {
+                                error!(
+                                    "{}",
+                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                );
+                                break;
+                            }
+                        }
+                    }
+                }
+                Commands::Back => {
+                    let objective =
+                        "Expertise lies in writing backend code for web servers and databases";
+                    let position = "BackendGPT";
+                    let workspace = workspace + "backend";
+                    let mut backend_gpt = BackendGPT::new(objective, position, language);
+                    loop {
+                        let mut input = String::new();
+                        std::io::stdin()
+                            .read_line(&mut input)
+                            .expect("Failed to read line");
+
+                        input = input.trim().to_string();
+
+                        if !input.is_empty() {
+                            let input = input.clone();
+                            info!(
+                                "{}",
+                                "[*] \"AGI\": 🫡 Roger! Executing your command..."
+                                    .bright_yellow()
+                                    .bold()
+                            );
+
+                            let mut tasks = Tasks {
+                                description: input.into(),
+                                scope: Some(Scope {
+                                    crud: true,
+                                    auth: true,
+                                    external: true,
+                                }),
+                                urls: None,
+                                frontend_code: None,
+                                backend_code: None,
+                                api_schema: None,
+                            };
+
+                            backend_gpt
+                                .execute(&mut tasks, true, false, 3)
+                                .await
+                                .unwrap();
+                            info!(
+                                "{}",
+                                "[*] \"AGI\": Committing the new code to Git..."
+                                    .green()
+                                    .bold()
+                            );
+                            let _ = git_agent.execute(&mut tasks, true, false, 1).await;
+                            info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
+                            if let Err(e) = ask_to_run_backend(
+                                backend_gpt.get_agent().clone(),
+                                language,
+                                &workspace,
+                            )
+                            .await
+                            {
+                                error!(
+                                    "{}",
+                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                );
+                                break;
+                            }
+                        } else {
+                            warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
+                                                    .bright_yellow()
+                                                    .bold());
+                            if let Err(e) = ask_to_run_backend(
+                                backend_gpt.get_agent().clone(),
+                                language,
+                                &workspace,
+                            )
+                            .await
+                            {
+                                error!(
+                                    "{}",
+                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                );
+                                break;
+                            }
+                        }
+                    }
+                }
                 Commands::Design => {}
                 Commands::Mail => {}
                 Commands::Git => {}

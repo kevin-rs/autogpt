@@ -29,7 +29,7 @@
 //!         api_schema: None,
 //!     };
 //!
-//!     if let Err(err) = backend_agent.execute(&mut tasks, true, 3).await {
+//!     if let Err(err) = backend_agent.execute(&mut tasks, true, false, 3).await {
 //!         eprintln!("Error executing backend tasks: {:?}", err);
 //!     }
 //! }
@@ -45,6 +45,7 @@ use crate::prompts::backend::{
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use std::io::Read;
+use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
 use std::thread::sleep;
@@ -108,7 +109,12 @@ impl BackendGPT {
         if let Err(e) = fs::create_dir_all(workspace.clone()) {
             error!("Error creating directory '{}': {}", workspace, e);
         }
-
+        info!(
+            "{}",
+            format!("[*] {:?}: 🛠️  Getting ready!", position,)
+                .bright_white()
+                .bold()
+        );
         match language {
             "rust" => {
                 let cargo_new = Command::new("cargo").arg("init").arg(&workspace).spawn();
@@ -171,12 +177,6 @@ impl BackendGPT {
             .to_owned();
         let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
         let client = Client::new(&api_key, &model);
-        info!(
-            "{}",
-            format!("[*] {:?}: 🛠️  Getting ready!", agent.position(),)
-                .bright_white()
-                .bold()
-        );
 
         let req_client: ReqClient = ReqClient::builder()
             .timeout(Duration::from_secs(3))
@@ -233,8 +233,11 @@ impl BackendGPT {
         let template = fs::read_to_string(full_path)?;
 
         let request: String = format!(
-            "{}\n\nCode Template: {}\nProject Description: {}",
-            WEBSERVER_CODE_PROMPT, template, tasks.description
+            "{}\n\nCode Template: {}\nProject Description: {}\nPrevious Conversation: {:?}\n",
+            WEBSERVER_CODE_PROMPT,
+            template,
+            tasks.description,
+            self.agent.memory()
         );
 
         self.agent.add_communication(Communication {
@@ -565,6 +568,7 @@ impl Functions for BackendGPT {
     ///
     /// * `tasks` - A mutable reference to tasks to be executed.
     /// * `execute` - A boolean indicating whether to execute the tasks.
+    /// * `browse` - Whether to open the API docs in a browser.
     /// * `max_tries` - Maximum number of attempts to execute tasks.
     ///
     /// # Returns
@@ -581,7 +585,13 @@ impl Functions for BackendGPT {
     /// - Handles task execution including code generation, bug fixing, and testing.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        execute: bool,
+        browse: bool,
+        max_tries: u64,
+    ) -> Result<()> {
         info!(
             "{}",
             format!("[*] {:?}: Executing task:", self.agent.position(),)
@@ -590,14 +600,18 @@ impl Functions for BackendGPT {
         );
         for task in tasks.clone().description.clone().split("- ") {
             if !task.trim().is_empty() {
-                info!("{} {}", "•".bright_white().bold(), task.trim().cyan());
+                info!(
+                    "[*] {:?}: {} {}",
+                    self.agent.position(),
+                    "•".bright_white().bold(),
+                    task.trim().cyan()
+                );
             }
         }
 
         let path = &self.workspace.to_string();
 
-        // TODO: add a func argument for webbrowser
-        if execute {
+        if browse {
             let _ = open_browser_with_options(
                 Browser::Default,
                 "http://127.0.0.1:8000/docs",
@@ -684,17 +698,118 @@ impl Functions for BackendGPT {
                                 }
                             }
                             "python" => {
-                                let run_output = Command::new("timeout")
-                                    .arg(format!("{}s", 10))
-                                    .arg("uvicorn")
-                                    .arg("main:app")
+                                let venv_path = format!("{}/.venv", path);
+                                let pip_path = format!("{}/bin/pip", venv_path);
+                                let venv_exists = Path::new(&venv_path).exists();
+
+                                if !venv_exists {
+                                    let create_venv = Command::new("python3")
+                                        .arg("-m")
+                                        .arg("venv")
+                                        .arg(&venv_path)
+                                        .stdout(Stdio::null())
+                                        .stderr(Stdio::null())
+                                        .status();
+
+                                    if let Ok(status) = create_venv {
+                                        if status.success() {
+                                            let main_py_path = format!("{}/main.py", path);
+                                            let main_py_content = fs::read_to_string(&main_py_path)
+                                                .expect("Failed to read main.py");
+
+                                            let mut packages = vec![];
+
+                                            for line in main_py_content.lines() {
+                                                if line.starts_with("from ")
+                                                    || line.starts_with("import ")
+                                                {
+                                                    let parts: Vec<&str> =
+                                                        line.split_whitespace().collect();
+
+                                                    if let Some(pkg) = parts.get(1) {
+                                                        let root_pkg =
+                                                            pkg.split('.').next().unwrap_or(pkg);
+                                                        if !packages.contains(&root_pkg) {
+                                                            packages.push(root_pkg);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if !packages.is_empty() {
+                                                if !packages.contains(&"uvicorn") {
+                                                    packages.push("uvicorn");
+                                                }
+                                                if !packages.contains(&"httpx") {
+                                                    packages.push("httpx");
+                                                }
+                                                for pkg in &packages {
+                                                    let install_status = Command::new(&pip_path)
+                                                        .arg("install")
+                                                        .arg(pkg)
+                                                        .stdout(Stdio::null())
+                                                        .stderr(Stdio::null())
+                                                        .status();
+
+                                                    match install_status {
+                                                        Ok(status) if status.success() => {
+                                                            info!(
+                                                                "{}",
+                                                                format!(
+                                                                    "[*] {:?}: Successfully installed Python package '{}'",
+                                                                    self.agent.position(),
+                                                                    pkg
+                                                                )
+                                                                .bright_white()
+                                                                .bold()
+                                                            );
+                                                        }
+                                                        Err(e) => {
+                                                            error!(
+                                                                "{}",
+                                                                format!(
+                                                                    "[*] {:?}: Failed to install Python package '{}': {}",
+                                                                    self.agent.position(),
+                                                                    pkg,
+                                                                    e
+                                                                )
+                                                                .bright_red()
+                                                                .bold()
+                                                            );
+                                                        }
+                                                        _ => {
+                                                            error!(
+                                                                "{}",
+                                                                format!(
+                                                                    "[*] {:?}: Installation of package '{}' exited with an error",
+                                                                    self.agent.position(),
+                                                                    pkg
+                                                                )
+                                                                .bright_red()
+                                                                .bold()
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                let run_output = Command::new("sh")
+                                    .arg("-c")
+                                    .arg(format!(
+                                        "timeout {} '.venv/bin/python' -m uvicorn main:app --host 0.0.0.0 --port 8000",
+                                        10
+                                    ))
                                     .current_dir(path)
                                     .stdout(Stdio::piped())
                                     .stderr(Stdio::piped())
                                     .spawn()
                                     .expect("Failed to run the backend application");
+
                                 Some(run_output)
                             }
+
                             "javascript" => {
                                 let run_output = Command::new("timeout")
                                     .arg(format!("{}s", 10))
@@ -837,6 +952,7 @@ impl Functions for BackendGPT {
                 _ => {}
             }
         }
+        self.agent.update(Status::Idle);
         Ok(())
     }
 }

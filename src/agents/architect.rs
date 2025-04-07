@@ -28,7 +28,7 @@
 //!         api_schema: None,
 //!     };
 //!
-//!     if let Err(err) = architect_agent.execute(&mut tasks, true, 3).await {
+//!     if let Err(err) = architect_agent.execute(&mut tasks, true, false, 3).await {
 //!         eprintln!("Error executing architect tasks: {:?}", err);
 //!     }
 //! }
@@ -119,6 +119,8 @@ impl ArchitectGPT {
                 let pip_install = Command::new(pip_path)
                     .arg("install")
                     .arg("diagrams")
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
                     .spawn();
 
                 match pip_install {
@@ -416,7 +418,13 @@ impl Functions for ArchitectGPT {
     /// - Handles task execution including scope retrieval, URL retrieval, and diagram generation.
     /// - Manages retries in case of failures during task execution.
     ///
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        _execute: bool,
+        _browse: bool,
+        max_tries: u64,
+    ) -> Result<()> {
         info!(
             "{}",
             format!("[*] {:?}: Executing task:", self.agent.position(),)

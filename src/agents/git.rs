@@ -220,7 +220,13 @@ impl Functions for GitGPT {
     /// - Logs the task description.
     /// - If agent is idle, stages files and creates a commit.
     /// - Updates agent status to completed after successful commit.
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        _execute: bool,
+        _browse: bool,
+        _max_tries: u64,
+    ) -> Result<()> {
         info!(
             "{}",
             format!(
