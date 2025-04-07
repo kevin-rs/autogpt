@@ -17,4 +17,6 @@ Cargo.lock
 
 workspace/
 
+logs/
+
 .ipynb_checkpoints

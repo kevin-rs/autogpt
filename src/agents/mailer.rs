@@ -232,7 +232,13 @@ impl Functions for MailerGPT {
     /// - Handles task execution including email retrieval and text generation.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        _execute: bool,
+        _browse: bool,
+        _max_tries: u64,
+    ) -> Result<()> {
         info!(
             "{}",
             format!("[*] {:?}: Executing task:", self.agent.position(),)

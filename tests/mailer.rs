@@ -33,5 +33,5 @@ async fn test_mailer_gpt() {
         backend_code: None,
         api_schema: None,
     };
-    let _ = mailer.execute(&mut tasks, true, 3).await;
+    let _ = mailer.execute(&mut tasks, true, false, 3).await;
 }

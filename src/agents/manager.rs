@@ -60,15 +60,21 @@ impl AgentType {
     ///
     /// - Executes tasks associated with the agent based on its type.
     ///
-    async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        execute: bool,
+        browse: bool,
+        max_tries: u64,
+    ) -> Result<()> {
         match self {
-            AgentType::Architect(agent) => agent.execute(tasks, execute, max_tries).await,
-            AgentType::Backend(agent) => agent.execute(tasks, execute, max_tries).await,
-            AgentType::Frontend(agent) => agent.execute(tasks, execute, max_tries).await,
+            AgentType::Architect(agent) => agent.execute(tasks, execute, browse, max_tries).await,
+            AgentType::Backend(agent) => agent.execute(tasks, execute, browse, max_tries).await,
+            AgentType::Frontend(agent) => agent.execute(tasks, execute, browse, max_tries).await,
             #[cfg(feature = "img")]
-            AgentType::Designer(agent) => agent.execute(tasks, execute, max_tries).await,
+            AgentType::Designer(agent) => agent.execute(tasks, execute, browse, max_tries).await,
             #[cfg(feature = "git")]
-            AgentType::Git(agent) => agent.execute(tasks, execute, max_tries).await,
+            AgentType::Git(agent) => agent.execute(tasks, execute, browse, max_tries).await,
         }
     }
 
@@ -248,7 +254,7 @@ impl ManagerGPT {
     /// - Executes tasks described by the user request using the collection of agents managed by the manager.
     /// - Logs user request, system decisions, and assistant responses.
     /// - Manages retries and error handling during task execution.
-    pub async fn execute(&mut self, execute: bool, max_tries: u64) -> Result<()> {
+    pub async fn execute(&mut self, execute: bool, browse: bool, max_tries: u64) -> Result<()> {
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
             content: Cow::Owned(format!(
@@ -337,7 +343,9 @@ impl ManagerGPT {
                 api_schema: None,
             };
 
-            let _agent_res = agent.execute(&mut self.tasks, execute, max_tries).await;
+            let _agent_res = agent
+                .execute(&mut self.tasks, execute, browse, max_tries)
+                .await;
         }
 
         self.agent.add_communication(Communication {

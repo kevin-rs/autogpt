@@ -23,7 +23,7 @@ async fn test_git_gpt_execute() {
         fs::remove_dir_all(test_workspace).unwrap();
     }
 
-    let mut git_agent = GitGPT::new("Commit all changes", "Git Commit Agent");
+    let mut git_agent = GitGPT::new("Commit all changes", "GitGPT");
 
     let dummy_file_path = format!("{}/hello.txt", test_workspace);
     fs::create_dir_all(test_workspace).unwrap();
@@ -38,7 +38,7 @@ async fn test_git_gpt_execute() {
         api_schema: None,
     };
 
-    let result = git_agent.execute(&mut tasks, true, 1).await;
+    let result = git_agent.execute(&mut tasks, true, false, 1).await;
 
     assert!(result.is_ok());
     assert_eq!(git_agent.get_agent().status(), &Status::Completed);

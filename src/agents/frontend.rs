@@ -29,7 +29,7 @@
 //!         api_schema: None,
 //!     };
 //!
-//!     if let Err(err) = frontend_agent.execute(&mut tasks, true, 3).await {
+//!     if let Err(err) = frontend_agent.execute(&mut tasks, true, false, 3).await {
 //!         eprintln!("Error executing frontend tasks: {:?}", err);
 //!     }
 //! }
@@ -530,7 +530,13 @@ impl Functions for FrontendGPT {
     /// - Handles task execution including code generation, improvement, bug fixing, and testing.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(&mut self, tasks: &mut Tasks, execute: bool, max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        execute: bool,
+        _browse: bool,
+        max_tries: u64,
+    ) -> Result<()> {
         info!(
             "{}",
             format!("[*] {:?}: Executing task:", self.agent.position(),)

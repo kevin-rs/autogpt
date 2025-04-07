@@ -28,7 +28,7 @@
 //!         api_schema: None,
 //!     };
 //!
-//!     if let Err(err) = designer_agent.execute(&mut tasks, true, 3).await {
+//!     if let Err(err) = designer_agent.execute(&mut tasks, true, false, 3).await {
 //!         eprintln!("Error executing designer tasks: {:?}", err);
 //!     }
 //! }
@@ -343,7 +343,13 @@ impl Functions for DesignerGPT {
     /// - Handles task execution including image generation, text generation, and comparison.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(&mut self, tasks: &mut Tasks, _execute: bool, _max_tries: u64) -> Result<()> {
+    async fn execute(
+        &mut self,
+        tasks: &mut Tasks,
+        _execute: bool,
+        _browse: bool,
+        _max_tries: u64,
+    ) -> Result<()> {
         info!(
             "{}",
             format!("[*] {:?}: Executing task:", self.agent.position(),)

@@ -64,9 +64,28 @@
 //! let stripped_code = strip_code_blocks(code_with_blocks);
 //! ```
 
+use crate::agents::agent::AgentGPT;
+use crate::traits::agent::Agent;
+use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
+use std::io;
+use std::io::Read;
+use std::process::Command;
+use std::process::Stdio;
+use webbrowser::open_browser_with_options;
+use webbrowser::Browser;
+use webbrowser::BrowserOptions;
+#[cfg(feature = "cli")]
+use {
+    tracing::{error, info, warn},
+    tracing_appender::rolling,
+    tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt,
+    tracing_subscriber::Layer,
+    tracing_subscriber::Registry,
+    tracing_subscriber::{filter, fmt},
+};
 
 /// Represents a communication between agents.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -235,4 +254,189 @@ pub fn strip_code_blocks(text: &str) -> String {
     }
 
     lines.join("\n")
+}
+
+pub fn is_yes(input: &str) -> bool {
+    matches!(
+        input.trim().to_lowercase().as_str(),
+        "yes" | "y" | "si" | "sure" | "ok" | "okay"
+    )
+}
+
+/// Runs a gpt project without generating new code.
+///
+/// # Arguments
+///
+/// * `language` - The programming language used ("rust", "python", "javascript").
+/// * `path` - The working directory where the gpt project resides.
+/// * `browse` - Whether to open the API docs in a browser.
+///
+/// # Returns
+///
+/// `Result<Option<Child>>` - The spawned gpt process (if successful), or an error.
+pub async fn run_code(
+    language: &str,
+    path: &str,
+    browse: bool,
+) -> Result<Option<std::process::Child>, Box<dyn std::error::Error>> {
+    if browse {
+        let _ = open_browser_with_options(
+            Browser::Default,
+            "http://127.0.0.1:8000/docs",
+            BrowserOptions::new().with_suppress_output(false),
+        );
+    }
+
+    match language {
+        "rust" => {
+            let mut build_command = Command::new("cargo");
+            build_command
+                .arg("build")
+                .arg("--release")
+                .arg("--verbose")
+                .current_dir(path);
+            let build_output = build_command.output()?;
+
+            if build_output.status.success() {
+                let run_output = Command::new("timeout")
+                    .arg("10s")
+                    .arg("cargo")
+                    .arg("run")
+                    .arg("--release")
+                    .arg("--verbose")
+                    .current_dir(path)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()?;
+                Ok(Some(run_output))
+            } else {
+                Err("Rust build failed.".into())
+            }
+        }
+
+        "python" => {
+            let run_output = Command::new("sh")
+                .arg("-c")
+                .arg(format!(
+                    "timeout {} '.venv/bin/python' -m uvicorn main:app --host 0.0.0.0 --port 8000",
+                    10
+                ))
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("Failed to run the backend application");
+
+            Ok(Some(run_output))
+        }
+
+        "javascript" => {
+            let run_output = Command::new("timeout")
+                .arg("10s")
+                .arg("node")
+                .arg("src/index.js")
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()?;
+            Ok(Some(run_output))
+        }
+
+        _ => Err(format!("Unsupported language: {}", language).into()),
+    }
+}
+
+#[cfg(feature = "cli")]
+pub fn setup_logging() -> anyhow::Result<()> {
+    let file_appender = rolling::daily("logs", "autogpt_log");
+
+    let console_layer = fmt::Layer::new()
+        .compact()
+        .with_file(false)
+        .with_line_number(false)
+        .with_thread_ids(false)
+        .with_target(false)
+        .with_writer(std::io::stdout)
+        .with_filter(filter::LevelFilter::INFO);
+
+    let file_layer = fmt::Layer::new()
+        .compact()
+        .with_file(true)
+        .with_line_number(true)
+        .with_thread_ids(true)
+        .with_target(true)
+        .with_writer(file_appender)
+        .with_filter(filter::LevelFilter::DEBUG);
+
+    let subscriber = Registry::default().with(console_layer).with(file_layer);
+
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    Ok(())
+}
+
+pub async fn ask_to_run_backend(
+    agent: AgentGPT,
+    language: &str,
+    workspace: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !agent.memory().is_empty() {
+        warn!(
+            "{}",
+            "[*] \"AGI\": 🤔 Thinking... Maybe it's time to run the backend application? (yes/no)"
+                .bright_yellow()
+                .bold()
+        );
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+
+        if is_yes(&input) {
+            info!(
+                "{}",
+                "[*] \"AGI\": 🫡 Roger! Running the backend..."
+                    .green()
+                    .bold()
+            );
+
+            let result = run_code(language, workspace, true).await;
+
+            match result {
+                Ok(Some(mut child)) => {
+                    let _build_stdout =
+                        child.stdout.take().expect("Failed to capture build stdout");
+                    let mut build_stderr =
+                        child.stderr.take().expect("Failed to capture build stderr");
+
+                    let mut stderr_output = String::new();
+                    build_stderr.read_to_string(&mut stderr_output)?;
+
+                    if !stderr_output.trim().is_empty() {
+                        error!(
+                            "{}",
+                            "[*] \"AGI\": Too many bugs found in the code. Consider debugging..."
+                                .bright_red()
+                                .bold()
+                        );
+                    } else {
+                        info!(
+                            "{}",
+                            "[*] \"AGI\": Backend server build successful..."
+                                .bright_white()
+                                .bold()
+                        );
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "{}",
+                        format!("[*] \"AGI\": Error: {}", e).bright_red().bold()
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(())
 }
