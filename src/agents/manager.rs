@@ -22,6 +22,12 @@ use std::borrow::Cow;
 use std::env::var;
 use tracing::info;
 
+#[cfg(feature = "mem")]
+use {
+    crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
+    crate::common::memory::save_long_term_memory,
+};
+
 /// Enum representing different types of GPT agents.
 #[derive(Debug, Clone)]
 enum AgentType {
@@ -263,6 +269,18 @@ impl ManagerGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(format!(
+                        "Execute tasks with description: '{}'",
+                        self.tasks.description.clone()
+                    )),
+                })
+                .await;
+        }
         info!(
             "{}",
             format!(
@@ -294,6 +312,18 @@ impl ManagerGPT {
             ),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(
+                        "Analyzing user request to determine programming language and framework..."
+                            .to_string(),
+                    ),
+                })
+                .await;
+        }
         let language = self.execute_prompt(language_request).await?;
         let framework = self.execute_prompt(framework_request).await?;
 
@@ -305,12 +335,34 @@ impl ManagerGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!(
+                        "Identified Language: '{}', Framework: '{}'",
+                        language, framework
+                    )),
+                })
+                .await;
+        }
         if self.agents.is_empty() {
             self.spawn_default_agents();
             self.agent.add_communication(Communication {
                 role: Cow::Borrowed("system"),
                 content: Cow::Borrowed("No agents were available. Spawned default agents."),
             });
+        }
+
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("system"),
+                    content: Cow::Borrowed("No agents were available. Spawned default agents."),
+                })
+                .await;
         }
 
         for mut agent in self.agents.clone() {
@@ -334,6 +386,20 @@ impl ManagerGPT {
                 )),
             });
 
+            #[cfg(feature = "mem")]
+            {
+                let _ = self
+                    .save_ltm(Communication {
+                        role: Cow::Borrowed("assistant"),
+                        content: Cow::Owned(format!(
+                            "Refined task for '{}': {}",
+                            agent.position(),
+                            refined_task
+                        )),
+                    })
+                    .await;
+            }
+
             self.tasks = Tasks {
                 description: refined_task.into(),
                 scope: None,
@@ -353,6 +419,15 @@ impl ManagerGPT {
             content: Cow::Borrowed("Task execution completed by all agents."),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Borrowed("Task execution completed by all agents."),
+                })
+                .await;
+        }
         info!(
             "{}",
             format!("[*] {:?}: Completed Tasks:", self.agent.position())
@@ -361,5 +436,56 @@ impl ManagerGPT {
         );
 
         Ok(())
+    }
+    /// Saves a communication to long-term memory for the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `communication` - The communication to save, which contains the role and content.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
+    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
+    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
+    #[cfg(feature = "mem")]
+    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
+        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
+    }
+
+    /// Retrieves all communications stored in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
+    /// - The function will return a list of communications that are indexed by the agent's unique ID.
+    /// - It handles the retrieval of the stored metadata and content for each communication.
+    #[cfg(feature = "mem")]
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        load_long_term_memory(self.agent.id.clone()).await
+    }
+
+    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
+    /// - The context string is composed of each communication's role and content, joined by new lines.
+    /// - It provides a quick overview of the agent's memory in a human-readable format.
+    #[cfg(feature = "mem")]
+    async fn ltm_context(&self) -> String {
+        long_term_memory_context(self.agent.id.clone()).await
     }
 }

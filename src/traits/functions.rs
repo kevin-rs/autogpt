@@ -9,6 +9,8 @@
 //! use autogpt::common::utils::Tasks;
 //! use anyhow::Result;
 //! use autogpt::traits::functions::Functions;
+//! use autogpt::common::utils::Communication;
+//! use std::borrow::Cow;
 //!
 //!
 //! /// A struct implementing the `Functions` trait.
@@ -49,13 +51,68 @@
 //!     ///
 //!     /// A result indicating success or failure.
 //!     async fn execute(&mut self, tasks: &mut Tasks, execute: bool, _browse: bool, max_tries: u64) -> Result<()> {
-//!         // Implementation here
-//!         unimplemented!()
+//!         Ok(())
+//!     }
+//!
+//!     /// Saves a communication to long-term memory for the agent.
+//!     ///
+//!     /// # Arguments
+//!     ///
+//!     /// * `communication` - The communication to save, which contains the role and content.
+//!     ///
+//!     /// # Returns
+//!     ///
+//!     /// (`Result<()>`): Result indicating the success or failure of saving the communication.
+//!     async fn save_ltm(&mut self, _communication: Communication) -> Result<()> {
+//!         Ok(())
+//!     }
+//!
+//!     /// Retrieves all communications stored in the agent's long-term memory.
+//!     ///
+//!     /// # Returns
+//!     ///
+//!     /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
+//!     async fn get_ltm(&self) -> Result<Vec<Communication>> {
+//!         Ok(vec![
+//!             Communication {
+//!                 role: Cow::Borrowed("system"),
+//!                 content: Cow::Borrowed("System initialized."),
+//!             },
+//!             Communication {
+//!                 role: Cow::Borrowed("user"),
+//!                 content: Cow::Borrowed("Hello, autogpt!"),
+//!             },
+//!         ])
+//!     }
+//!
+//!     /// Retrieves the concatenated context of all communications in the agent's long-term memory.
+//!     ///
+//!     /// # Returns
+//!     ///
+//!     /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
+//!     async fn ltm_context(&self) -> String {
+//!         let comms = [
+//!             Communication {
+//!                 role: Cow::Borrowed("system"),
+//!                 content: Cow::Borrowed("System initialized."),
+//!             },
+//!             Communication {
+//!                 role: Cow::Borrowed("user"),
+//!                 content: Cow::Borrowed("Hello, autogpt!"),
+//!             },
+//!         ];
+//!
+//!         comms
+//!             .iter()
+//!             .map(|c| format!("{}: {}", c.role, c.content))
+//!             .collect::<Vec<_>>()
+//!             .join("\n")
 //!     }
 //! }
 //!
 
 use crate::agents::agent::AgentGPT;
+use crate::common::utils::Communication;
 use crate::common::utils::Tasks;
 use anyhow::Result;
 
@@ -88,4 +145,32 @@ pub trait Functions {
         browse: bool,
         max_tries: u64,
     ) -> Result<()>;
+
+    /// Save a communication into long-term memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `communication` - The communication to save.
+    ///
+    /// # Returns
+    ///
+    /// A result indicating success or failure.
+    #[allow(async_fn_in_trait)]
+    async fn save_ltm(&mut self, communication: Communication) -> Result<()>;
+
+    /// Get the long-term memory of an agent.
+    ///
+    /// # Returns
+    ///
+    /// A result containing a vector of communications.
+    #[allow(async_fn_in_trait)]
+    async fn get_ltm(&self) -> Result<Vec<Communication>>;
+
+    /// Retrieve the long-term memory context as a string.
+    ///
+    /// # Returns
+    ///
+    /// A string containing the concatenated context of the agent's memory.
+    #[allow(async_fn_in_trait)]
+    async fn ltm_context(&self) -> String;
 }

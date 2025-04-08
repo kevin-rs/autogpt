@@ -61,6 +61,12 @@ use std::time::Duration;
 use tracing::{debug, error, info, warn};
 use webbrowser::{open_browser_with_options, Browser, BrowserOptions};
 
+#[cfg(feature = "mem")]
+use {
+    crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
+    crate::common::memory::save_long_term_memory,
+};
+
 /// Struct representing a BackendGPT, which manages backend development tasks using GPT.
 #[derive(Debug, Clone)]
 pub struct BackendGPT {
@@ -219,7 +225,7 @@ impl BackendGPT {
     /// - Writes the generated backend code to the appropriate file based on language.
     /// - Updates the task's backend code and the agent's status to `Completed`.
     pub async fn generate_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = &self.workspace;
+        let path = self.workspace.clone();
 
         let full_path = match self.language {
             "rust" => format!("{}/{}", path, "src/main.rs"),
@@ -229,6 +235,11 @@ impl BackendGPT {
         };
 
         debug!("[*] {:?}: {:?}", self.agent.position(), full_path);
+
+        #[cfg(feature = "mem")]
+        {
+            self.agent.memory = self.get_ltm().await?;
+        }
 
         let template = fs::read_to_string(full_path)?;
 
@@ -245,6 +256,16 @@ impl BackendGPT {
             content: Cow::Owned(request.clone()),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(request.clone()),
+                })
+                .await;
+        }
+
         let gemini_response_result = self.client.generate_content(&request).await;
 
         let gemini_response = match gemini_response_result {
@@ -254,6 +275,16 @@ impl BackendGPT {
                     content: Cow::Owned(response.clone()),
                 });
 
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response.clone()),
+                        })
+                        .await;
+                }
+
                 strip_code_blocks(&response)
             }
             Err(err) => {
@@ -261,6 +292,15 @@ impl BackendGPT {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!("Error generating backend code: {}", err)),
                 });
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error generating backend code: {}", err)),
+                        })
+                        .await;
+                }
 
                 Default::default()
             }
@@ -307,7 +347,7 @@ impl BackendGPT {
     /// - Writes the improved backend code to the appropriate file.
     /// - Updates tasks and agent status accordingly.
     pub async fn improve_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = &self.workspace;
+        let path = self.workspace.clone();
 
         let request: String = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
@@ -321,6 +361,16 @@ impl BackendGPT {
             content: Cow::Owned(request.clone()),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(request.clone()),
+                })
+                .await;
+        }
+
         let gemini_response_result = self.client.generate_content(&request).await;
 
         let gemini_response = match gemini_response_result {
@@ -330,6 +380,16 @@ impl BackendGPT {
                     content: Cow::Owned(response.clone()),
                 });
 
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response.clone()),
+                        })
+                        .await;
+                }
+
                 strip_code_blocks(&response)
             }
             Err(err) => {
@@ -337,6 +397,15 @@ impl BackendGPT {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!("Error improving backend code: {}", err)),
                 });
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error improving backend code: {}", err)),
+                        })
+                        .await;
+                }
 
                 Default::default()
             }
@@ -398,6 +467,15 @@ impl BackendGPT {
             role: Cow::Borrowed("user"),
             content: Cow::Owned(request.clone()),
         });
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(request.clone()),
+                })
+                .await;
+        }
 
         let gemini_response_result = self.client.generate_content(&request).await;
 
@@ -408,6 +486,15 @@ impl BackendGPT {
                     content: Cow::Owned(response.clone()),
                 });
 
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response.clone()),
+                        })
+                        .await;
+                }
                 strip_code_blocks(&response)
             }
             Err(err) => {
@@ -415,6 +502,15 @@ impl BackendGPT {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
                 });
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                        })
+                        .await;
+                }
 
                 Default::default()
             }
@@ -457,7 +553,7 @@ impl BackendGPT {
     /// - Logs the AI's response as a `Communication`.
     /// - Updates agent status accordingly.
     pub async fn get_routes_json(&mut self) -> Result<String> {
-        let path = &self.workspace;
+        let path = self.workspace.clone();
 
         let full_path = match self.language {
             "rust" => format!("{}/{}", path, "src/main.rs"),
@@ -479,7 +575,15 @@ impl BackendGPT {
             role: Cow::Borrowed("user"),
             content: Cow::Owned(request.clone()),
         });
-
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(request.clone()),
+                })
+                .await;
+        }
         let gemini_response_result = self.client.generate_content(&request).await;
 
         let gemini_response = match gemini_response_result {
@@ -489,6 +593,15 @@ impl BackendGPT {
                     content: Cow::Owned(response.clone()),
                 });
 
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response.clone()),
+                        })
+                        .await;
+                }
                 strip_code_blocks(&response)
             }
             Err(err) => {
@@ -497,6 +610,15 @@ impl BackendGPT {
                     content: Cow::Owned(format!("Error retrieving routes JSON: {}", err)),
                 });
 
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error retrieving routes JSON: {}", err)),
+                        })
+                        .await;
+                }
                 Default::default()
             }
         };
@@ -841,7 +963,7 @@ impl Functions for BackendGPT {
                                     error!(
                                         "{}",
                                         format!(
-                                            "[*] {:?}: Too many bugs found in the code. Consider debugging...",
+                                            "[*] {:?}: Too many bugs found. Consider debugging...",
                                             self.agent.position(),
                                         )
                                         .bright_red()
@@ -954,5 +1076,56 @@ impl Functions for BackendGPT {
         }
         self.agent.update(Status::Idle);
         Ok(())
+    }
+    /// Saves a communication to long-term memory for the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `communication` - The communication to save, which contains the role and content.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
+    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
+    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
+    #[cfg(feature = "mem")]
+    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
+        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
+    }
+
+    /// Retrieves all communications stored in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
+    /// - The function will return a list of communications that are indexed by the agent's unique ID.
+    /// - It handles the retrieval of the stored metadata and content for each communication.
+    #[cfg(feature = "mem")]
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        load_long_term_memory(self.agent.id.clone()).await
+    }
+
+    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
+    /// - The context string is composed of each communication's role and content, joined by new lines.
+    /// - It provides a quick overview of the agent's memory in a human-readable format.
+    #[cfg(feature = "mem")]
+    async fn ltm_context(&self) -> String {
+        long_term_memory_context(self.agent.id.clone()).await
     }
 }

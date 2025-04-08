@@ -8,3 +8,6 @@
 //!
 
 pub mod utils;
+
+#[cfg(feature = "mem")]
+pub mod memory;

@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
         use autogpt::agents::frontend::FrontendGPT;
         use autogpt::agents::git::GitGPT;
         use autogpt::agents::manager::ManagerGPT;
-        use autogpt::common::utils::ask_to_run_backend;
+        use autogpt::common::utils::ask_to_run_command;
         use autogpt::common::utils::setup_logging;
         use autogpt::common::utils::Scope;
         use autogpt::common::utils::Tasks;
@@ -143,7 +143,7 @@ async fn main() -> Result<()> {
                             let _ = git_agent.execute(&mut tasks, true, false, 1).await;
                             info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
 
-                            if let Err(e) = ask_to_run_backend(
+                            if let Err(e) = ask_to_run_command(
                                 architect_agent.get_agent().clone(),
                                 language,
                                 &workspace,
@@ -161,7 +161,7 @@ async fn main() -> Result<()> {
                                             .bright_yellow()
                                             .bold());
 
-                            if let Err(e) = ask_to_run_backend(
+                            if let Err(e) = ask_to_run_command(
                                 architect_agent.get_agent().clone(),
                                 language,
                                 &workspace,
@@ -226,7 +226,7 @@ async fn main() -> Result<()> {
                             let _ = git_agent.execute(&mut tasks, true, false, 1).await;
                             info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
 
-                            if let Err(e) = ask_to_run_backend(
+                            if let Err(e) = ask_to_run_command(
                                 frontend_agent.get_agent().clone(),
                                 language,
                                 &workspace,
@@ -243,7 +243,7 @@ async fn main() -> Result<()> {
                             warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
                                             .bright_yellow()
                                             .bold());
-                            if let Err(e) = ask_to_run_backend(
+                            if let Err(e) = ask_to_run_command(
                                 frontend_agent.get_agent().clone(),
                                 language,
                                 &workspace,
@@ -265,6 +265,19 @@ async fn main() -> Result<()> {
                     let position = "BackendGPT";
                     let workspace = workspace + "backend";
                     let mut backend_gpt = BackendGPT::new(objective, position, language);
+
+                    let mut tasks = Tasks {
+                        description: Default::default(),
+                        scope: Some(Scope {
+                            crud: true,
+                            auth: true,
+                            external: true,
+                        }),
+                        urls: None,
+                        frontend_code: None,
+                        backend_code: None,
+                        api_schema: None,
+                    };
                     loop {
                         let mut input = String::new();
                         std::io::stdin()
@@ -281,19 +294,7 @@ async fn main() -> Result<()> {
                                     .bright_yellow()
                                     .bold()
                             );
-
-                            let mut tasks = Tasks {
-                                description: input.into(),
-                                scope: Some(Scope {
-                                    crud: true,
-                                    auth: true,
-                                    external: true,
-                                }),
-                                urls: None,
-                                frontend_code: None,
-                                backend_code: None,
-                                api_schema: None,
-                            };
+                            tasks.description = input.into();
 
                             backend_gpt
                                 .execute(&mut tasks, true, false, 3)
@@ -307,7 +308,7 @@ async fn main() -> Result<()> {
                             );
                             let _ = git_agent.execute(&mut tasks, true, false, 1).await;
                             info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
-                            if let Err(e) = ask_to_run_backend(
+                            if let Err(e) = ask_to_run_command(
                                 backend_gpt.get_agent().clone(),
                                 language,
                                 &workspace,
@@ -324,7 +325,7 @@ async fn main() -> Result<()> {
                             warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
                                                     .bright_yellow()
                                                     .bold());
-                            if let Err(e) = ask_to_run_backend(
+                            if let Err(e) = ask_to_run_command(
                                 backend_gpt.get_agent().clone(),
                                 language,
                                 &workspace,

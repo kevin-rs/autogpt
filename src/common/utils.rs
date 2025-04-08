@@ -375,7 +375,7 @@ pub fn setup_logging() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn ask_to_run_backend(
+pub async fn ask_to_run_command(
     agent: AgentGPT,
     language: &str,
     workspace: &str,
@@ -383,7 +383,7 @@ pub async fn ask_to_run_backend(
     if !agent.memory().is_empty() {
         warn!(
             "{}",
-            "[*] \"AGI\": 🤔 Thinking... Maybe it's time to run the backend application? (yes/no)"
+            "[*] \"AGI\": 🤔 Thinking... Maybe it's time to run the application? (yes/no)"
                 .bright_yellow()
                 .bold()
         );
@@ -394,7 +394,7 @@ pub async fn ask_to_run_backend(
         if is_yes(&input) {
             info!(
                 "{}",
-                "[*] \"AGI\": 🫡 Roger! Running the backend..."
+                "[*] \"AGI\": 🫡 Roger! Running the application..."
                     .green()
                     .bold()
             );
@@ -414,14 +414,14 @@ pub async fn ask_to_run_backend(
                     if !stderr_output.trim().is_empty() {
                         error!(
                             "{}",
-                            "[*] \"AGI\": Too many bugs found in the code. Consider debugging..."
+                            "[*] \"AGI\": Too many bugs found. Consider debugging..."
                                 .bright_red()
                                 .bold()
                         );
                     } else {
                         info!(
                             "{}",
-                            "[*] \"AGI\": Backend server build successful..."
+                            "[*] \"AGI\": Application built successful..."
                                 .bright_white()
                                 .bold()
                         );
