@@ -148,6 +148,21 @@ This makes GitGPT perfect for keeping a clean Git history without manual interve
 >     - Step 2: Build the UI for managing and displaying patient records.
 >     - Step 3: Create the billing interface for generating and displaying invoices.
 
+### 8. 🧠 OptimizerGPT
+
+<img src="https://github.com/kevin-rs/kevin/assets/62179149/91a4868a-093f-4c96-89fc-5447e6f904f1" align="left" alt="optimizer" width="64" />
+
+OptimizerGPT takes messy or monolithic frontend and backend code files and intelligently restructures them into clean, modular components. It improves maintainability, readability, and performance by automatically applying best practices in code organization.
+
+#### How OptimizerGPT Works
+
+When activated by ManagerGPT, OptimizerGPT will:
+
+- Analyze a single source code file (frontend or backend) and identify logical separations of concern.
+- Break the file into well-organized modules (e.g., components, services, utilities, routes).
+- Apply standard conventions and folder structures depending on the tech stack (React, FastAPI, etc.).
+- Refactor duplicated or redundant code into reusable functions or components.
+
 With Autogpt's team of specialized agents working together, your project is in capable hands. Simply provide a simple project goal, and let Autogpt handle the rest!
 
 ---

@@ -13,6 +13,7 @@ async fn main() -> Result<()> {
         use autogpt::agents::frontend::FrontendGPT;
         use autogpt::agents::git::GitGPT;
         use autogpt::agents::manager::ManagerGPT;
+        use autogpt::agents::optimizer::OptimizerGPT;
         use autogpt::common::utils::ask_to_run_command;
         use autogpt::common::utils::setup_logging;
         use autogpt::common::utils::Scope;
@@ -266,6 +267,13 @@ async fn main() -> Result<()> {
                     let workspace = workspace + "backend";
                     let mut backend_gpt = BackendGPT::new(objective, position, language);
 
+                    let objective = "Expertise lies in modularizing monolithic source code into clean components";
+                    let position = "OptimizerGPT";
+                    let language = "python";
+
+                    let workspace = workspace + "optimizer/";
+                    let mut _optimizer_gpt = OptimizerGPT::new(objective, position, language);
+
                     let mut tasks = Tasks {
                         description: Default::default(),
                         scope: Some(Scope {
@@ -308,6 +316,7 @@ async fn main() -> Result<()> {
                             );
                             let _ = git_agent.execute(&mut tasks, true, false, 1).await;
                             info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
+
                             if let Err(e) = ask_to_run_command(
                                 backend_gpt.get_agent().clone(),
                                 language,

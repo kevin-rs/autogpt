@@ -16,3 +16,4 @@ pub mod backend;
 pub mod designer;
 pub mod frontend;
 pub mod manager;
+pub mod optimizer;

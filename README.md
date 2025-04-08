@@ -115,7 +115,7 @@ Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, runn
   
 ## 🤖 Available Agents
 
-At the current release, Autogpt consists of 6 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
+At the current release, Autogpt consists of 8 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!
 Refer to [our guide](AGENTS.md) to learn more about how the built-in agents work.
 
 ## 📌 Examples
