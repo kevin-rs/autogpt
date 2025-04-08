@@ -87,6 +87,23 @@ use {
     tracing_subscriber::{filter, fmt},
 };
 
+#[cfg(feature = "gem")]
+use gems::Client as GeminiClient;
+#[cfg(feature = "oai")]
+use openai_dive::v1::api::Client as OpenAIClient;
+
+/// Enum representing supported AI clients.
+#[derive(Debug, Clone)]
+pub enum ClientType {
+    /// OpenAI client.
+    #[cfg(feature = "oai")]
+    OpenAI(OpenAIClient),
+
+    /// Google Gemini client.
+    #[cfg(feature = "gem")]
+    Gemini(GeminiClient),
+}
+
 /// Represents a communication between agents.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Communication {

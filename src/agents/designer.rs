@@ -36,14 +36,12 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{similarity, Communication, Status, Tasks};
+use crate::common::utils::{similarity, ClientType, Communication, Status, Tasks};
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
 use colored::*;
-use gems::utils::load_and_encode_image;
-use gems::Client;
 use getimg::client::Client as ImgClient;
 use getimg::utils::save_image;
 use std::borrow::Cow;
@@ -58,7 +56,16 @@ use {
     crate::common::memory::save_long_term_memory,
 };
 
-/// Struct representing a DesignerGPT, which manages design-related tasks using Gemini API.
+#[cfg(feature = "oai")]
+use {
+    openai_dive::v1::api::Client as OpenAIClient, openai_dive::v1::models::FlagshipModel,
+    openai_dive::v1::resources::chat::*,
+};
+
+#[cfg(feature = "gem")]
+use {gems::utils::load_and_encode_image, gems::Client as GeminiClient};
+
+/// Struct representing a DesignerGPT, which manages design-related tasks using Gemini or OpenAI API.
 #[derive(Debug, Clone)]
 pub struct DesignerGPT {
     /// Represents the workspace directory path for DesignerGPT.
@@ -67,8 +74,8 @@ pub struct DesignerGPT {
     agent: AgentGPT,
     /// Represents a GetIMG client for generating images from text prompts.
     img_client: ImgClient,
-    /// Represents a Gemini client for interacting with Gemini API.
-    client: Client,
+    /// Represents an OpenAI or Gemini client for interacting with their API.
+    client: ClientType,
 }
 
 impl DesignerGPT {
@@ -87,7 +94,7 @@ impl DesignerGPT {
     ///
     /// - Constructs the workspace directory path for `DesignerGPT`.
     /// - Initializes the GPT agent with the given objective and position.
-    /// - Creates clients for generating images and interacting with Gemini API.
+    /// - Creates clients for generating images and interacting with Gemini or OpenAI API.
     ///
     pub fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
@@ -112,11 +119,22 @@ impl DesignerGPT {
 
         let img_client = ImgClient::new(&getimg_api_key, &getimg_model);
 
-        let model = var("GEMINI_MODEL")
-            .unwrap_or("gemini-2.0-flash-vision".to_string())
-            .to_owned();
-        let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
-        let client = Client::new(&api_key, &model);
+        #[cfg(feature = "oai")]
+        let client = {
+            let openai_client = OpenAIClient::new_from_env();
+            ClientType::OpenAI(openai_client)
+        };
+
+        #[cfg(feature = "gem")]
+        let client = {
+            let model = var("GEMINI_MODEL")
+                .unwrap_or("gemini-2.0-flash".to_string())
+                .to_owned();
+            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
+            let gemini_client = GeminiClient::new(&api_key, &model);
+
+            ClientType::Gemini(gemini_client)
+        };
 
         info!(
             "{}",
@@ -243,7 +261,7 @@ impl DesignerGPT {
     ///
     /// - Loads and encodes the image from the specified file path.
     /// - Logs communication between the user, assistant, and system.
-    /// - Sends the image data to the Gemini API to generate text.
+    /// - Sends the image data to the Gemini or OpenAI API to generate text.
     /// - Returns the generated text description of the image.
     pub async fn generate_text_from_image(&mut self, image_path: &str) -> Result<String> {
         self.agent.add_communication(Communication {
@@ -307,31 +325,178 @@ impl DesignerGPT {
                 })
                 .await;
         }
-        let response = self
-            .client
-            .generate_content_with_image(WEB_DESIGNER_PROMPT, &base64_image_data)
-            .await
-            .unwrap();
+        let response: String = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client
+                    .generate_content_with_image(WEB_DESIGNER_PROMPT, &base64_image_data)
+                    .await;
 
-        self.agent.add_communication(Communication {
-            role: Cow::Borrowed("assistant"),
-            content: Cow::Owned(format!("Generated image description: {}", response)),
-        });
+                match result {
+                    Ok(response) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!(
+                                "Generated image description: {}",
+                                response
+                            )),
+                        });
 
-        #[cfg(feature = "mem")]
-        {
-            let _ = self
-                .save_ltm(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(format!("Generated image description: {}", response)),
-                })
-                .await;
-        }
-        debug!(
-            "[*] {:?}: Got Image Description: {:?}",
-            self.agent.position(),
-            response
-        );
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Generated image description: {}",
+                                        response
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        debug!(
+                            "[*] {:?}: Got Image Description: {:?}",
+                            self.agent.position(),
+                            response
+                        );
+
+                        response
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!(
+                                "Error generating image description: {}",
+                                err
+                            )),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error generating image description: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![
+                        ChatMessage::User {
+                            content: ChatMessageContent::Text("What is in this image?".to_string()),
+                            name: None,
+                        },
+                        ChatMessage::User {
+                            content: ChatMessageContent::ContentPart(vec![
+                                ChatMessageContentPart::Image(ChatMessageImageContentPart {
+                                    r#type: "image_url".to_string(),
+                                    image_url: ImageUrlType {
+                                        url: base64_image_data.to_string(),
+                                        detail: None,
+                                    },
+                                }),
+                            ]),
+                            name: None,
+                        },
+                    ])
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!(
+                                "Generated image description: {}",
+                                response_text
+                            )),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Generated image description: {}",
+                                        response_text
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        debug!(
+                            "[*] {:?}: Got Image Description: {:?}",
+                            self.agent.position(),
+                            response_text
+                        );
+
+                        response_text
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!(
+                                "Error generating image description: {}",
+                                err
+                            )),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error generating image description: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
+            }
+        };
 
         Ok(response)
     }

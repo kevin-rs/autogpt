@@ -1,32 +1,79 @@
+use crate::common::utils::ClientType;
 use crate::common::utils::Communication;
 use anyhow::Result;
-use gems::Client;
 use pinecone_sdk::models::{Kind, Value, Vector};
 use pinecone_sdk::pinecone::PineconeClientConfig;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use tracing::error;
 
-async fn embed_gemini_text(client: &mut Client, content: Cow<'static, str>) -> Vec<f64> {
-    client.model = "embedding-001".into();
-    match client.embed_content(&content).await {
-        Ok(embed_response) => {
-            if let Some(embedding) = embed_response.embedding {
-                embedding.values
-            } else {
-                error!("No embedding returned.");
-                vec![]
+async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<f64> {
+    match client {
+        #[cfg(feature = "gem")]
+        ClientType::Gemini(gem_client) => {
+            gem_client.model = "embedding-001".into();
+            match gem_client.embed_content(&content).await {
+                Ok(embed_response) => {
+                    if let Some(embedding) = embed_response.embedding {
+                        embedding.values
+                    } else {
+                        error!("Gemini: No embedding returned.");
+                        vec![]
+                    }
+                }
+                Err(err) => {
+                    error!("Gemini: Failed to embed content: {}", err);
+                    vec![]
+                }
             }
         }
-        Err(err) => {
-            error!("Failed to embed content: {}", err);
+        #[cfg(feature = "oai")]
+        ClientType::OpenAI(oai_client) => {
+            use openai_dive::v1::models::EmbeddingModel;
+            use openai_dive::v1::resources::embedding::{
+                EmbeddingEncodingFormat, EmbeddingInput, EmbeddingOutput,
+                EmbeddingParametersBuilder,
+            };
+
+            let parameters = EmbeddingParametersBuilder::default()
+                .model(EmbeddingModel::TextEmbedding3Small.to_string())
+                .input(EmbeddingInput::String(content.to_string()))
+                .encoding_format(EmbeddingEncodingFormat::Float)
+                .build()
+                .unwrap();
+
+            match oai_client.embeddings().create(parameters).await {
+                Ok(response) => {
+                    if let Some(embedding) = response.data.get(0) {
+                        match &embedding.embedding {
+                            EmbeddingOutput::Float(vec) => vec.clone(),
+                            EmbeddingOutput::Base64(_) => {
+                                error!("OpenAI: Expected embedding as Float, found Base64.");
+                                vec![]
+                            }
+                        }
+                    } else {
+                        error!("OpenAI: No embedding returned.");
+                        vec![]
+                    }
+                }
+                Err(err) => {
+                    error!("OpenAI: Failed to embed content: {}", err);
+                    vec![]
+                }
+            }
+        }
+
+        #[allow(unreachable_patterns)]
+        _ => {
+            error!("Unsupported AI client for embedding.");
             vec![]
         }
     }
 }
 
 pub async fn save_long_term_memory(
-    client: &mut Client,
+    client: &mut ClientType,
     agent_id: Cow<'static, str>,
     communication: Communication,
 ) -> Result<()> {
@@ -64,14 +111,14 @@ pub async fn save_long_term_memory(
     };
 
     let namespace = format!("agent-{}", agent_id);
-    let values_f32: Vec<f32> = embed_gemini_text(client, communication.content.clone())
+    let values_f32: Vec<f32> = embed_text(client, communication.content.clone())
         .await
         .into_iter()
         .map(|v| v as f32)
         .collect();
 
     let padding: Vec<f32> = vec![0.0; 1024 - values_f32.len()];
-    let padded_values: Vec<f32> = values_f32.iter().cloned().chain(padding).collect();
+    let padded_values: Vec<f32> = values_f32.into_iter().chain(padding).collect();
 
     let content = communication.content.clone();
     let role = communication.role.clone();
