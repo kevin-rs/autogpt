@@ -107,81 +107,108 @@ impl BackendGPT {
     /// - Creates clients for interacting with Gemini API and making HTTP requests.
     ///
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
-        let workspace = var("AUTOGPT_WORKSPACE")
-            .unwrap_or("workspace/".to_string())
-            .to_owned()
-            + "backend";
+        let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace/".to_string());
+        let workspace = format!("{}/backend", base_workspace);
 
-        if let Err(e) = fs::create_dir_all(workspace.clone()) {
-            error!("Error creating directory '{}': {}", workspace, e);
+        if !Path::new(&workspace).exists() {
+            if let Err(e) = fs::create_dir_all(&workspace) {
+                error!("Error creating directory '{}': {}", workspace, e);
+            } else {
+                debug!("Workspace directory '{}' created successfully.", workspace);
+            }
+        } else {
+            debug!("Workspace directory '{}' already exists.", workspace);
         }
+
         info!(
             "{}",
-            format!("[*] {:?}: 🛠️  Getting ready!", position,)
+            format!("[*] {:?}: 🛠️  Getting ready!", position)
                 .bright_white()
                 .bold()
         );
+
         match language {
             "rust" => {
-                let cargo_new = Command::new("cargo").arg("init").arg(&workspace).spawn();
+                if !Path::new(&format!("{}/Cargo.toml", workspace)).exists() {
+                    let cargo_new = Command::new("cargo").arg("init").arg(&workspace).spawn();
 
-                match cargo_new {
-                    Ok(_) => debug!("Cargo project initialized successfully!"),
-                    Err(e) => error!("Error initializing Cargo project: {}", e),
-                };
-                match fs::write(workspace.to_string() + "src/template.rs", "") {
-                    Ok(_) => debug!("File 'template.rs' created successfully!"),
-                    Err(e) => error!("Error creating file 'template.rs': {}", e),
-                };
-            }
-            "python" => {
-                match fs::write(workspace.to_string() + "/main.py", "") {
-                    Ok(_) => debug!("File 'main.py' created successfully!"),
-                    Err(e) => error!("Error creating file 'main.py': {}", e),
-                };
-                match fs::write(workspace.to_string() + "/template.py", "") {
-                    Ok(_) => debug!("File 'template.py' created successfully!"),
-                    Err(e) => error!("Error creating file 'template.py': {}", e),
-                };
-            }
-            "javascript" => {
-                let npx_install = Command::new("npx")
-                    .arg("create-react-app")
-                    .arg(&workspace)
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .spawn();
-
-                match npx_install {
-                    Ok(mut child) => match child.wait() {
-                        Ok(status) => {
-                            if status.success() {
-                                debug!("React JS project initialized successfully!");
-                            } else {
-                                error!("Failed to initialize React JS project");
-                            }
-                        }
-                        Err(e) => {
-                            error!("Error waiting for process: {}", e);
-                        }
-                    },
-                    Err(e) => {
-                        error!("Error initializing React JS project: {}", e);
+                    match cargo_new {
+                        Ok(_) => debug!("Cargo project initialized successfully."),
+                        Err(e) => error!("Error initializing Cargo project: {}", e),
                     }
-                };
-                match fs::write(workspace.to_string() + "src/template.js", "") {
-                    Ok(_) => debug!("File 'template.js' created successfully!"),
-                    Err(e) => error!("Error creating file 'template.js': {}", e),
-                };
+                }
+
+                let template_path = format!("{}/src/template.rs", workspace);
+                if !Path::new(&template_path).exists() {
+                    if let Err(e) = fs::write(&template_path, "") {
+                        error!("Error creating file '{}': {}", template_path, e);
+                    } else {
+                        debug!("File '{}' created successfully.", template_path);
+                    }
+                }
             }
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
-        };
+
+            "python" => {
+                let files = ["main.py", "template.py"];
+                for file in files.iter() {
+                    let full_path = format!("{}/{}", workspace, file);
+                    if !Path::new(&full_path).exists() {
+                        if let Err(e) = fs::write(&full_path, "") {
+                            error!("Error creating file '{}': {}", full_path, e);
+                        } else {
+                            debug!("File '{}' created successfully.", full_path);
+                        }
+                    }
+                }
+            }
+
+            "javascript" => {
+                if !Path::new(&format!("{}/package.json", workspace)).exists() {
+                    let npx_install = Command::new("npx")
+                        .arg("create-react-app")
+                        .arg(&workspace)
+                        .stdout(Stdio::inherit())
+                        .stderr(Stdio::inherit())
+                        .spawn();
+
+                    match npx_install {
+                        Ok(mut child) => match child.wait() {
+                            Ok(status) => {
+                                if status.success() {
+                                    debug!("React JS project initialized successfully.");
+                                } else {
+                                    error!("Failed to initialize React JS project.");
+                                }
+                            }
+                            Err(e) => {
+                                error!("Error waiting for process: {}", e);
+                            }
+                        },
+                        Err(e) => {
+                            error!("Error initializing React JS project: {}", e);
+                        }
+                    }
+                }
+
+                let template_path = format!("{}/src/template.js", workspace);
+                if !Path::new(&template_path).exists() {
+                    if let Err(e) = fs::write(&template_path, "") {
+                        error!("Error creating file '{}': {}", template_path, e);
+                    } else {
+                        debug!("File '{}' created successfully.", template_path);
+                    }
+                }
+            }
+
+            _ => panic!(
+                "Unsupported language '{}'. Consider opening an issue/PR.",
+                language
+            ),
+        }
 
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
-        let model = var("GEMINI_MODEL")
-            .unwrap_or("gemini-2.0-flash".to_string())
-            .to_owned();
-        let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
+        let model = var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.0-flash".to_string());
+        let api_key = var("GEMINI_API_KEY").unwrap_or_default();
         let client = Client::new(&api_key, &model);
 
         let req_client: ReqClient = ReqClient::builder()

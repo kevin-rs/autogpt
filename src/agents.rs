@@ -14,3 +14,4 @@ pub mod git;
 #[cfg(feature = "mail")]
 pub mod mailer;
 pub mod manager;
+pub mod optimizer;
