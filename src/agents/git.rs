@@ -8,6 +8,7 @@ use std::path::Path;
 use tracing::{debug, error, info};
 
 use crate::agents::agent::AgentGPT;
+use crate::common::utils::Communication;
 use crate::common::utils::{Status, Tasks};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
@@ -263,5 +264,80 @@ impl Functions for GitGPT {
         }
 
         Ok(())
+    }
+    /// Saves a communication to long-term memory for the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `communication` - The communication to save, which contains the role and content.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
+    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
+    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
+    async fn save_ltm(&mut self, _communication: Communication) -> Result<()> {
+        // dummy impl cz of no ai client
+        Ok(())
+    }
+
+    /// Retrieves all communications stored in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
+    /// - The function will return a list of communications that are indexed by the agent's unique ID.
+    /// - It handles the retrieval of the stored metadata and content for each communication.
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        // dummy impl cz of no ai client
+        Ok(vec![
+            Communication {
+                role: Cow::Borrowed("system"),
+                content: Cow::Borrowed("System initialized."),
+            },
+            Communication {
+                role: Cow::Borrowed("user"),
+                content: Cow::Borrowed("Hello, autogpt!"),
+            },
+        ])
+    }
+
+    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
+    /// - The context string is composed of each communication's role and content, joined by new lines.
+    /// - It provides a quick overview of the agent's memory in a human-readable format.
+    async fn ltm_context(&self) -> String {
+        // dummy impl cz of no ai client
+        let comms = [
+            Communication {
+                role: Cow::Borrowed("system"),
+                content: Cow::Borrowed("System initialized."),
+            },
+            Communication {
+                role: Cow::Borrowed("user"),
+                content: Cow::Borrowed("Hello, autogpt!"),
+            },
+        ];
+
+        comms
+            .iter()
+            .map(|c| format!("{}: {}", c.role, c.content))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }

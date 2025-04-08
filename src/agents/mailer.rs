@@ -17,6 +17,12 @@ use std::borrow::Cow;
 use std::env::var;
 use tracing::{debug, info};
 
+#[cfg(feature = "mem")]
+use {
+    crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
+    crate::common::memory::save_long_term_memory,
+};
+
 /// Struct representing a `MailerGPT`, which manages email processing and text generation using Nylas and Gemini API.
 pub struct MailerGPT {
     /// Represents the GPT agent responsible for handling email processing and text generation.
@@ -131,7 +137,18 @@ impl MailerGPT {
                 prompt
             )),
         });
-
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(format!(
+                        "Requested to generate text based on emails with prompt: '{}'",
+                        prompt
+                    )),
+                })
+                .await;
+        }
         let emails = match self.get_latest_emails().await {
             Ok(e) => e,
             Err(err) => {
@@ -140,6 +157,15 @@ impl MailerGPT {
                     role: Cow::Borrowed("system"),
                     content: Cow::Owned(error_msg.clone()),
                 });
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        })
+                        .await;
+                }
                 return Err(anyhow::anyhow!(error_msg));
             }
         };
@@ -151,6 +177,18 @@ impl MailerGPT {
                     .to_string(),
             ),
         });
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(
+                        "Analyzing latest emails and generating text based on provided prompt..."
+                            .to_string(),
+                    ),
+                })
+                .await;
+        }
 
         let gemini_response = match self
             .client
@@ -164,6 +202,15 @@ impl MailerGPT {
                     role: Cow::Borrowed("system"),
                     content: Cow::Owned(error_msg.clone()),
                 });
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        })
+                        .await;
+                }
                 return Err(anyhow::anyhow!(error_msg));
             }
         };
@@ -175,6 +222,17 @@ impl MailerGPT {
             ),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(
+                        "Generated text from emails based on the given prompt.".to_string(),
+                    ),
+                })
+                .await;
+        }
         info!(
             "[*] {:?}: Got Response: {:?}",
             self.agent.position(),
@@ -269,5 +327,56 @@ impl Functions for MailerGPT {
         }
 
         Ok(())
+    }
+    /// Saves a communication to long-term memory for the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `communication` - The communication to save, which contains the role and content.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
+    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
+    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
+    #[cfg(feature = "mem")]
+    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
+        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
+    }
+
+    /// Retrieves all communications stored in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
+    /// - The function will return a list of communications that are indexed by the agent's unique ID.
+    /// - It handles the retrieval of the stored metadata and content for each communication.
+    #[cfg(feature = "mem")]
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        load_long_term_memory(self.agent.id.clone()).await
+    }
+
+    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
+    /// - The context string is composed of each communication's role and content, joined by new lines.
+    /// - It provides a quick overview of the agent's memory in a human-readable format.
+    #[cfg(feature = "mem")]
+    async fn ltm_context(&self) -> String {
+        long_term_memory_context(self.agent.id.clone()).await
     }
 }

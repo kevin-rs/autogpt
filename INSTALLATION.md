@@ -97,7 +97,7 @@ The CLI provides a convenient means to interact with the code generation ecosyst
 To configure the CLI and or the SDK environment, follow these steps:
 
 1. **Define Workspace Path**: Set up the paths for designer, backend, frontend, and architect workspaces by setting the following environment variable:
-   
+
    ```sh
    export AUTOGPT_WORKSPACE=workspace/
    ```
@@ -113,22 +113,31 @@ To configure the CLI and or the SDK environment, follow these steps:
    To obtain your API key, navigate to [Google AI Studio](https://aistudio.google.com/app/apikey) and generate it there. This key allows autogpt to communicate with Gemini API.
 
 1. **DesignerGPT Setup (Optional)**: To enable DesignerGPT, you will need to set up the following environment variable:
-   
-     ```sh
-     export GETIMG_API_KEY=<your_getimg_api_key>
-     ```
 
-     Generate an API key from your [GetImg Dashboard](https://dashboard.getimg.ai/api-keys).
+   ```sh
+   export GETIMG_API_KEY=<your_getimg_api_key>
+   ```
+
+   Generate an API key from your [GetImg Dashboard](https://dashboard.getimg.ai/api-keys).
 
 1. **MailerGPT Setup (Optional)**: To enable MailerGPT, in addition to these environment variables, you will need to set up the environment:
-   
-     ```sh
-     export NYLAS_SYSTEM_TOKEN=<Your_Nylas_System_Token>
-     export NYLAS_CLIENT_ID=<Your_Nylas_Client_ID>
-     export NYLAS_CLIENT_SECRET=<Your_Nylas_Client_Secret>
-     ```
 
-     Follow [this tutorial](NYLAS.md) for a guide on how to obtain these values.
+   ```sh
+   export NYLAS_SYSTEM_TOKEN=<Your_Nylas_System_Token>
+   export NYLAS_CLIENT_ID=<Your_Nylas_Client_ID>
+   export NYLAS_CLIENT_SECRET=<Your_Nylas_Client_Secret>
+   ```
+
+   Follow [this tutorial](NYLAS.md) for a guide on how to obtain these values.
+
+1. **Pinecone Setup (Optional)**: To persist agents memory in a vector database, you will need to set up these environment variables:
+
+   ```sh
+   export PINECONE_API_KEY=<Your_Pinecone_API_Key>
+   export PINECONE_INDEX_URL=<Your_Pinecone_Index_URL>
+   ```
+
+   Follow [this tutorial](PINECONE.md) for a guide on how to obtain these values.
 
 ### Running Agents
 

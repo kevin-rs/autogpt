@@ -1,5 +1,6 @@
 use anyhow::Result;
 use autogpt::agents::agent::AgentGPT;
+use autogpt::common::utils::Communication;
 use autogpt::common::utils::{Route, Scope, Tasks};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::Functions;
@@ -35,6 +36,42 @@ impl Functions for MockFunctions {
         tasks.description = "Updated description".into();
 
         Ok(())
+    }
+
+    async fn save_ltm(&mut self, _communication: Communication) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        Ok(vec![
+            Communication {
+                role: Cow::Borrowed("system"),
+                content: Cow::Borrowed("System initialized."),
+            },
+            Communication {
+                role: Cow::Borrowed("user"),
+                content: Cow::Borrowed("Hello, autogpt!"),
+            },
+        ])
+    }
+
+    async fn ltm_context(&self) -> String {
+        let comms = [
+            Communication {
+                role: Cow::Borrowed("system"),
+                content: Cow::Borrowed("System initialized."),
+            },
+            Communication {
+                role: Cow::Borrowed("user"),
+                content: Cow::Borrowed("Hello, autogpt!"),
+            },
+        ];
+
+        comms
+            .iter()
+            .map(|c| format!("{}: {}", c.role, c.content))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 

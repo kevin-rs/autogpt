@@ -52,6 +52,12 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, error, info};
 
+#[cfg(feature = "mem")]
+use {
+    crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
+    crate::common::memory::save_long_term_memory,
+};
+
 /// Struct representing a DesignerGPT, which manages design-related tasks using Gemini API.
 #[derive(Debug, Clone)]
 pub struct DesignerGPT {
@@ -157,11 +163,29 @@ impl DesignerGPT {
             role: Cow::Borrowed("user"),
             content: tasks.description.clone(),
         });
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: tasks.description.clone(),
+                })
+                .await;
+        }
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
             content: Cow::Owned(format!("Generating image with prompt: '{}'", text_prompt)),
         });
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Generating image with prompt: '{}'", text_prompt)),
+                })
+                .await;
+        }
 
         let text_response = self
             .img_client
@@ -182,6 +206,15 @@ impl DesignerGPT {
             role: Cow::Borrowed("system"),
             content: Cow::Owned(format!("Image saved at {}", img_path)),
         });
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("system"),
+                    content: Cow::Owned(format!("Image saved at {}", img_path)),
+                })
+                .await;
+        }
 
         info!(
             "[*] {:?}: Image saved at {}",
@@ -221,6 +254,19 @@ impl DesignerGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(format!(
+                        "Requesting text generation from image at path: {}",
+                        image_path
+                    )),
+                })
+                .await;
+        }
+
         let base64_image_data = match load_and_encode_image(image_path) {
             Ok(data) => data,
             Err(_) => {
@@ -231,6 +277,15 @@ impl DesignerGPT {
                     content: Cow::Owned(error_msg.clone()),
                 });
 
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        })
+                        .await;
+                }
                 debug!("[*] {:?}: Error loading image!", self.agent.position());
                 return Ok("".to_string());
             }
@@ -241,6 +296,17 @@ impl DesignerGPT {
             content: Cow::Owned("Generating description from uploaded image...".to_string()),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(
+                        "Generating description from uploaded image...".to_string(),
+                    ),
+                })
+                .await;
+        }
         let response = self
             .client
             .generate_content_with_image(WEB_DESIGNER_PROMPT, &base64_image_data)
@@ -252,6 +318,15 @@ impl DesignerGPT {
             content: Cow::Owned(format!("Generated image description: {}", response)),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!("Generated image description: {}", response)),
+                })
+                .await;
+        }
         debug!(
             "[*] {:?}: Got Image Description: {:?}",
             self.agent.position(),
@@ -393,5 +468,56 @@ impl Functions for DesignerGPT {
         }
 
         Ok(())
+    }
+    /// Saves a communication to long-term memory for the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `communication` - The communication to save, which contains the role and content.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
+    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
+    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
+    #[cfg(feature = "mem")]
+    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
+        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
+    }
+
+    /// Retrieves all communications stored in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
+    /// - The function will return a list of communications that are indexed by the agent's unique ID.
+    /// - It handles the retrieval of the stored metadata and content for each communication.
+    #[cfg(feature = "mem")]
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        load_long_term_memory(self.agent.id.clone()).await
+    }
+
+    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
+    /// - The context string is composed of each communication's role and content, joined by new lines.
+    /// - It provides a quick overview of the agent's memory in a human-readable format.
+    #[cfg(feature = "mem")]
+    async fn ltm_context(&self) -> String {
+        long_term_memory_context(self.agent.id.clone()).await
     }
 }

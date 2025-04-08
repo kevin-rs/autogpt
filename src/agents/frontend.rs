@@ -56,6 +56,12 @@ use std::process::Stdio;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
+#[cfg(feature = "mem")]
+use {
+    crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
+    crate::common::memory::save_long_term_memory,
+};
+
 /// Struct representing a `FrontendGPT`, which manages frontend code generation and testing using Gemini API.
 #[derive(Debug, Clone)]
 #[allow(unused)]
@@ -216,7 +222,7 @@ impl FrontendGPT {
     /// - Sends the request to the Gemini API to generate frontend code.
     /// - Writes the generated frontend code to the appropriate file.
     pub async fn generate_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = &self.workspace;
+        let path = self.workspace.clone();
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
@@ -226,6 +232,18 @@ impl FrontendGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(format!(
+                        "Request to generate frontend code for project: {}",
+                        tasks.description
+                    )),
+                })
+                .await;
+        }
         let full_path = match self.language {
             "rust" => format!("{}/{}", path, "src/template.rs"),
             "python" => format!("{}/{}", path, "template.py"),
@@ -245,6 +263,18 @@ impl FrontendGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!(
+                    "Generating frontend code using template from '{}' and project description.",
+                    full_path
+                )),
+                })
+                .await;
+        }
         let request = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
             FRONTEND_CODE_PROMPT, template, tasks.description
@@ -258,6 +288,15 @@ impl FrontendGPT {
                     role: Cow::Borrowed("system"),
                     content: Cow::Owned(error_msg.clone()),
                 });
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        })
+                        .await;
+                }
                 return Err(anyhow::anyhow!(error_msg));
             }
         };
@@ -279,6 +318,18 @@ impl FrontendGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!(
+                        "Frontend code generated and saved to '{}'",
+                        frontend_path
+                    )),
+                })
+                .await;
+        }
         tasks.frontend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
@@ -307,7 +358,7 @@ impl FrontendGPT {
     /// - Sends the request to the Gemini API to improve the frontend code.
     /// - Writes the improved frontend code to the appropriate file.
     pub async fn improve_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = &self.workspace;
+        let path = self.workspace.clone();
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
@@ -317,6 +368,18 @@ impl FrontendGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(format!(
+                        "Request to improve frontend code for project: {}",
+                        tasks.description
+                    )),
+                })
+                .await;
+        }
         let existing_code = tasks.clone().frontend_code.unwrap_or_default();
 
         self.agent.add_communication(Communication {
@@ -326,6 +389,17 @@ impl FrontendGPT {
             ),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(
+                        "Improving existing frontend code using project description...".to_string(),
+                    ),
+                })
+                .await;
+        }
         let request = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
             IMPROVED_FRONTEND_CODE_PROMPT, existing_code, tasks.description
@@ -340,6 +414,16 @@ impl FrontendGPT {
                     role: Cow::Borrowed("system"),
                     content: Cow::Owned(error_msg.clone()),
                 });
+
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        })
+                        .await;
+                }
                 return Err(anyhow::anyhow!(error_msg));
             }
         };
@@ -361,6 +445,18 @@ impl FrontendGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!(
+                        "Improved frontend code saved to '{}'",
+                        frontend_path
+                    )),
+                })
+                .await;
+        }
         tasks.frontend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
@@ -389,7 +485,7 @@ impl FrontendGPT {
     /// - Sends the request to the Gemini API to fix bugs in the frontend code.
     /// - Writes the fixed frontend code to the appropriate file.
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
-        let path = &self.workspace;
+        let path = self.workspace.clone();
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
@@ -401,6 +497,20 @@ impl FrontendGPT {
             )),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(format!(
+                        "Request to fix bugs in frontend code. Known bugs: {}",
+                        self.bugs
+                            .clone()
+                            .unwrap_or_else(|| "No bug description provided.".into())
+                    )),
+                })
+                .await;
+        }
         let request = format!(
             "{}\n\nBuggy Code: {}\nBugs: {}\n\nFix all bugs.",
             FIX_CODE_PROMPT,
@@ -415,6 +525,18 @@ impl FrontendGPT {
             ),
         });
 
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(
+                        "Attempting to fix bugs in the provided frontend code...".to_string(),
+                    ),
+                })
+                .await;
+        }
+
         let gemini_response = match self.client.generate_content(&request).await {
             Ok(response) => strip_code_blocks(&response),
             Err(_err) => {
@@ -424,6 +546,16 @@ impl FrontendGPT {
                     role: Cow::Borrowed("system"),
                     content: Cow::Owned(error_msg.clone()),
                 });
+                #[cfg(feature = "mem")]
+                {
+                    let _ = self
+                        .save_ltm(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        })
+                        .await;
+                }
+
                 return Err(anyhow::anyhow!(error_msg));
             }
         };
@@ -444,7 +576,18 @@ impl FrontendGPT {
                 frontend_path
             )),
         });
-
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(format!(
+                        "Bugs fixed. Updated code saved to '{}'",
+                        frontend_path
+                    )),
+                })
+                .await;
+        }
         tasks.frontend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
@@ -649,7 +792,7 @@ impl Functions for FrontendGPT {
                                 error!(
                                     "{}",
                                     format!(
-                                        "[*] {:?}: Too many bugs found in the code. Consider debugging...",
+                                        "[*] {:?}: Too many bugs found. Consider debugging...",
                                         self.agent.position(),
                                     )
                                     .bright_red()
@@ -692,5 +835,56 @@ impl Functions for FrontendGPT {
             }
         }
         Ok(())
+    }
+    /// Saves a communication to long-term memory for the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `communication` - The communication to save, which contains the role and content.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
+    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
+    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
+    #[cfg(feature = "mem")]
+    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
+        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
+    }
+
+    /// Retrieves all communications stored in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
+    /// - The function will return a list of communications that are indexed by the agent's unique ID.
+    /// - It handles the retrieval of the stored metadata and content for each communication.
+    #[cfg(feature = "mem")]
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        load_long_term_memory(self.agent.id.clone()).await
+    }
+
+    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
+    ///
+    /// # Returns
+    ///
+    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
+    ///
+    /// # Business Logic
+    ///
+    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
+    /// - The context string is composed of each communication's role and content, joined by new lines.
+    /// - It provides a quick overview of the agent's memory in a human-readable format.
+    #[cfg(feature = "mem")]
+    async fn ltm_context(&self) -> String {
+        long_term_memory_context(self.agent.id.clone()).await
     }
 }

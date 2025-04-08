@@ -4,18 +4,33 @@
 use crate::common::utils::{Communication, Status};
 use crate::traits::agent::Agent;
 use std::borrow::Cow;
+use uuid::Uuid;
 
 /// Represents an agent with specific characteristics.
-#[derive(Debug, PartialEq, Default, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AgentGPT {
+    /// Unique identifier for the agent.
+    pub id: Cow<'static, str>,
     /// The objective of the agent.
-    objective: Cow<'static, str>,
+    pub objective: Cow<'static, str>,
     /// The position of the agent.
-    position: Cow<'static, str>,
+    pub position: Cow<'static, str>,
     /// The current status of the agent.
-    status: Status,
-    /// Memory containing exchanged communications.
-    memory: Vec<Communication>,
+    pub status: Status,
+    /// Hot memory containing exchanged communications between agents and/or user.
+    pub memory: Vec<Communication>,
+}
+
+impl Default for AgentGPT {
+    fn default() -> Self {
+        AgentGPT {
+            id: Cow::Owned(Uuid::new_v4().to_string()),
+            objective: Cow::Borrowed(""),
+            position: Cow::Borrowed(""),
+            status: Status::default(),
+            memory: vec![],
+        }
+    }
 }
 
 impl AgentGPT {
@@ -40,6 +55,7 @@ impl AgentGPT {
     /// A new instance of `AgentGPT`.
     pub fn new_owned(objective: String, position: String) -> Self {
         Self {
+            id: Cow::Owned(Uuid::new_v4().to_string()),
             objective: Cow::Owned(objective),
             position: Cow::Owned(position),
             status: Default::default(),
@@ -59,6 +75,7 @@ impl AgentGPT {
     /// A new instance of `AgentGPT`.
     pub fn new_borrowed(objective: &'static str, position: &'static str) -> Self {
         Self {
+            id: Cow::Owned(Uuid::new_v4().to_string()),
             objective: Cow::Borrowed(objective),
             position: Cow::Borrowed(position),
             status: Default::default(),
@@ -80,6 +97,7 @@ impl Agent for AgentGPT {
     /// A new instance of the `Agent` struct.
     fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
         Self {
+            id: Cow::Owned(Uuid::new_v4().to_string()),
             objective,
             position,
             status: Default::default(),
