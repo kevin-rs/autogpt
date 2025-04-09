@@ -67,13 +67,7 @@ use {
 };
 
 #[cfg(feature = "oai")]
-use {
-    openai_dive::v1::api::Client as OpenAIClient, openai_dive::v1::models::FlagshipModel,
-    openai_dive::v1::resources::chat::*,
-};
-
-#[cfg(feature = "gem")]
-use gems::Client as GeminiClient;
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Struct representing a BackendGPT, which manages backend development tasks using GPT.
 #[derive(Debug, Clone)]
@@ -216,20 +210,8 @@ impl BackendGPT {
 
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
 
-        #[cfg(feature = "oai")]
-        let client = {
-            let openai_client = OpenAIClient::new_from_env();
-            ClientType::OpenAI(openai_client)
-        };
+        let client = ClientType::from_env();
 
-        #[cfg(feature = "gem")]
-        let client = {
-            let model = var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.0-flash".to_string());
-            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-            let gemini_client = GeminiClient::new(&api_key, &model);
-
-            ClientType::Gemini(gemini_client)
-        };
         let req_client: ReqClient = ReqClient::builder()
             .timeout(Duration::from_secs(3))
             .build()

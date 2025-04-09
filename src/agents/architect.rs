@@ -61,13 +61,7 @@ use {
 };
 
 #[cfg(feature = "oai")]
-use {
-    openai_dive::v1::api::Client as OpenAIClient, openai_dive::v1::models::FlagshipModel,
-    openai_dive::v1::resources::chat::*,
-};
-
-#[cfg(feature = "gem")]
-use gems::Client as GeminiClient;
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Struct representing an ArchitectGPT, which orchestrates tasks related to architectural design using GPT.
 #[derive(Debug, Clone)]
@@ -156,20 +150,8 @@ impl ArchitectGPT {
 
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
 
-        #[cfg(feature = "oai")]
-        let client = {
-            let openai_client = OpenAIClient::new_from_env();
-            ClientType::OpenAI(openai_client)
-        };
+        let client = ClientType::from_env();
 
-        #[cfg(feature = "gem")]
-        let client = {
-            let model = var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.0-flash".to_string());
-            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-            let gemini_client = GeminiClient::new(&api_key, &model);
-
-            ClientType::Gemini(gemini_client)
-        };
         info!(
             "{}",
             format!("[*] {:?}: 🛠️  Getting ready!", agent.position())
@@ -367,7 +349,7 @@ impl ArchitectGPT {
             }
         };
 
-        tasks.scope = Some(response.clone());
+        tasks.scope = Some(response);
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 

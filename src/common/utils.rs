@@ -70,6 +70,7 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
+use std::env::var;
 use std::io;
 use std::io::Read;
 use std::process::Command;
@@ -102,6 +103,35 @@ pub enum ClientType {
     /// Google Gemini client.
     #[cfg(feature = "gem")]
     Gemini(GeminiClient),
+}
+
+impl ClientType {
+    pub fn from_env() -> Self {
+        let provider = var("AI_PROVIDER").unwrap_or_else(|_| "gemini".to_string());
+
+        #[cfg(feature = "oai")]
+        if provider == "openai" {
+            let openai_client = OpenAIClient::new_from_env();
+            return ClientType::OpenAI(openai_client);
+        }
+
+        #[cfg(feature = "gem")]
+        if provider == "gemini" || cfg!(not(feature = "oai")) {
+            let model = var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.0-flash".to_string());
+            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
+            let gemini_client = GeminiClient::new(&api_key, &model);
+            return ClientType::Gemini(gemini_client);
+        }
+
+        #[allow(unreachable_code)]
+        {
+            panic!(
+                "Invalid AI_PROVIDER `{}` or missing required feature flags. \
+                Make sure to enable at least one of: `oai`, `gem`.",
+                provider
+            );
+        }
+    }
 }
 
 /// Represents a communication between agents.

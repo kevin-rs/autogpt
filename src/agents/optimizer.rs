@@ -82,13 +82,8 @@ use {
     crate::common::memory::save_long_term_memory,
 };
 #[cfg(feature = "oai")]
-use {
-    openai_dive::v1::api::Client as OpenAIClient, openai_dive::v1::models::FlagshipModel,
-    openai_dive::v1::resources::chat::*,
-};
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
-#[cfg(feature = "gem")]
-use gems::Client as GeminiClient;
 /// Struct representing an `OptimizerGPT`, which manages code optimization and modularization tasks using the Gemini API.
 #[derive(Debug, Clone)]
 pub struct OptimizerGPT {
@@ -145,22 +140,8 @@ impl OptimizerGPT {
 
         let agent = AgentGPT::new_borrowed(objective, position);
 
-        #[cfg(feature = "oai")]
-        let client = {
-            let openai_client = OpenAIClient::new_from_env();
-            ClientType::OpenAI(openai_client)
-        };
+        let client = ClientType::from_env();
 
-        #[cfg(feature = "gem")]
-        let client = {
-            let model = var("GEMINI_MODEL")
-                .unwrap_or("gemini-2.0-flash".to_string())
-                .to_owned();
-            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-            let gemini_client = GeminiClient::new(&api_key, &model);
-
-            ClientType::Gemini(gemini_client)
-        };
         info!(
             "{}",
             format!("[*] {:?}: 🔧 Optimizer ready!", agent.position())

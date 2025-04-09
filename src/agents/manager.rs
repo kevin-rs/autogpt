@@ -28,13 +28,7 @@ use {
     crate::common::memory::save_long_term_memory,
 };
 #[cfg(feature = "oai")]
-use {
-    openai_dive::v1::api::Client as OpenAIClient, openai_dive::v1::models::FlagshipModel,
-    openai_dive::v1::resources::chat::*,
-};
-
-#[cfg(feature = "gem")]
-use gems::Client as GeminiClient;
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Enum representing different types of GPT agents.
 #[derive(Debug, Clone)]
@@ -178,22 +172,7 @@ impl ManagerGPT {
                 .bold()
         );
 
-        #[cfg(feature = "oai")]
-        let client = {
-            let openai_client = OpenAIClient::new_from_env();
-            ClientType::OpenAI(openai_client)
-        };
-
-        #[cfg(feature = "gem")]
-        let client = {
-            let model = var("GEMINI_MODEL")
-                .unwrap_or("gemini-2.0-flash".to_string())
-                .to_owned();
-            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-            let gemini_client = GeminiClient::new(&api_key, &model);
-
-            ClientType::Gemini(gemini_client)
-        };
+        let client = ClientType::from_env();
 
         Self {
             agent,

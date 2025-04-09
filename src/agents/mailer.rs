@@ -22,13 +22,7 @@ use {
     crate::common::memory::save_long_term_memory,
 };
 #[cfg(feature = "oai")]
-use {
-    openai_dive::v1::api::Client as OpenAIClient, openai_dive::v1::models::FlagshipModel,
-    openai_dive::v1::resources::chat::*,
-};
-
-#[cfg(feature = "gem")]
-use gems::Client as GeminiClient;
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Struct representing a `MailerGPT`, which manages email processing and text generation using Nylas and Gemini API.
 pub struct MailerGPT {
@@ -68,22 +62,7 @@ impl MailerGPT {
             .await
             .unwrap();
 
-        #[cfg(feature = "oai")]
-        let client = {
-            let openai_client = OpenAIClient::new_from_env();
-            ClientType::OpenAI(openai_client)
-        };
-
-        #[cfg(feature = "gem")]
-        let client = {
-            let model = var("GEMINI_MODEL")
-                .unwrap_or("gemini-2.0-flash".to_string())
-                .to_owned();
-            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-            let gemini_client = GeminiClient::new(&api_key, &model);
-
-            ClientType::Gemini(gemini_client)
-        };
+        let client = ClientType::from_env();
 
         info!(
             "{}",
@@ -259,7 +238,7 @@ impl MailerGPT {
                     Ok(chat_response) => {
                         let message = &chat_response.choices[0].message;
 
-                        let response_text = match message {
+                        match message {
                             ChatMessage::Assistant {
                                 content: Some(chat_content),
                                 ..
@@ -269,8 +248,7 @@ impl MailerGPT {
                             ChatMessage::Developer { content, .. } => content.to_string(),
                             ChatMessage::Tool { content, .. } => content.clone(),
                             _ => String::from(""),
-                        };
-                        response_text
+                        }
                     }
 
                     Err(err) => {

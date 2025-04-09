@@ -44,7 +44,7 @@ async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<
 
             match oai_client.embeddings().create(parameters).await {
                 Ok(response) => {
-                    if let Some(embedding) = response.data.get(0) {
+                    if let Some(embedding) = response.data.first() {
                         match &embedding.embedding {
                             EmbeddingOutput::Float(vec) => vec.clone(),
                             EmbeddingOutput::Base64(_) => {

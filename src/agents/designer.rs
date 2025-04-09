@@ -57,13 +57,10 @@ use {
 };
 
 #[cfg(feature = "oai")]
-use {
-    openai_dive::v1::api::Client as OpenAIClient, openai_dive::v1::models::FlagshipModel,
-    openai_dive::v1::resources::chat::*,
-};
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 #[cfg(feature = "gem")]
-use {gems::utils::load_and_encode_image, gems::Client as GeminiClient};
+use gems::utils::load_and_encode_image;
 
 /// Struct representing a DesignerGPT, which manages design-related tasks using Gemini or OpenAI API.
 #[derive(Debug, Clone)]
@@ -119,22 +116,7 @@ impl DesignerGPT {
 
         let img_client = ImgClient::new(&getimg_api_key, &getimg_model);
 
-        #[cfg(feature = "oai")]
-        let client = {
-            let openai_client = OpenAIClient::new_from_env();
-            ClientType::OpenAI(openai_client)
-        };
-
-        #[cfg(feature = "gem")]
-        let client = {
-            let model = var("GEMINI_MODEL")
-                .unwrap_or("gemini-2.0-flash".to_string())
-                .to_owned();
-            let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-            let gemini_client = GeminiClient::new(&api_key, &model);
-
-            ClientType::Gemini(gemini_client)
-        };
+        let client = ClientType::from_env();
 
         info!(
             "{}",
