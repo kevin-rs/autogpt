@@ -37,7 +37,7 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{strip_code_blocks, Communication, Status, Tasks};
+use crate::common::utils::{strip_code_blocks, ClientType, Communication, Status, Tasks};
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
@@ -45,7 +45,6 @@ use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
 use colored::*;
-use gems::Client;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
@@ -61,6 +60,8 @@ use {
     crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
     crate::common::memory::save_long_term_memory,
 };
+#[cfg(feature = "oai")]
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Struct representing a `FrontendGPT`, which manages frontend code generation and testing using Gemini API.
 #[derive(Debug, Clone)]
@@ -70,8 +71,8 @@ pub struct FrontendGPT {
     workspace: Cow<'static, str>,
     /// Represents the GPT agent responsible for handling frontend tasks.
     agent: AgentGPT,
-    /// Represents a Gemini client for interacting with Gemini API.
-    client: Client,
+    /// Represents an OpenAI or Gemini client for interacting with their API.
+    client: ClientType,
     /// Represents a client for sending HTTP requests.
     req_client: ReqClient,
     /// Represents the bugs found in the code.
@@ -170,11 +171,8 @@ impl FrontendGPT {
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
-        let model = var("GEMINI_MODEL")
-            .unwrap_or("gemini-2.0-flash".to_string())
-            .to_owned();
-        let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
-        let client = Client::new(&api_key, &model);
+
+        let client = ClientType::from_env();
 
         info!(
             "{}",
@@ -280,24 +278,91 @@ impl FrontendGPT {
             FRONTEND_CODE_PROMPT, template, tasks.description
         );
 
-        let gemini_response = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => {
-                let error_msg = "Failed to generate content from Gemini API.".to_string();
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("system"),
-                    content: Cow::Owned(error_msg.clone()),
-                });
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+        let gemini_response = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&request).await;
+
+                match result {
+                    Ok(response) => strip_code_blocks(&response),
+                    Err(_err) => {
+                        let error_msg = "Failed to generate content from Gemini API.".to_string();
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
-                        })
-                        .await;
+                        });
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
                 }
-                return Err(anyhow::anyhow!(error_msg));
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_err) => {
+                        let error_msg = "Failed to generate content from OpenAI API.".to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
@@ -305,7 +370,7 @@ impl FrontendGPT {
             "rust" => format!("{}/{}", path, "src/main.rs"),
             "python" => format!("{}/{}", path, "main.py"),
             "javascript" => format!("{}/{}", path, "src/index.js"),
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
+            _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
         fs::write(&frontend_path, gemini_response.clone())?;
@@ -330,6 +395,7 @@ impl FrontendGPT {
                 })
                 .await;
         }
+
         tasks.frontend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
@@ -405,26 +471,96 @@ impl FrontendGPT {
             IMPROVED_FRONTEND_CODE_PROMPT, existing_code, tasks.description
         );
 
-        let gemini_response = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => {
-                let error_msg =
-                    "Failed to generate improved frontend code via Gemini API.".to_string();
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("system"),
-                    content: Cow::Owned(error_msg.clone()),
-                });
+        let gemini_response = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&request).await;
 
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                match result {
+                    Ok(response) => strip_code_blocks(&response),
+                    Err(_err) => {
+                        let error_msg =
+                            "Failed to generate improved frontend code via Gemini API.".to_string();
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
-                        })
-                        .await;
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
                 }
-                return Err(anyhow::anyhow!(error_msg));
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_err) => {
+                        let error_msg =
+                            "Failed to generate improved frontend code via OpenAI API.".to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
@@ -432,7 +568,7 @@ impl FrontendGPT {
             "rust" => format!("{}/{}", path, "src/main.rs"),
             "python" => format!("{}/{}", path, "main.py"),
             "javascript" => format!("{}/{}", path, "src/index.js"),
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
+            _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
         fs::write(&frontend_path, gemini_response.clone())?;
@@ -457,6 +593,7 @@ impl FrontendGPT {
                 })
                 .await;
         }
+
         tasks.frontend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);
@@ -537,26 +674,98 @@ impl FrontendGPT {
                 .await;
         }
 
-        let gemini_response = match self.client.generate_content(&request).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => {
-                let error_msg =
-                    "Failed to generate bug-fixed frontend code via Gemini API.".to_string();
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("system"),
-                    content: Cow::Owned(error_msg.clone()),
-                });
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+        let gemini_response = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&request).await;
+
+                match result {
+                    Ok(response) => strip_code_blocks(&response),
+                    Err(_err) => {
+                        let error_msg =
+                            "Failed to generate bug-fixed frontend code via Gemini API."
+                                .to_string();
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
-                        })
-                        .await;
-                }
+                        });
 
-                return Err(anyhow::anyhow!(error_msg));
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_err) => {
+                        let error_msg =
+                            "Failed to generate bug-fixed frontend code via OpenAI API."
+                                .to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
@@ -564,7 +773,7 @@ impl FrontendGPT {
             "rust" => format!("{}/{}", path, "src/main.rs"),
             "python" => format!("{}/{}", path, "main.py"),
             "javascript" => format!("{}/{}", path, "src/index.js"),
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
+            _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
         fs::write(&frontend_path, gemini_response.clone())?;
@@ -576,6 +785,7 @@ impl FrontendGPT {
                 frontend_path
             )),
         });
+
         #[cfg(feature = "mem")]
         {
             let _ = self
@@ -588,6 +798,7 @@ impl FrontendGPT {
                 })
                 .await;
         }
+
         tasks.frontend_code = Some(gemini_response.clone().into());
 
         self.agent.update(Status::Completed);

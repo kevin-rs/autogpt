@@ -1,7 +1,7 @@
 //! # `BackendGPT` agent.
 //!
 //! This module provides functionality for generating backend code for web servers
-//! and JSON databases based on prompts using Gemini API. The `BackendGPT` agent
+//! and JSON databases based on prompts using Gemini or OpenAI API. The `BackendGPT` agent
 //! understands user requirements and produces code snippets in various programming
 //! languages commonly used for backend development.
 //!
@@ -38,7 +38,7 @@
 
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::strip_code_blocks;
-use crate::common::utils::{Communication, Route, Status, Tasks};
+use crate::common::utils::{ClientType, Communication, Route, Status, Tasks};
 use crate::prompts::backend::{
     API_ENDPOINTS_PROMPT, FIX_CODE_PROMPT, IMPROVED_WEBSERVER_CODE_PROMPT, WEBSERVER_CODE_PROMPT,
 };
@@ -52,7 +52,6 @@ use std::thread::sleep;
 
 use anyhow::Result;
 use colored::*;
-use gems::Client;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
@@ -67,6 +66,9 @@ use {
     crate::common::memory::save_long_term_memory,
 };
 
+#[cfg(feature = "oai")]
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
+
 /// Struct representing a BackendGPT, which manages backend development tasks using GPT.
 #[derive(Debug, Clone)]
 pub struct BackendGPT {
@@ -74,8 +76,8 @@ pub struct BackendGPT {
     workspace: Cow<'static, str>,
     /// Represents the GPT agent responsible for handling backend tasks.
     agent: AgentGPT,
-    /// Represents a Gemini client for interacting with Gemini API.
-    client: Client,
+    /// Represents an OpenAI or Gemini client for interacting with their API.
+    client: ClientType,
     /// Represents a client for making HTTP requests.
     req_client: ReqClient,
     /// Represents the bugs found in the codebase, if any.
@@ -104,7 +106,7 @@ impl BackendGPT {
     /// - Constructs the workspace directory path for `BackendGPT`.
     /// - Initializes backend projects based on the specified language.
     /// - Initializes the GPT agent with the given objective and position.
-    /// - Creates clients for interacting with Gemini API and making HTTP requests.
+    /// - Creates clients for interacting with Gemini or OpenAI API and making HTTP requests.
     ///
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace/".to_string());
@@ -207,9 +209,8 @@ impl BackendGPT {
         }
 
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
-        let model = var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.0-flash".to_string());
-        let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-        let client = Client::new(&api_key, &model);
+
+        let client = ClientType::from_env();
 
         let req_client: ReqClient = ReqClient::builder()
             .timeout(Duration::from_secs(3))
@@ -240,14 +241,14 @@ impl BackendGPT {
     /// # Errors
     ///
     /// Returns an error if there's a failure in reading the template file,
-    /// generating content via the Gemini API, or writing the output file.
+    /// generating content via the Gemini or OpenAI API, or writing the output file.
     ///
     /// # Business Logic
     ///
     /// - Determines the file path based on the specified language.
     /// - Reads the template code from the specified file.
     /// - Constructs a request using the template code and project description.
-    /// - Sends the request to the Gemini API to generate backend code.
+    /// - Sends the request to the Gemini or OpenAI API to generate backend code.
     /// - Logs the user request and assistant response as communication history in the agent's memory.
     /// - Writes the generated backend code to the appropriate file based on language.
     /// - Updates the task's backend code and the agent's status to `Completed`.
@@ -292,44 +293,131 @@ impl BackendGPT {
                 })
                 .await;
         }
+        let response: String = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&request).await;
 
-        let gemini_response_result = self.client.generate_content(&request).await;
-
-        let gemini_response = match gemini_response_result {
-            Ok(response) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(response.clone()),
-                });
-
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                match result {
+                    Ok(response) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(response.clone()),
-                        })
-                        .await;
-                }
+                        });
 
-                strip_code_blocks(&response)
-            }
-            Err(err) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(format!("Error generating backend code: {}", err)),
-                });
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(format!("Error generating backend code: {}", err)),
-                        })
-                        .await;
-                }
+                        });
 
-                Default::default()
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error generating backend code: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error generating backend code: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error generating backend code: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
@@ -337,17 +425,17 @@ impl BackendGPT {
             "rust" => format!("{}/{}", path, "src/main.rs"),
             "python" => format!("{}/{}", path, "main.py"),
             "javascript" => format!("{}/{}", path, "src/index.js"),
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
+            _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(backend_path, gemini_response.clone())?;
+        fs::write(backend_path, response.clone())?;
 
-        tasks.backend_code = Some(gemini_response.clone().into());
+        tasks.backend_code = Some(response.clone().into());
 
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
-        Ok(gemini_response)
+        Ok(response)
     }
 
     /// Asynchronously improves existing backend code based on tasks,
@@ -369,7 +457,7 @@ impl BackendGPT {
     ///
     /// - Constructs a request based on the existing backend code and project description.
     /// - Logs the user's request as a `Communication`.
-    /// - Sends the request to the Gemini API to generate improved code.
+    /// - Sends the request to the Gemini or OpenAI API to generate improved code.
     /// - Logs the AI's response as a `Communication`.
     /// - Writes the improved backend code to the appropriate file.
     /// - Updates tasks and agent status accordingly.
@@ -398,43 +486,131 @@ impl BackendGPT {
                 .await;
         }
 
-        let gemini_response_result = self.client.generate_content(&request).await;
+        let response: String = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&request).await;
 
-        let gemini_response = match gemini_response_result {
-            Ok(response) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(response.clone()),
-                });
-
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                match result {
+                    Ok(response) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(response.clone()),
-                        })
-                        .await;
-                }
+                        });
 
-                strip_code_blocks(&response)
-            }
-            Err(err) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(format!("Error improving backend code: {}", err)),
-                });
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(format!("Error improving backend code: {}", err)),
-                        })
-                        .await;
-                }
+                        });
 
-                Default::default()
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error improving backend code: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error improving backend code: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error improving backend code: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
@@ -442,19 +618,19 @@ impl BackendGPT {
             "rust" => format!("{}/{}", path, "src/main.rs"),
             "python" => format!("{}/{}", path, "main.py"),
             "javascript" => format!("{}/{}", path, "src/index.js"),
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
+            _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
         debug!("[*] {:?}: {:?}", self.agent.position(), backend_path);
 
-        fs::write(backend_path, gemini_response.clone())?;
+        fs::write(backend_path, response.clone())?;
 
-        tasks.backend_code = Some(gemini_response.clone().into());
+        tasks.backend_code = Some(response.clone().into());
 
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
-        Ok(gemini_response)
+        Ok(response)
     }
 
     /// Asynchronously fixes bugs in the backend code based on tasks,
@@ -476,7 +652,7 @@ impl BackendGPT {
     ///
     /// - Constructs a request based on the buggy backend code and project description.
     /// - Logs the request as a user `Communication`.
-    /// - Sends the request to the Gemini API to generate content for fixing bugs.
+    /// - Sends the request to the Gemini or OpenAI API to generate content for fixing bugs.
     /// - Logs the response or any errors as assistant `Communication`s.
     /// - Writes the fixed backend code to the appropriate file.
     /// - Updates tasks and agent status accordingly.
@@ -504,42 +680,125 @@ impl BackendGPT {
                 .await;
         }
 
-        let gemini_response_result = self.client.generate_content(&request).await;
+        let response: String = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&request).await;
 
-        let gemini_response = match gemini_response_result {
-            Ok(response) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(response.clone()),
-                });
-
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                match result {
+                    Ok(response) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(response.clone()),
-                        })
-                        .await;
-                }
-                strip_code_blocks(&response)
-            }
-            Err(err) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
-                });
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
-                        })
-                        .await;
-                }
+                        });
 
-                Default::default()
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
@@ -547,17 +806,17 @@ impl BackendGPT {
             "rust" => format!("{}/{}", path, "src/main.rs"),
             "python" => format!("{}/{}", path, "main.py"),
             "javascript" => format!("{}/{}", path, "src/index.js"),
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
+            _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(backend_path, gemini_response.clone())?;
+        fs::write(backend_path, response.clone())?;
 
-        tasks.backend_code = Some(gemini_response.clone().into());
+        tasks.backend_code = Some(response.clone().into());
 
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
-        Ok(gemini_response)
+        Ok(response)
     }
 
     /// Asynchronously retrieves routes JSON from the backend code,
@@ -576,7 +835,7 @@ impl BackendGPT {
     /// - Reads the backend code from the appropriate file.
     /// - Constructs a request with the backend code.
     /// - Logs the user's request as a `Communication`.
-    /// - Sends the request to the Gemini API to generate content for routes JSON.
+    /// - Sends the request to the Gemini or OpenAI API to generate content for routes JSON.
     /// - Logs the AI's response as a `Communication`.
     /// - Updates agent status accordingly.
     pub async fn get_routes_json(&mut self) -> Result<String> {
@@ -611,49 +870,132 @@ impl BackendGPT {
                 })
                 .await;
         }
-        let gemini_response_result = self.client.generate_content(&request).await;
+        let response: String = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&request).await;
 
-        let gemini_response = match gemini_response_result {
-            Ok(response) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(response.clone()),
-                });
-
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                match result {
+                    Ok(response) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(response.clone()),
-                        })
-                        .await;
-                }
-                strip_code_blocks(&response)
-            }
-            Err(err) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(format!("Error retrieving routes JSON: {}", err)),
-                });
+                        });
 
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(format!("Error retrieving routes JSON: {}", err)),
-                        })
-                        .await;
+                            content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
                 }
-                Default::default()
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
-        Ok(gemini_response)
+        Ok(response)
     }
 
     /// Accessor method to retrieve the agent associated with BackendGPT.

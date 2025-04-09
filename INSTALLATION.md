@@ -104,6 +104,21 @@ To configure the CLI and or the SDK environment, follow these steps:
 
    This variable guide the agents on where to generate the code within your project structure.
 
+1. **AI Provider Selection**: You can control which AI client is initialized at runtime using the `AI_PROVIDER` environment variable.
+
+   - `openai` - Initializes the OpenAI client (**requires** the `oai` feature).
+   - `gemini` - Initializes the Gemini client (**requires** the `gem` feature). This is the **default** if `AI_PROVIDER` is not set.
+
+   ```sh
+   # Use OpenAI (requires `--features oai`)
+   export AI_PROVIDER=openai
+
+   # Use Gemini (requires `--features gem`)
+   export AI_PROVIDER=gemini
+   ```
+
+   Make sure to enable the corresponding Cargo features (`oai` or `gem`) when building your project.
+
 1. **API Key Configuration**: Additionally, you need to set up the Gemini API key by setting the following environment variable:
 
    ```sh

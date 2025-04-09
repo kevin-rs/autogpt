@@ -11,7 +11,7 @@ use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
 use crate::agents::git::GitGPT;
 use crate::common::utils::strip_code_blocks;
-use crate::common::utils::{Communication, Tasks};
+use crate::common::utils::{ClientType, Communication, Tasks};
 use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT, MANAGER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
@@ -27,6 +27,8 @@ use {
     crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
     crate::common::memory::save_long_term_memory,
 };
+#[cfg(feature = "oai")]
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Enum representing different types of GPT agents.
 #[derive(Debug, Clone)]
@@ -117,8 +119,8 @@ pub struct ManagerGPT {
     language: &'static str,
     /// Represents a collection of GPT agents managed by the manager.
     agents: Vec<AgentType>,
-    /// Represents a client for interacting with external services.
-    client: Client,
+    /// Represents an OpenAI or Gemini client for interacting with their API.
+    client: ClientType,
 }
 
 impl ManagerGPT {
@@ -170,12 +172,7 @@ impl ManagerGPT {
                 .bold()
         );
 
-        let model = var("GEMINI_MODEL")
-            .unwrap_or("gemini-2.0-flash".to_string())
-            .to_owned();
-
-        let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
-        let client = Client::new(&api_key, &model);
+        let client = ClientType::from_env();
 
         Self {
             agent,
@@ -232,14 +229,104 @@ impl ManagerGPT {
     ///
     /// - Adds default agents to the collection if it is empty.
     ///
-    pub async fn execute_prompt(&self, prompt: String) -> Result<String> {
-        let gemini_response: String = match self.client.clone().generate_content(&prompt).await {
-            Ok(response) => strip_code_blocks(&response),
-            Err(_err) => Default::default(),
+    pub async fn execute_prompt(&mut self, prompt: String) -> Result<String, anyhow::Error> {
+        let gemini_response = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(&prompt).await;
+
+                match result {
+                    Ok(response) => strip_code_blocks(&response),
+                    Err(_err) => {
+                        let error_msg = "Failed to generate content via Gemini API.".to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                use openai_dive::v1::resources::chat::*;
+                use openai_dive::v1::resources::model::*;
+
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(prompt.clone()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_err) => {
+                        let error_msg = "Failed to generate content via OpenAI API.".to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
+            }
         };
 
         Ok(gemini_response)
     }
+
     /// Asynchronously executes the tasks described by the user request.
     ///
     /// # Arguments
@@ -367,13 +454,13 @@ impl ManagerGPT {
 
         for mut agent in self.agents.clone() {
             let request_prompt = format!(
-            "{}\n\n\n\nUser Request: {}\n\nAgent Role: {}\nProgramming Language: {}\nFramework: {}\n",
-            MANAGER_PROMPT,
-            self.tasks.description.clone(),
-            agent.position(),
-            language,
-            framework
-        );
+                "{}\n\n\n\nUser Request: {}\n\nAgent Role: {}\nProgramming Language: {}\nFramework: {}\n",
+                MANAGER_PROMPT,
+                self.tasks.description.clone(),
+                agent.position(),
+                language,
+                framework
+            );
 
             let refined_task = self.execute_prompt(request_prompt).await?;
 

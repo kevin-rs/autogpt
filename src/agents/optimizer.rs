@@ -63,13 +63,12 @@
 
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::strip_code_blocks;
-use crate::common::utils::{Communication, Status, Tasks};
+use crate::common::utils::{ClientType, Communication, Status, Tasks};
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
 use colored::*;
-use gems::Client;
 use std::borrow::Cow;
 use std::env::var;
 use std::fs::{self, File};
@@ -82,6 +81,8 @@ use {
     crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
     crate::common::memory::save_long_term_memory,
 };
+#[cfg(feature = "oai")]
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Struct representing an `OptimizerGPT`, which manages code optimization and modularization tasks using the Gemini API.
 #[derive(Debug, Clone)]
@@ -97,9 +98,9 @@ pub struct OptimizerGPT {
     /// This helps the optimizer tailor its behavior based on the language of the code being optimized.
     pub language: String,
 
-    /// Represents the Gemini client for interacting with the Gemini API.
+    /// Represents the Gemini or OpenAI client for interacting with their API.
     /// The client is used to send requests and receive responses from the Gemini model to handle optimization tasks.
-    client: Client,
+    client: ClientType,
 }
 
 impl OptimizerGPT {
@@ -139,9 +140,7 @@ impl OptimizerGPT {
 
         let agent = AgentGPT::new_borrowed(objective, position);
 
-        let api_key = var("GEMINI_API_KEY").unwrap_or_default();
-        let model = var("GEMINI_MODEL").unwrap_or("gemini-2.0-flash".to_string());
-        let client = Client::new(&api_key, &model);
+        let client = ClientType::from_env();
 
         info!(
             "{}",
@@ -212,29 +211,127 @@ impl OptimizerGPT {
     /// - Facilitates communication between the agent and the Gemini model.
     /// - Ensures that all model interactions are logged and optionally persisted for future context or audits.
     /// - Prepares the returned content for further downstream processing (e.g., file writing or parsing).
-    pub async fn generate_and_track(&mut self, request: &str) -> String {
-        let gemini_response_result = self.client.generate_content(request).await;
+    pub async fn generate_and_track(&mut self, request: &str) -> Result<String> {
+        let gemini_response = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client.generate_content(request).await;
 
-        let gemini_response = match gemini_response_result {
-            Ok(response) => {
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(response.clone()),
-                });
-
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+                match result {
+                    Ok(response) => {
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(response.clone()),
-                        })
-                        .await;
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response)
+                    }
+                    Err(err) => {
+                        let err_msg = format!("Error retrieving Gemini response: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
                 }
-                strip_code_blocks(&response)
             }
-            Err(err) => {
-                let err_msg = format!("Error retrieving Gemini response: {}", err);
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(request.to_string()),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        let response_text = match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        };
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+                    Err(err) => {
+                        let err_msg = format!("Error retrieving OpenAI response: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                let err_msg =
+                    "No valid AI client configured. Enable `gem` or `oai` feature.".to_string();
 
                 self.agent.add_communication(Communication {
                     role: Cow::Borrowed("assistant"),
@@ -250,11 +347,12 @@ impl OptimizerGPT {
                         })
                         .await;
                 }
+
                 Default::default()
             }
         };
 
-        gemini_response
+        Ok(gemini_response)
     }
 }
 /// Implementation of the `Functions` trait for the `OptimizerGPT` struct.
@@ -361,7 +459,7 @@ impl Functions for OptimizerGPT {
         .await?;
 
         let prompt = format!("{}\n\n{}", MODULARIZE_PROMPT, original_code);
-        let file_list_raw = self.generate_and_track(&prompt).await;
+        let file_list_raw = self.generate_and_track(&prompt).await?;
 
         let filenames: Vec<String> = file_list_raw
             .lines()
@@ -378,7 +476,7 @@ impl Functions for OptimizerGPT {
                 "{}\n\nFilename: {}\nContent:\n{}",
                 SPLIT_PROMPT, filename, original_code
             );
-            let response = self.generate_and_track(&split_prompt).await;
+            let response = self.generate_and_track(&split_prompt).await?;
 
             self.save_module(filename, &response)?;
 

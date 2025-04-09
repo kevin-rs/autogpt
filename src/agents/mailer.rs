@@ -5,12 +5,11 @@
 //! understands email contents and produces textual responses tailored to user requirements.
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{Communication, Status, Tasks};
+use crate::common::utils::{ClientType, Communication, Status, Tasks};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
 use colored::*;
-use gems::Client;
 use nylas::client::Nylas;
 use nylas::messages::Message;
 use std::borrow::Cow;
@@ -22,6 +21,8 @@ use {
     crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
     crate::common::memory::save_long_term_memory,
 };
+#[cfg(feature = "oai")]
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 /// Struct representing a `MailerGPT`, which manages email processing and text generation using Nylas and Gemini API.
 pub struct MailerGPT {
@@ -29,8 +30,8 @@ pub struct MailerGPT {
     agent: AgentGPT,
     /// Represents the Nylas client for interacting with email services.
     nylas_client: Nylas,
-    /// Represents the Gemini client for interacting with Gemini API.
-    client: Client,
+    /// Represents an OpenAI or Gemini client for interacting with their API.
+    client: ClientType,
 }
 
 impl MailerGPT {
@@ -61,11 +62,7 @@ impl MailerGPT {
             .await
             .unwrap();
 
-        let model = var("GEMINI_MODEL")
-            .unwrap_or("gemini-2.0-flash".to_string())
-            .to_owned();
-        let api_key = var("GEMINI_API_KEY").unwrap_or_default().to_owned();
-        let client = Client::new(&api_key, &model);
+        let client = ClientType::from_env();
 
         info!(
             "{}",
@@ -190,28 +187,97 @@ impl MailerGPT {
                 .await;
         }
 
-        let gemini_response = match self
-            .client
-            .generate_content(&format!("User Request:{}\n\nEmails:{:?}", prompt, emails))
-            .await
-        {
-            Ok(response) => response,
-            Err(err) => {
-                let error_msg = format!("Failed to generate content from emails: {}", err);
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("system"),
-                    content: Cow::Owned(error_msg.clone()),
-                });
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
+        let gemini_response = match &mut self.client {
+            #[cfg(feature = "gem")]
+            ClientType::Gemini(ref mut gem_client) => {
+                let result = gem_client
+                    .generate_content(&format!("User Request:{}\n\nEmails:{:?}", prompt, emails))
+                    .await;
+
+                match result {
+                    Ok(response) => response,
+                    Err(err) => {
+                        let error_msg = format!("Failed to generate content from emails: {}", err);
+                        self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
-                        })
-                        .await;
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
                 }
-                return Err(anyhow::anyhow!(error_msg));
+            }
+
+            #[cfg(feature = "oai")]
+            ClientType::OpenAI(oai_client) => {
+                let parameters = ChatCompletionParametersBuilder::default()
+                    .model(FlagshipModel::Gpt4O.to_string())
+                    .messages(vec![ChatMessage::User {
+                        content: ChatMessageContent::Text(format!(
+                            "User Request:{}\n\nEmails:{:?}",
+                            prompt, emails
+                        )),
+                        name: None,
+                    }])
+                    .response_format(ChatCompletionResponseFormat::Text)
+                    .build()?;
+
+                let result = oai_client.chat().create(parameters).await;
+
+                match result {
+                    Ok(chat_response) => {
+                        let message = &chat_response.choices[0].message;
+
+                        match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::from(""),
+                        }
+                    }
+
+                    Err(err) => {
+                        let error_msg = format!("Failed to generate content from emails: {}", err);
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                ));
             }
         };
 
@@ -233,6 +299,7 @@ impl MailerGPT {
                 })
                 .await;
         }
+
         info!(
             "[*] {:?}: Got Response: {:?}",
             self.agent.position(),

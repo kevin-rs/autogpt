@@ -129,7 +129,7 @@ fn main() {
     let request = "Refactor the following function to improve readability and modularity.";
     let response = optimizer_agent.generate_and_track(request).await;
 
-    assert!(!response.is_empty());
+    assert!(!response.unwrap().is_empty());
 
     assert_eq!(optimizer_agent.get_agent().memory().len(), 1);
     assert_eq!(optimizer_agent.get_agent().memory()[0].role, "assistant");
