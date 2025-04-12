@@ -17,7 +17,6 @@ use crate::agents::git::GitGPT;
 use crate::agents::types::AgentType;
 use crate::{
     common::tls::load_tls_config,
-    common::utils::Tasks,
     message::{parse_message, Message},
 };
 use std::env;

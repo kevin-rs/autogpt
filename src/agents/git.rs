@@ -96,8 +96,6 @@ impl GitGPT {
         info!(
             "{}",
             format!("[*] {:?}: GitGPT initialized.", agent.position())
-                .bright_green()
-                .bold()
         );
 
         Self {
