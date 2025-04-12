@@ -1,0 +1,35 @@
+name: 🚢 Compose Build Check
+
+on:
+  pull_request:
+
+jobs:
+  build-compose:
+    name: Build Docker Compose Services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📁 Generate TLS Certificates
+        run: |
+          mkdir -p certs
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout certs/key.pem \
+            -out certs/cert.pem \
+            -days 365 \
+            -subj "/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost" \
+            -addext "basicConstraints=critical,CA:FALSE"
+
+      - name: 🐋 Set up Compose V2
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl -SL https://github.com/docker/compose/releases/download/v2.35.0/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          docker compose version
+
+      - name: 🏗️ Build all services
+        run: |
+          docker compose build

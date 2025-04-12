@@ -10,7 +10,7 @@ COPY src/ src/
 COPY README.md ./
 RUN cargo build --release --all-features
 
-FROM alpine:3.19
+FROM alpine:3.21
 RUN addgroup -S kevin && \
     adduser -S -G kevin kevin
 
@@ -24,8 +24,11 @@ RUN echo "%sudo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 WORKDIR /home/kevin
 
-COPY --from=builder /kevin/target/release/autogpt /usr/local/bin/autogpt
+COPY certs/ ./certs
+RUN chown -R kevin:kevin ./certs
+
+COPY --from=builder /kevin/target/release/orchgpt /usr/local/bin/orchgpt
 
 USER kevin
 
-ENTRYPOINT [ "/usr/local/bin/autogpt" ]
+ENTRYPOINT [ "/usr/local/bin/orchgpt" ]

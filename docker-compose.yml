@@ -1,4 +1,17 @@
 version: '3'
 services:
   autogpt:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.autogpt
+    container_name: autogpt
+    volumes:
+      - ./certs:/certs
+
+  orchgpt:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchgpt
+    container_name: orchgpt
+    volumes:
+      - ./certs:/certs
