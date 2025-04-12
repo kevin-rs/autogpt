@@ -88,13 +88,53 @@ $ docker stop $(docker ps -q)
 
 ---
 
+## 🔐 TLS Certificate Setup (Required If Using CLI)
+
+Before running the AutoGPT CLI or using the SDK, you **must set up a local TLS certificate**. This certificate is required to establish secure communication between the CLI and the orchestrator.
+
+To generate a **self-signed TLS certificate**, run the following command in your terminal:
+
+```sh
+openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 \
+   -subj "/CN=localhost" \
+   -addext "subjectAltName=DNS:localhost" \
+   -addext "basicConstraints=critical,CA:FALSE"
+```
+
+- `-x509`: Generate a self-signed certificate.
+- `-newkey rsa:2048`: Create a new RSA private key (2048-bit).
+- `-nodes`: Skip the passphrase for the private key.
+- `-keyout key.pem`: Output file for the private key.
+- `-out cert.pem`: Output file for the certificate.
+- `-days 365`: Validity of the certificate (1 year).
+- `-subj "/CN=localhost"`: Set the Common Name to `localhost`.
+- `-addext "subjectAltName=DNS:localhost"`: Specify the Subject Alternative Name.
+- `-addext "basicConstraints=critical,CA:FALSE"`: Restrict the certificate from acting as a Certificate Authority.
+
+The generated `cert.pem` and `key.pem` file must be made available in a **certs** directory in the root project.
+
+---
+
 ## 🛠️ CLI Usage
 
-The CLI provides a convenient means to interact with the code generation ecosystem. Before utilizing the CLI and or the SDK, your need to set up the necessary environment variables.
+The CLI provides a convenient means to interact with the code generation ecosystem. The `autogpt` crate bundles two binaries in a single package:
+
+- `orchgpt` - Launches the orchestrator that manages agents.
+- `autogpt` - Launches an agent.
+
+Before utilizing the CLI, you need to **set up TLS**. To do so, make sure you've created `cert.pem` and `key.pem` under the **certs** directory using the previous command. These are essential for establishing a secure connection with the orchestrator.
 
 ### Environment Variables Setup
 
 To configure the CLI and or the SDK environment, follow these steps:
+
+1. **Define Orchestrator Bind Address (Required If Using CLI)**: The orchestrator listens for incoming agent requests over a secure TLS connection. By default, it binds to `0.0.0.0:8443`. You can override this behavior by setting the `ORCHESTRATOR_ADDRESS` environment variable:
+
+   ```sh
+   export ORCHESTRATOR_ADDRESS=127.0.0.1:9443
+   ```
+
+   This tells the orchestrator to bind to `127.0.0.1` on port `9443` instead of the default.
 
 1. **Define Workspace Path**: Set up the paths for designer, backend, frontend, and architect workspaces by setting the following environment variable:
 
@@ -154,15 +194,46 @@ To configure the CLI and or the SDK environment, follow these steps:
 
    Follow [this tutorial](PINECONE.md) for a guide on how to obtain these values.
 
-### Running Agents
+### 🚀 Running the Orchestrator
 
-Execute agents to perform tasks using the `run` command:
+To launch the orchestrator and start listening for incoming agent connections over TLS, simply run:
+
+```sh
+orchgpt
+```
+
+### 🧠 Running Agents
+
+To start an agent and establish a connection with the orchestrator (either locally or on a remote machine), run:
 
 ```sh
 autogpt
 ```
 
-You can also run AutoGPT CLI using Docker:
+This command launches the agent and connects it to the orchestrator over a secure TLS connection using the configured address.
+
+Once the agent is running, you can interact with it using simple command syntax:
+
+```sh
+/<agent_name> <action> <input> | <language>
+```
+
+For example, to instruct the orchestrator to **create** a new agent, send a command like:
+
+```sh
+/ArchitectGPT create "fastapi app" | python
+```
+
+This will send a message to the orchestrator with:
+
+- `msg_type`: `"create"`
+- `to`: `"ArchitectGPT"`
+- `payload_json`: `"fastapi app"`
+- `language`: `"python"`
+
+The orchestrator will then initialize and register an `ArchitectGPT` agent ready to perform tasks.
+
+You can also run AutoGPT CLI using Docker (TODO):
 
 ```sh
 docker run -it -e GEMINI_API_KEY=<your_gemini_api_key> --rm --name autogpt kevinrsdev/autogpt:0.0.1

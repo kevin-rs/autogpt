@@ -11,3 +11,6 @@ pub mod utils;
 
 #[cfg(feature = "mem")]
 pub mod memory;
+
+#[cfg(feature = "cli")]
+pub mod tls;

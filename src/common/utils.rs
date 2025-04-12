@@ -200,6 +200,19 @@ pub struct Tasks {
     pub api_schema: Option<Vec<Route>>,
 }
 
+impl Tasks {
+    pub fn from_payload(payload: &str) -> Self {
+        Tasks {
+            description: payload.to_string().into(),
+            scope: None,
+            urls: None,
+            frontend_code: None,
+            backend_code: None,
+            api_schema: None,
+        }
+    }
+}
+
 pub fn extract_json_string(text: &str) -> Option<String> {
     if let Some(start_index) = text.find("{\n  \"crud\"") {
         let mut end_index = start_index + 1;
@@ -325,7 +338,7 @@ pub async fn run_code(
     language: &str,
     path: &str,
     browse: bool,
-) -> Result<Option<std::process::Child>, Box<dyn std::error::Error>> {
+) -> Result<Option<std::process::Child>, Box<dyn std::error::Error + Send + Sync>> {
     if browse {
         let _ = open_browser_with_options(
             Browser::Default,
@@ -426,7 +439,7 @@ pub async fn ask_to_run_command(
     agent: AgentGPT,
     language: &str,
     workspace: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if !agent.memory().is_empty() {
         warn!(
             "{}",

@@ -19,4 +19,6 @@ workspace/
 
 logs/
 
+certs/
+
 .ipynb_checkpoints
