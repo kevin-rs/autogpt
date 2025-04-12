@@ -55,64 +55,67 @@ Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, runn
 
 ## 🔄 Workflow
 
+AutoGPT introduces a novel and scalable communication protocol called [`IAC`](IAC.md) (Inter/Intra-Agent Communication), enabling seamless and secure interactions between agents and orchestrators, inspired by [operating system IPC mechanisms](https://en.wikipedia.org/wiki/Inter-process_communication).
+
+AutoGPT utilizes a layered architecture:
+
 ```sh
                        +------------------------------------+
                        |                User                |
-                       |             Provides               |
-                       |          Project Prompt            |
+                       |         Sends Prompt via CLI       |
                        +------------------+-----------------+
                                           |
                                           v
+                            TLS + Protobuf over TCP to:
                        +------------------+-----------------+
-                       |               ManagerGPT           |
-                       |            Distributes Tasks       |
-                       |          to Backend, Frontend,     |
-                       |           Designer, Architect      |
-                       +------------------+-----------------+
-                                          |
-                                          v
-   +--------------------------+-----------+----------+----------------------+
-   |                          |                      |                      |
-   |                          v                      v                      v
-+--+---------+       +--------+--------+       +-----+-------+       +-----+-------+
-|  Backend   |       |    Frontend     |       |  Designer   |       |  Architect  |
-|    GPT     |       |      GPT        |<----->|    GPT      |       |  GPT        |
-|            |       |                 |       |  (Optional) |       |             |
-+--+---------+       +-----------------+       +-------------+       +-------------+
-   |                          |                       |                       |
-   v                          v                       v                       v
-(Backend Logic)        (Frontend Logic)         (Designer Logic)        (Architect Logic)
-   |                          |                       |                       |
-   +--------------------------+----------+------------+-----------------------+
+                       |             Orchestrator           |
+                       |     Receives and Routes Commands   |
+                       +-----------+----------+-------------+
+                                   |          |
+     +-----------------------------+          +----------------------------+
+     |                                                                     |
+     v                                                                     v
++--------------------+                                         +--------------------+
+|   ArchitectGPT     |<---------------- IAC ------------------>|    ManagerGPT      |
++--------------------+                                         +--------------------+
+   |                        Agent Layer:                                   |
+   |          (BackendGPT, FrontendGPT, DesignerGPT)                       |
+   +-------------------------------------+---------------------------------+
                                          |
                                          v
-                      +------------------+-----------------+
-                      |               ManagerGPT           |
-                      |       Collects and Consolidates    |
-                      |        Results from Agents         |
-                      +------------------+-----------------+
+                               Task Execution & Collection
                                          |
                                          v
-                      +------------------+-----------------+
-                      |                User                |
-                      |            Receives Final          |
-                      |             Output from            |
-                      |            ManagerGPT              |
-                      +------------------------------------+
+                           +---------------------------+
+                           |           User            |
+                           |     Receives Final Output |
+                           +---------------------------+
 ```
 
-- ✍️ **User Input**: Provide a project's goal (e.g. "Develop a full stack app that fetches today's weather. Use the axum web framework for the backend and the Yew rust framework for the frontend.").
-  
-- 🚀 **Initialization**: AutoGPT initializes based on the user's input, creating essential components such as the ManagerGPT and individual agent instances (ArchitectGPT, BackendGPT, FrontendGPT).
-  
-- 🛠️ **Agent Configuration**: Each agent is configured with its unique objectives and capabilities, aligning them with the project's defined goals. This configuration ensures that agents contribute effectively to the project's objectives.
-  
-- 📋 **Task Allocation**: ManagerGPT distributes tasks among agents considering their capabilities and project requirements.
-  
-- ⚙️ **Task Execution**: Agents execute tasks asynchronously, leveraging their specialized functionalities.
-  
-- 🔄 **Feedback Loop**: Continuous feedback updates users on project progress and addresses issues.
-  
+All communication happens securely over **TLS + TCP**, with messages encoded in **Protocol Buffers (protobuf)** for efficiency and structure.
+
+1. User Input: The user provides a project prompt like:
+
+   ```sh
+   /architect create "fastapi app" | python
+   ```
+
+   This is securely sent to the Orchestrator over TLS.
+
+1. Initialization: The Orchestrator parses the command and initializes the appropriate agent (e.g., `ArchitectGPT`).
+
+1. Agent Configuration: Each agent is instantiated with its specialized goals:
+   - **ArchitectGPT**: Plans system structure
+   - **BackendGPT**: Generates backend logic
+   - **FrontendGPT**: Builds frontend UI
+   - **DesignerGPT**: Handles design
+
+1. Task Allocation: `ManagerGPT` dynamically assigns subtasks to agents using the IAC protocol. It determines which agent should perform what based on capabilities and the original user goal.
+
+1. Task Execution: Agents execute their tasks, communicate with their subprocesses or other agents via IAC (inter/intra communication), and push updates or results back to the orchestrator.
+
+1. Feedback Loop: Throughout execution, agents return status reports. The `ManagerGPT` collects all output, and the Orchestrator sends it back to the user.
+
 ## 🤖 Available Agents
 
 At the current release, Autogpt consists of 8 built-in specialized autonomous AI agents ready to assist you in bringing your ideas to life!

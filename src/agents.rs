@@ -15,3 +15,4 @@ pub mod git;
 pub mod mailer;
 pub mod manager;
 pub mod optimizer;
+pub mod types;

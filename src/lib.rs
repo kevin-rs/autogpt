@@ -8,3 +8,9 @@ pub mod traits;
 
 #[cfg(feature = "cli")]
 pub mod cli;
+
+#[cfg(feature = "cli")]
+pub mod orchestrator;
+
+#[cfg(feature = "cli")]
+pub mod message;
