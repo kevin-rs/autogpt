@@ -17,7 +17,21 @@ cargo install autogpt --all-features
 To install and run the AutoGPT CLI via Docker, use the following command:
 
 ```sh
-docker run -it -e GEMINI_API_KEY=<your_gemini_api_key> --rm --name autogpt kevinrsdev/autogpt:0.0.1
+docker run -it \
+  -e GEMINI_API_KEY=<your_gemini_api_key> \
+  -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
+  -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
+  --rm --name autogpt kevinrsdev/autogpt:0.1.0 man
+```
+
+To install and run the OrchGPT CLI via Docker, use the following command:
+
+```sh
+docker run -it \
+  -e GEMINI_API_KEY=<your_gemini_api_key> \
+  -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
+  -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
+  --rm --name orchgpt kevinrsdev/orchgpt:0.1.0
 ```
 
 ## 📦 Build From Source
@@ -36,24 +50,50 @@ cd autogpt
 
 ### ⚓ Using Cargo
 
+To run OrchGPT CLI via Cargo, execute:
+
+```sh
+cargo run --all-features --bin orchgpt
+```
+
 To run AutoGPT CLI via Cargo, execute:
 
 ```sh
-cargo run --all-features
+cargo run --all-features --bin autogpt
 ```
 
 ### 🐳 Using Docker
 
-Build the Docker container:
+Build the `orchgpt` Docker container:
 
 ```sh
-docker build -t autogpt .
+docker build -f Dockerfile.orchgpt -t orchgpt .
 ```
 
-Run the container:
+Build the `autogpt` Docker container:
 
 ```sh
-docker run -i -e GEMINI_API_KEY=<your_gemini_api_key> -t autogpt:latest
+docker build -f Dockerfile.autogpt -t autogpt .
+```
+
+Run the `orchgpt` container:
+
+```sh
+docker run -i \
+  -e GEMINI_API_KEY=<your_gemini_api_key> \
+  -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
+  -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
+  -t orchgpt:latest
+```
+
+Run the `autogpt` container:
+
+```sh
+docker run -i \
+  -e GEMINI_API_KEY=<your_gemini_api_key> \
+  -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
+  -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
+  -t autogpt:latest
 ```
 
 Now, you can attach to the container:
@@ -86,9 +126,32 @@ to stop the current container, open up a new terminal and run:
 $ docker stop $(docker ps -q)
 ```
 
+### 🚢 Using Compose V2
+
+This project uses [**Docker Compose V2**](https://github.com/docker/compose) to define and manage two services:
+
+- `autogpt` - an AutoGPT instance
+- `orchgpt` - an orchestrator that interacts with the AutoGPT container
+
+These services are built from separate custom Dockerfiles and run in isolated containers. Docker Compose sets up networking automatically, enabling communication between `autogpt` and `orchgpt` as if they were on the same local network.
+
+#### 🚀 Build and Run
+
+To build and start both services:
+
+```bash
+docker compose up --build
+```
+
+This will:
+
+- Build both `autogpt` and `orchgpt` images using their respective Dockerfiles.
+- Create and start the containers.
+- Allow `autogpt` to communicate with `orchgpt`.
+
 ---
 
-## 🔐 TLS Certificate Setup (Required If Using CLI)
+## 🔐 TLS Certificate Setup (Required If Using CLI or Compose V2)
 
 Before running the AutoGPT CLI or using the SDK, you **must set up a local TLS certificate**. This certificate is required to establish secure communication between the CLI and the orchestrator.
 
@@ -233,10 +296,24 @@ This will send a message to the orchestrator with:
 
 The orchestrator will then initialize and register an `ArchitectGPT` agent ready to perform tasks.
 
-You can also run AutoGPT CLI using Docker (TODO):
+You can also run OrchGPT CLI using Docker:
 
 ```sh
-docker run -it -e GEMINI_API_KEY=<your_gemini_api_key> --rm --name autogpt kevinrsdev/autogpt:0.0.1
+docker run -i \
+  -e GEMINI_API_KEY=<your_gemini_api_key> \
+  -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
+  -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
+  -t orchgpt:latest
+```
+
+You can also run AutoGPT CLI using Docker:
+
+```sh
+docker run -i \
+  -e GEMINI_API_KEY=<your_gemini_api_key> \
+  -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
+  -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
+  --rm --name autogpt kevinrsdev/autogpt:0.1.0
 ```
 
 ---

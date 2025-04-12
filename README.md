@@ -23,10 +23,10 @@
 
 ![banner](https://github.com/kevin-rs/kevin/assets/62179149/8b54dea8-2231-4509-8c18-10ec414578d2)
 
-| 🏗️  `(Recommended)` | 🐋 |
-| :------: | :--------: |
-| [![Crates.io Downloads](https://img.shields.io/crates/d/autogpt)](https://crates.io/crates/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/autogpt.svg)](https://hub.docker.com/r/kevinrsdev/autogpt) |
-| `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.0.1` |
+| 🏗️  `(Recommended)` | 🐋 | 🐋 |
+| :------: | :--------: | :--------: |
+| [![Crates.io Downloads](https://img.shields.io/crates/d/autogpt)](https://crates.io/crates/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/autogpt.svg)](https://hub.docker.com/r/kevinrsdev/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/orchgpt.svg)](https://hub.docker.com/r/kevinrsdev/orchgpt) |
+| `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.0` | `docker pull kevinrsdev/orchgpt:0.1.0` |
 
 <video src="https://github.com/kevin-rs/kevin/assets/62179149/ba6f7204-849e-4b89-ae92-5b7faa0be68a"></video>
 

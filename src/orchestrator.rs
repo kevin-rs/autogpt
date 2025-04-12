@@ -97,7 +97,7 @@ impl Orchestrator {
                         if let Ok(msg) = parse_message(&buf[..n]) {
                             let mut agents = agents.lock().await;
                             if let Some(agent) = agents.get_mut(&msg.to) {
-                                debug!("Agent {:?} found", agent);
+                                debug!("Agent {:?} found", agent.position());
                                 // TODO: Fix `gems` client and make it threads safe cz of dyn std::error::Error
                                 // let mut tasks = Tasks::from_payload(&msg.payload_json);
                                 // let _ = agent.execute(&mut tasks, true, false, 3).await;
@@ -134,7 +134,7 @@ impl Orchestrator {
                             info!("Agent {} terminated", msg.to);
                         },
                         "run" => {
-                            if let Some(agent) = agents.get_mut(&msg.to) {
+                            if let Some(_agent) = agents.get_mut(&msg.to) {
                                 // TODO: Fix `gems` client and make it threads safe cz of dyn std::error::Error
                                 // let mut tasks = Tasks::from_payload(&msg.payload_json);
                                 // let _ = agent.execute(&mut tasks, true, false, 3).await;
