@@ -27,6 +27,7 @@
 | :------: | :--------: | :--------: |
 | [![Crates.io Downloads](https://img.shields.io/crates/d/autogpt)](https://crates.io/crates/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/autogpt.svg)](https://hub.docker.com/r/kevinrsdev/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/orchgpt.svg)](https://hub.docker.com/r/kevinrsdev/orchgpt) |
 | `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.0` | `docker pull kevinrsdev/orchgpt:0.1.0` |
+| `autogpt -h` <br> `orchgpt -h` |  `docker run autogpt -h` | `docker run orchgpt -h` |
 
 <video src="https://github.com/kevin-rs/kevin/assets/62179149/ba6f7204-849e-4b89-ae92-5b7faa0be68a"></video>
 
