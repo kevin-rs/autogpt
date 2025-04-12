@@ -53,11 +53,76 @@ Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, runn
 > [!NOTE]
 > For optimal performance and compatibility, we strongly advise utilizing a Linux operating system to install this CLI.
 
+---
+
 ## 🔄 Workflow
+
+AutoGPT supports two modes of operation, enabling both standalone and distributed use cases:
+
+### 1. 🧠 Agentic Networkless Mode (Standalone)
+
+In this mode, the user runs an individual `autogpt` agent directly via a subcommand (e.g., `autogpt arch`). Each agent operates independently without needing a networked orchestrator.
+
+```sh
+                       +------------------------------------+
+                       |                User                |
+                       |             Provides               |
+                       |          Project Prompt            |
+                       +------------------+-----------------+
+                                          |
+                                          v
+                       +------------------+-----------------+
+                       |               ManagerGPT           |
+                       |            Distributes Tasks       |
+                       |          to Backend, Frontend,     |
+                       |           Designer, Architect      |
+                       +------------------+-----------------+
+                                          |
+                                          v
+   +--------------------------+-----------+----------+----------------------+
+   |                          |                      |                      |
+   |                          v                      v                      v
++--+---------+       +--------+--------+       +-----+-------+       +-----+-------+
+|  Backend   |       |    Frontend     |       |  Designer   |       |  Architect  |
+|    GPT     |       |      GPT        |  ...  |    GPT      |       |  GPT        |
+|            |       |                 |       |  (Optional) |       |             |
++--+---------+       +-----------------+       +-------------+       +-------------+
+   |                          |                       |                       |
+   v                          v                       v                       v
+(Backend Logic)        (Frontend Logic)   ...   (Designer Logic)        (Architect Logic)
+   |                          |                       |                       |
+   +--------------------------+----------+------------+-----------------------+
+                                         |
+                                         v
+                      +------------------+-----------------+
+                      |               ManagerGPT           |
+                      |       Collects and Consolidates    |
+                      |        Results from Agents         |
+                      +------------------+-----------------+
+                                         |
+                                         v
+                      +------------------+-----------------+
+                      |                User                |
+                      |            Receives Final          |
+                      |             Output from            |
+                      |            ManagerGPT              |
+                      +------------------------------------+
+```
+
+- ✍️ **User Input**: Provide a project's goal (e.g. "Develop a full stack app that fetches today's weather. Use the axum web framework for the backend and the Yew rust framework for the frontend.").
+- 🚀 **Initialization**: AutoGPT initializes based on the user's input, creating essential components such as the `ManagerGPT` and individual agent instances (ArchitectGPT, BackendGPT, FrontendGPT).
+- 🛠️ **Agent Configuration**: Each agent is configured with its unique objectives and capabilities, aligning them with the project's defined goals. This configuration ensures that agents contribute effectively to the project's objectives.
+- 📋 **Task Allocation**: ManagerGPT distributes tasks among agents considering their capabilities and project requirements.
+- ⚙️ **Task Execution**: Agents execute tasks asynchronously, leveraging their specialized functionalities.
+- 🔄 **Feedback Loop**: Continuous feedback updates users on project progress and addresses issues.
+
+### 2. 🌐 Agentic Networking Mode (Orchestrated)
+
+In networking mode, `autogpt` connects to an external orchestrator (`orchgpt`) over a secure TLS-encrypted TCP channel. This orchestrator manages agent lifecycles, routes commands, and enables rich inter-agent collaboration using a unified protocol.
 
 AutoGPT introduces a novel and scalable communication protocol called [`IAC`](IAC.md) (Inter/Intra-Agent Communication), enabling seamless and secure interactions between agents and orchestrators, inspired by [operating system IPC mechanisms](https://en.wikipedia.org/wiki/Inter-process_communication).
 
-AutoGPT utilizes a layered architecture:
+In networking mode, AutoGPT utilizes a layered architecture:
 
 ```sh
                        +------------------------------------+
@@ -105,6 +170,7 @@ All communication happens securely over **TLS + TCP**, with messages encoded in 
 1. Initialization: The Orchestrator parses the command and initializes the appropriate agent (e.g., `ArchitectGPT`).
 
 1. Agent Configuration: Each agent is instantiated with its specialized goals:
+
    - **ArchitectGPT**: Plans system structure
    - **BackendGPT**: Generates backend logic
    - **FrontendGPT**: Builds frontend UI

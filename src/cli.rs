@@ -26,59 +26,38 @@ fn styles() -> Styles {
     propagate_version = true,
     styles = styles(),
     help_template = r#"{before-help}{name} {version}
-{about-with-newline}
-
+{about}
 {usage-heading} {usage}
-
 {all-args}{after-help}
 
 AUTHORS:
     {author}
 "#,
     about=r#"
+ █████  ██    ██ ████████  ██████   ██████  ██████  ████████ 
+██   ██ ██    ██    ██    ██    ██ ██       ██   ██    ██    
+███████ ██    ██    ██    ██    ██ ██   ███ ██████     ██    
+██   ██ ██    ██    ██    ██    ██ ██    ██ ██         ██    
+██   ██  ██████     ██     ██████   ██████  ██         ██    
 
-Autogpt CLI
-===========
+The `autogpt` CLI enables interaction with the Orchestrator and/or an AI Provider
+through a suite of built-in, specialized autonomous AI agents designed for various
+stages of project development.
 
-Autogpt cli allows you to chat with the gemini api using built-in specialized autonomous AI agents.
+Modes of Operation:
+-------------------
+Autogpt supports 2 modes:
 
-SUBCOMMANDS:
-  - man: ManagerGPT agent for generating project requirements.
-  - arch: ArchitectGPT agent for architecture design.
-  - front: FrontendGPT agent for front-end development.
-  - back: BackendGPT agent for back-end development.
-  - design: DesignerGPT agent for graphic design.
-  - mail: MailerGPT agent for email automation.
+1. Networking (Agentic) Mode (default):
+   When no subcommand is provided, `autogpt` runs as a networked agent that connects
+   to an orchestrator (`orchgpt`) over TLS-encrypted TCP. The orchestrator can run
+   on the same or a separate machine.
 
-USAGE:
-  autogpt [SUBCOMMAND]
-
-EXAMPLES:
-  1. Generate an entire project in one command:
-      autogpt
-
-  2. Generate a design architecture for a project:
-      autogpt arch
-
-  3. Develop a frontend app:
-      autogpt front
-
-  4. Develop backend app:
-      autogpt back
-
-  5. Design UIs and Wireframes:
-      autogpt design
-
-  6. Automate emails:
-      autogpt mail
-
-  7. Automate Git Commit hell:
-      autogpt git
-
-  8. Get help with a specific subcommand:
-      autogpt man --help
-      autogpt arch --help
+2. Networkless (Agentic) Mode:
+   When a subcommand is specified, `autogpt` runs locally in standalone mode, without
+   requiring a connection to an orchestrator.
 "#
+
 )]
 pub struct Cli {
     #[clap(global = true, short, long)]
@@ -95,25 +74,49 @@ pub struct Cli {
 pub enum Commands {
     #[clap(
         name = "man",
-        about = "Manage AI agent for generating an entire project."
+        about = "ManagerGPT: Generate complete project requirements, specs, and task plans."
     )]
     Man,
 
-    #[clap(name = "arch", about = "Manage AI agent for architecture design.")]
+    #[clap(
+        name = "arch",
+        about = "ArchitectGPT: Design system architecture and component structure."
+    )]
     Arch,
 
-    #[clap(name = "front", about = "Manage AI agent for front-end development.")]
+    #[clap(
+        name = "front",
+        about = "FrontendGPT: Build front-end applications, UIs, and interactive flows."
+    )]
     Front,
 
-    #[clap(name = "back", about = "Manage AI agent for back-end development.")]
+    #[clap(
+        name = "back",
+        about = "BackendGPT: Develop APIs, services, and server-side logic."
+    )]
     Back,
 
-    #[clap(name = "design", about = "Manage AI agent for graphic design.")]
+    #[clap(
+        name = "design",
+        about = "DesignerGPT: Create UI mockups, wireframes, and visual assets."
+    )]
     Design,
 
-    #[clap(name = "mail", about = "Manage AI agent for email automation.")]
+    #[clap(
+        name = "mail",
+        about = "MailerGPT: Automate email content generation and outreach flows."
+    )]
     Mail,
 
-    #[clap(name = "git", about = "Manage AI agent for git commit automation.")]
+    #[clap(
+        name = "git",
+        about = "GitGPT: Automate Git commit messages, summaries, and version control tasks."
+    )]
     Git,
+
+    #[clap(
+        name = "opt",
+        about = "OptimizerGPT: Specializes in refactoring monolithic codebases into clean, modular components."
+    )]
+    Opt,
 }
