@@ -60,7 +60,10 @@ use {
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
 #[cfg(feature = "gem")]
-use gems::utils::load_and_encode_image;
+use gems::{
+    messages::Content, messages::Message, traits::CTrait, utils::load_and_encode_image,
+    vision::VisionBuilder,
+};
 
 /// Struct representing a DesignerGPT, which manages design-related tasks using Gemini or OpenAI API.
 #[derive(Debug, Clone)]
@@ -309,10 +312,18 @@ impl DesignerGPT {
         }
         let response: String = match &mut self.client {
             #[cfg(feature = "gem")]
-            ClientType::Gemini(ref mut gem_client) => {
-                let result = gem_client
-                    .generate_content_with_image(WEB_DESIGNER_PROMPT, &base64_image_data)
-                    .await;
+            ClientType::Gemini(gem_client) => {
+                let params = VisionBuilder::default()
+                    .input(Message::User {
+                        content: Content::Text(WEB_DESIGNER_PROMPT.to_string()),
+                        name: None,
+                    })
+                    .image(Message::Tool {
+                        content: base64_image_data,
+                    })
+                    .build()?;
+
+                let result = gem_client.vision().generate(params).await;
 
                 match result {
                     Ok(response) => {

@@ -15,6 +15,7 @@ use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
 use crate::agents::git::GitGPT;
 use crate::agents::types::AgentType;
+use crate::common::utils::Tasks;
 use crate::{
     common::tls::load_tls_config,
     message::{parse_message, Message},
@@ -99,8 +100,8 @@ impl Orchestrator {
                             if let Some(agent) = agents.get_mut(&msg.to) {
                                 debug!("Agent {:?} found", agent.position());
                                 // TODO: Fix `gems` client and make it threads safe cz of dyn std::error::Error
-                                // let mut tasks = Tasks::from_payload(&msg.payload_json);
-                                // let _ = agent.execute(&mut tasks, true, false, 3).await;
+                                let mut tasks = Tasks::from_payload(&msg.payload_json);
+                                let _ = agent.execute(&mut tasks, true, false, 3).await;
                             } else {
                                 warn!("Agent {:?} not found", agents);
                             }

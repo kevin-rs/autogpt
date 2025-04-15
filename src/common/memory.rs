@@ -11,9 +11,25 @@ async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<
     match client {
         #[cfg(feature = "gem")]
         ClientType::Gemini(gem_client) => {
-            gem_client.model = "embedding-001".into();
-            match gem_client.embed_content(&content).await {
+            use gems::embed::EmbeddingBuilder;
+            use gems::messages::Content;
+            use gems::messages::Message;
+            use gems::models::Model;
+            use gems::traits::CTrait;
+
+            let params = EmbeddingBuilder::default()
+                .model(Model::Embedding)
+                .input(Message::User {
+                    content: Content::Text(content.into()),
+                    name: None,
+                })
+                .build()
+                .unwrap_or_default();
+            gem_client.set_model(Model::Embedding);
+            let response = gem_client.embeddings().create(params).await;
+            match response {
                 Ok(embed_response) => {
+                    gem_client.set_model(Model::Flash20);
                     if let Some(embedding) = embed_response.embedding {
                         embedding.values
                     } else {
@@ -22,6 +38,7 @@ async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<
                     }
                 }
                 Err(err) => {
+                    gem_client.set_model(Model::Flash20);
                     error!("Gemini: Failed to embed content: {}", err);
                     vec![]
                 }
