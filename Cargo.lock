@@ -694,11 +694,13 @@ dependencies = [
 
 [[package]]
 name = "gems"
-version = "0.0.9"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd389a097b342d8d3f510785c00f197e80b52fc92331a330e38b791a5a03b4dd"
+checksum = "b84243d7b8282c3526dffa7d1060325122a2f3f0b3375d4288150593d17ec945"
 dependencies = [
+ "anyhow",
  "base64 0.22.1",
+ "derive_builder",
  "futures-util",
  "reqwest 0.12.15",
  "serde",
