@@ -69,6 +69,13 @@ use {
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
+#[cfg(feature = "gem")]
+use gems::{
+    chat::ChatBuilder,
+    messages::{Content, Message},
+    traits::CTrait,
+};
+
 /// Struct representing a BackendGPT, which manages backend development tasks using GPT.
 #[derive(Debug, Clone)]
 pub struct BackendGPT {
@@ -295,8 +302,15 @@ impl BackendGPT {
         }
         let response: String = match &mut self.client {
             #[cfg(feature = "gem")]
-            ClientType::Gemini(ref mut gem_client) => {
-                let result = gem_client.generate_content(&request).await;
+            ClientType::Gemini(gem_client) => {
+                let parameters = ChatBuilder::default()
+                    .messages(vec![Message::User {
+                        content: Content::Text(request),
+                        name: None,
+                    }])
+                    .build()?;
+
+                let result = gem_client.chat().generate(parameters).await;
 
                 match result {
                     Ok(response) => {
@@ -488,8 +502,15 @@ impl BackendGPT {
 
         let response: String = match &mut self.client {
             #[cfg(feature = "gem")]
-            ClientType::Gemini(ref mut gem_client) => {
-                let result = gem_client.generate_content(&request).await;
+            ClientType::Gemini(gem_client) => {
+                let parameters = ChatBuilder::default()
+                    .messages(vec![Message::User {
+                        content: Content::Text(request),
+                        name: None,
+                    }])
+                    .build()?;
+
+                let result = gem_client.chat().generate(parameters).await;
 
                 match result {
                     Ok(response) => {
@@ -682,8 +703,15 @@ impl BackendGPT {
 
         let response: String = match &mut self.client {
             #[cfg(feature = "gem")]
-            ClientType::Gemini(ref mut gem_client) => {
-                let result = gem_client.generate_content(&request).await;
+            ClientType::Gemini(gem_client) => {
+                let parameters = ChatBuilder::default()
+                    .messages(vec![Message::User {
+                        content: Content::Text(request),
+                        name: None,
+                    }])
+                    .build()?;
+
+                let result = gem_client.chat().generate(parameters).await;
 
                 match result {
                     Ok(response) => {
@@ -872,8 +900,15 @@ impl BackendGPT {
         }
         let response: String = match &mut self.client {
             #[cfg(feature = "gem")]
-            ClientType::Gemini(ref mut gem_client) => {
-                let result = gem_client.generate_content(&request).await;
+            ClientType::Gemini(gem_client) => {
+                let parameters = ChatBuilder::default()
+                    .messages(vec![Message::User {
+                        content: Content::Text(request),
+                        name: None,
+                    }])
+                    .build()?;
+
+                let result = gem_client.chat().generate(parameters).await;
 
                 match result {
                     Ok(response) => {

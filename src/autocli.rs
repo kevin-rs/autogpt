@@ -484,7 +484,7 @@ async fn main() -> Result<()> {
                             );
                             tasks.description = input.into();
 
-                            let _ = designer_agent.execute(&mut tasks, true, false, 3).await?;
+                            designer_agent.execute(&mut tasks, true, false, 3).await?;
 
                             info!(
                                 "{}",
@@ -493,7 +493,7 @@ async fn main() -> Result<()> {
                                     .bold()
                             );
 
-                            let _ = git_agent.execute(&mut tasks, true, false, 1).await?;
+                            git_agent.execute(&mut tasks, true, false, 1).await?;
                             info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
                         } else {
                             warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"

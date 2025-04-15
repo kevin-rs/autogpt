@@ -24,6 +24,12 @@ use {
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
+#[cfg(feature = "gem")]
+use gems::{
+    chat::ChatBuilder,
+    messages::{Content, Message as GemMessage},
+    traits::CTrait,
+};
 /// Struct representing a `MailerGPT`, which manages email processing and text generation using Nylas and Gemini API.
 pub struct MailerGPT {
     /// Represents the GPT agent responsible for handling email processing and text generation.
@@ -189,10 +195,18 @@ impl MailerGPT {
 
         let gemini_response = match &mut self.client {
             #[cfg(feature = "gem")]
-            ClientType::Gemini(ref mut gem_client) => {
-                let result = gem_client
-                    .generate_content(&format!("User Request:{}\n\nEmails:{:?}", prompt, emails))
-                    .await;
+            ClientType::Gemini(gem_client) => {
+                let parameters = ChatBuilder::default()
+                    .messages(vec![GemMessage::User {
+                        content: Content::Text(format!(
+                            "User Request:{}\n\nEmails:{:?}",
+                            prompt, emails
+                        )),
+                        name: None,
+                    }])
+                    .build()?;
+
+                let result = gem_client.chat().generate(parameters).await;
 
                 match result {
                     Ok(response) => response,
