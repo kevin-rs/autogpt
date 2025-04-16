@@ -37,7 +37,9 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{strip_code_blocks, ClientType, Communication, Status, Tasks};
+#[cfg(feature = "cli")]
+use crate::common::utils::strip_code_blocks;
+use crate::common::utils::{ClientType, Communication, Status, Tasks};
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
@@ -108,7 +110,8 @@ impl FrontendGPT {
     /// - Constructs the workspace directory path for FrontendGPT.
     /// - Initializes the GPT agent with the given objective, position, and language.
     /// - Creates clients for interacting with Gemini API
-    ///
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())
@@ -226,6 +229,8 @@ impl FrontendGPT {
     /// - Constructs a request for generating frontend code using the template and project description.
     /// - Sends the request to the Gemini API to generate frontend code.
     /// - Writes the generated frontend code to the appropriate file.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn generate_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = self.workspace.clone();
 
@@ -285,7 +290,7 @@ impl FrontendGPT {
             FRONTEND_CODE_PROMPT, template, tasks.description
         );
 
-        let gemini_response = match &mut self.client {
+        let gemini_response: String = match &mut self.client {
             #[cfg(feature = "gem")]
             ClientType::Gemini(gem_client) => {
                 let parameters = ChatBuilder::default()
@@ -437,6 +442,8 @@ impl FrontendGPT {
     /// - Logs communication entries for tracing user intent and AI response.
     /// - Sends the request to the Gemini API to improve the frontend code.
     /// - Writes the improved frontend code to the appropriate file.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn improve_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = self.workspace.clone();
 
@@ -485,7 +492,7 @@ impl FrontendGPT {
             IMPROVED_FRONTEND_CODE_PROMPT, existing_code, tasks.description
         );
 
-        let gemini_response = match &mut self.client {
+        let gemini_response: String = match &mut self.client {
             #[cfg(feature = "gem")]
             ClientType::Gemini(gem_client) => {
                 let parameters = ChatBuilder::default()
@@ -642,6 +649,8 @@ impl FrontendGPT {
     /// - Logs communications throughout the process.
     /// - Sends the request to the Gemini API to fix bugs in the frontend code.
     /// - Writes the fixed frontend code to the appropriate file.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = self.workspace.clone();
 
@@ -695,7 +704,7 @@ impl FrontendGPT {
                 .await;
         }
 
-        let gemini_response = match &mut self.client {
+        let gemini_response: String = match &mut self.client {
             #[cfg(feature = "gem")]
             ClientType::Gemini(gem_client) => {
                 let parameters = ChatBuilder::default()

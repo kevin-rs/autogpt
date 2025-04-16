@@ -64,20 +64,20 @@
 //! let stripped_code = strip_code_blocks(code_with_blocks);
 //! ```
 
+#[cfg(feature = "cli")]
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "cli")]
 use crate::traits::agent::Agent;
+#[cfg(feature = "cli")]
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::env::var;
-use std::io;
-use std::io::Read;
-use std::process::Command;
-use std::process::Stdio;
-use webbrowser::open_browser_with_options;
-use webbrowser::Browser;
-use webbrowser::BrowserOptions;
+#[cfg(feature = "cli")]
+use std::{io, io::Read, process::Command, process::Stdio};
+#[cfg(feature = "cli")]
+use webbrowser::{open_browser_with_options, Browser, BrowserOptions};
 #[cfg(feature = "cli")]
 use {
     tracing::{error, info, warn},
@@ -300,6 +300,10 @@ pub fn similarity(s1: &str, s2: &str) -> f64 {
 }
 
 pub fn strip_code_blocks(text: &str) -> String {
+    if !text.contains("```") {
+        return text.to_string();
+    }
+
     let mut inside_block = false;
     let mut found_first = false;
     let mut result = Vec::new();
@@ -341,6 +345,7 @@ pub fn is_yes(input: &str) -> bool {
 /// # Returns
 ///
 /// `Result<Option<Child>>` - The spawned gpt process (if successful), or an error.
+#[cfg(feature = "cli")]
 pub async fn run_code(
     language: &str,
     path: &str,
@@ -443,6 +448,7 @@ pub fn setup_logging() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "cli")]
 pub async fn ask_to_run_command(
     agent: AgentGPT,
     language: &str,

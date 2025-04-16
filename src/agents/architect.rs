@@ -35,6 +35,7 @@
 //! ```
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "cli")]
 use crate::common::utils::{extract_array, extract_json_string, strip_code_blocks};
 use crate::common::utils::{ClientType, Communication, Scope, Status, Tasks};
 use crate::prompts::architect::{
@@ -101,7 +102,8 @@ impl ArchitectGPT {
     /// - Creates the workspace directory if it does not exist.
     /// - Initializes the GPT agent with the given objective and position.
     /// - Creates clients for interacting with Gemini or OpenAI API and making HTTP requests.
-    ///
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())
@@ -203,6 +205,8 @@ impl ArchitectGPT {
     /// - Logs the response (or error) as an assistant communication.
     /// - Updates the tasks with the retrieved scope.
     /// - Updates the agent status to `Completed`.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn get_scope(&mut self, tasks: &mut Tasks) -> Result<Scope> {
         let request: String = format!(
             "{}\n\nHere is the User Request:{}",
@@ -394,6 +398,8 @@ impl ArchitectGPT {
     /// - Logs the response (or error) as an assistant communication.
     /// - Updates the tasks with the retrieved URLs.
     /// - Updates the agent status to `InUnitTesting`.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn get_urls(&mut self, tasks: &mut Tasks) -> Result<()> {
         let request: String = format!(
             "{}\n\nHere is the Project Description:{}",
@@ -589,6 +595,8 @@ impl ArchitectGPT {
     /// - Logs the response (or error) as an assistant communication.
     /// - Processes the response to strip code blocks.
     /// - Returns the cleaned-up diagram content.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn generate_diagram(&mut self, tasks: &mut Tasks) -> Result<String> {
         let request: String = format!(
             "{}\n\nUser Request:{}",

@@ -62,6 +62,7 @@
 //! back to the workspace directory.
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "cli")]
 use crate::common::utils::strip_code_blocks;
 use crate::common::utils::{ClientType, Communication, Status, Tasks};
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
@@ -134,6 +135,8 @@ impl OptimizerGPT {
     ///
     /// - Ensures the working directory exists before continuing.
     /// - Establishes the foundational state for performing code modularization or refactoring.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub fn new(objective: &'static str, position: &'static str, language: &str) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or("workspace/".to_string());
         let workspace = format!("{}/backend", base_workspace);
@@ -218,6 +221,8 @@ impl OptimizerGPT {
     /// - Facilitates communication between the agent and the Gemini model.
     /// - Ensures that all model interactions are logged and optionally persisted for future context or audits.
     /// - Prepares the returned content for further downstream processing (e.g., file writing or parsing).
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn generate_and_track(&mut self, request: &str) -> Result<String> {
         let gemini_response = match &mut self.client {
             #[cfg(feature = "gem")]

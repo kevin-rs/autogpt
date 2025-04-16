@@ -112,6 +112,7 @@
 //!
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "mem")]
 use crate::common::utils::Communication;
 use crate::common::utils::Tasks;
 use anyhow::Result;
@@ -156,6 +157,7 @@ pub trait Functions {
     ///
     /// A result indicating success or failure.
     #[allow(async_fn_in_trait)]
+    #[cfg(feature = "mem")]
     async fn save_ltm(&mut self, communication: Communication) -> Result<()>;
 
     /// Get the long-term memory of an agent.
@@ -164,6 +166,7 @@ pub trait Functions {
     ///
     /// A result containing a vector of communications.
     #[allow(async_fn_in_trait)]
+    #[cfg(feature = "mem")]
     async fn get_ltm(&self) -> Result<Vec<Communication>>;
 
     /// Retrieve the long-term memory context as a string.
@@ -172,5 +175,6 @@ pub trait Functions {
     ///
     /// A string containing the concatenated context of the agent's memory.
     #[allow(async_fn_in_trait)]
+    #[cfg(feature = "mem")]
     async fn ltm_context(&self) -> String;
 }
