@@ -17,11 +17,11 @@ exclude = ["/workspace", "/examples"]
 
 [[bin]]
 name = "autogpt"
-path = "src/autocli.rs"
+path = "src/bin/autogpt.rs"
 
 [[bin]]
 name = "orchgpt"
-path = "src/main.rs"
+path = "src/bin/orchgpt.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
         use autogpt::agents::mailer::MailerGPT;
         use autogpt::agents::manager::ManagerGPT;
         use autogpt::agents::optimizer::OptimizerGPT;
-        use autogpt::cli::{Cli, Commands};
+        use autogpt::cli::autogpt::{Cli, Commands};
         use autogpt::common::input::read_user_input;
         use autogpt::common::utils::ask_to_run_command;
         use autogpt::common::utils::setup_logging;
@@ -49,8 +49,13 @@ async fn main() -> Result<()> {
         use std::env;
         use std::io::Write;
         use std::sync::Arc;
+        use tokio::io::AsyncBufReadExt;
+        use tokio::io::AsyncReadExt;
         use tokio::io::AsyncWriteExt;
         use tokio::net::TcpStream;
+        use tokio::signal;
+        use tokio::time::timeout;
+        use tokio::time::Duration;
         use tokio_rustls::TlsConnector;
         use tracing::{error, info, warn};
 
@@ -58,13 +63,7 @@ async fn main() -> Result<()> {
 
         let args: Cli = Cli::parse();
 
-        if args.command.is_none() {
-            // If no command specified, default to networking mode (connects to an orchestrator).
-            info!(
-                "{}",
-                "[*] \"AGI\": 🌟 Welcome! What would you like to work on today?".bright_green()
-            );
-
+        async fn run_client() -> Result<(), Box<dyn std::error::Error>> {
             let certs = load_certs("certs/cert.pem")?;
             let mut root = RootCertStore::empty();
             root.add_parsable_certificates(certs);
@@ -76,77 +75,134 @@ async fn main() -> Result<()> {
             let connector = TlsConnector::from(Arc::new(config));
             let bind_address =
                 env::var("ORCHESTRATOR_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8443".to_string());
-            let stream = TcpStream::connect(bind_address.to_string()).await?;
+
+            let stream = TcpStream::connect(&bind_address).await?;
             let domain = ServerName::try_from("localhost")?;
             let mut tls_stream = connector.connect(domain, stream).await?;
+
+            let mut stdin = tokio::io::BufReader::new(tokio::io::stdin());
+            let mut input_line = String::new();
+
+            let shutdown_signal = signal::ctrl_c();
+
+            tokio::pin!(shutdown_signal);
+
             loop {
                 print!("> ");
                 std::io::stdout().flush()?;
-                let mut input = String::new();
-                std::io::stdin()
-                    .read_line(&mut input)
-                    .expect("Failed to read line");
 
-                input = input.trim().to_string();
+                input_line.clear();
+                tokio::select! {
+                    read = stdin.read_line(&mut input_line) => {
+                        if read? == 0 {
+                            break;
+                        }
 
-                if input.is_empty() {
-                    warn!(
-                        "{}",
-                        "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"
-                            .bright_yellow()
-                            .bold()
-                    );
-                    continue;
-                }
+                        let input = input_line.trim().to_string();
+                        if input.is_empty() {
+                            warn!(
+                                "{}",
+                                "[*] \"AGI\": 🤔 You've entered an empty command? What exactly does that entail?"
+                                    .bright_yellow()
+                                    .bold()
+                            );
+                            continue;
+                        }
 
-                if !input.starts_with('/') {
-                    info!(
-                        "{}",
-                        "[*] \"AGI\": ❌ Command must begin with a '/' followed by the agent name."
-                            .bright_red()
-                            .bold()
-                    );
-                    continue;
-                }
+                        if !input.starts_with('/') {
+                            error!(
+                                "{}",
+                                "[*] \"AGI\": ❌ Command must begin with a '/' followed by the agent name."
+                                    .bright_red()
+                                    .bold()
+                            );
+                            continue;
+                        }
 
-                if let Some((to, rest)) = input.split_once(' ') {
-                    if let Some((input, lang)) = rest.split_once('|') {
-                        info!(
-                            "{}",
-                            "[*] \"AGI\": 🫡 Roger! Executing your command..."
-                                .bright_yellow()
-                                .bold()
-                        );
+                        if let Some((to, rest)) = input.split_once(' ') {
+                            let mut parts = rest.trim().splitn(2, ' ');
+                            if let Some(action) = parts.next() {
+                                let (actual_input, lang) = if action.eq_ignore_ascii_case("create") {
+                                    ("", "")
+                                } else if let Some(remaining) = parts.next() {
+                                    if let Some((input, lang)) = remaining.split_once('|') {
+                                        (input.trim(), lang.trim())
+                                    } else {
+                                        (remaining.trim(), "python")
+                                    }
+                                } else {
+                                    error!(
+                                        "{}",
+                                        "[*] \"AGI\": ❌ Invalid command format. Use: /<agent> <action>"
+                                            .bright_red()
+                                            .bold()
+                                    );
+                                    continue;
+                                };
 
-                        let payload = format!("input={};language={}", input.trim(), lang.trim());
+                                let payload = format!("input={};language={}", actual_input, lang);
 
-                        let msg = Message {
-                            from: "cli".to_string(),
-                            to: to.trim_start_matches('/').to_string(),
-                            msg_type: "run".into(),
-                            payload_json: payload,
-                            auth_token: "secret".into(),
-                        };
+                                let msg = Message {
+                                    from: "cli".to_string(),
+                                    to: to.trim_start_matches('/').to_string(),
+                                    msg_type: action.into(),
+                                    payload_json: payload,
+                                    auth_token: "secret".into(),
+                                };
 
-                        let data = encode_message(&msg)?;
-                        tls_stream.write_all(&data).await?;
+                                let data = encode_message(&msg)?;
+                                tls_stream.write_all(&data).await?;
+                                info!("{}", "[*] \"AGI\": ✅ Sent!".green().bold());
 
-                        info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
-                    } else {
-                        info!(
-                            "{}",
-                            "[*] \"AGI\": ❌ Invalid command format. Use: /<agent> <action> <input> | <language>"
-                                .bright_red()
-                                .bold()
-                        );
+                                let mut buf = vec![0u8; 4096];
+                                let n = match timeout(Duration::from_secs(30), tls_stream.read(&mut buf)).await {
+                                    Ok(Ok(n)) if n > 0 => n,
+                                    Ok(_) => {
+                                        warn!("{}", "[*] \"AGI\": ❌ Connection closed.".bright_red().bold());
+                                        break;
+                                    },
+                                    Err(_) => {
+                                        warn!("{}", "[*] \"AGI\": ⏱️ Timeout waiting for response.".bright_red().bold());
+                                        break;
+                                    }
+                                };
+
+                                let response = String::from_utf8_lossy(&buf[..n]);
+                                println!(
+                                    "{} {}",
+                                    "[*] \"AGI\": 📬 Got Response →".bright_green().bold(),
+                                    response.trim()
+                                );
+                            }
+                        }
                     }
-                } else {
-                    info!(
-                        "{}",
-                        "[*] \"AGI\": ❌ Invalid command format. Use: /<agent> <action> <input> | <language>"
-                            .bright_red()
-                            .bold()
-                    );
+                    _ = &mut shutdown_signal => {
+                        println!("\n[*] \"AGI\": 👋 Graceful shutdown requested.");
+                        let _ = tls_stream.shutdown().await;
+                        std::process::exit(0);
+                    }
+                }
+            }
+
+            Ok(())
+        }
+
+        if args.command.is_none() {
+            // If no command specified, default to networking mode (connects to an orchestrator).
+            info!(
+                "{}",
+                "[*] \"AGI\": 🌟 Welcome! What would you like to work on today?".bright_green()
+            );
+            loop {
+                match run_client().await {
+                    Ok(_) => {
+                        break;
+                    }
+                    Err(e) => {
+                        error!("Client error: {}", e);
+                        println!("[*] \"AGI\": 🔁 Reconnecting in 3s...");
+                        tokio::time::sleep(Duration::from_secs(3)).await;
+                    }
                 }
             }
         } else if let Some(command) = args.command {

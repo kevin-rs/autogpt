@@ -300,21 +300,27 @@ pub fn similarity(s1: &str, s2: &str) -> f64 {
 }
 
 pub fn strip_code_blocks(text: &str) -> String {
-    let mut lines = text.lines().collect::<Vec<_>>();
+    let mut inside_block = false;
+    let mut found_first = false;
+    let mut result = Vec::new();
 
-    if let Some(first_line) = lines.first() {
-        if first_line.trim().starts_with("```") {
-            lines.remove(0);
+    for line in text.lines() {
+        if line.trim_start().starts_with("```") {
+            if !found_first {
+                found_first = true;
+                inside_block = true;
+                continue;
+            } else if inside_block {
+                break;
+            }
+        }
+
+        if inside_block {
+            result.push(line);
         }
     }
 
-    if let Some(last_line) = lines.last() {
-        if last_line.trim().starts_with("```") {
-            lines.pop();
-        }
-    }
-
-    lines.join("\n")
+    result.join("\n")
 }
 
 pub fn is_yes(input: &str) -> bool {
@@ -413,6 +419,7 @@ pub fn setup_logging() -> anyhow::Result<()> {
 
     let console_layer = fmt::Layer::new()
         .compact()
+        .without_time()
         .with_file(false)
         .with_line_number(false)
         .with_thread_ids(false)
