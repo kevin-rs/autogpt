@@ -62,7 +62,7 @@ AutoGPT supports two modes of operation, enabling both standalone and distribute
 
 ### 1. 🧠 Agentic Networkless Mode (Standalone)
 
-<video src="https://github.com/kevin-rs/kevin/assets/62179149/ba6f7204-849e-4b89-ae92-5b7faa0be68a"></video>
+<video src="https://github.com/user-attachments/assets/7d47b1d8-b2f2-4d23-a1f4-da926e425330"></video>
 
 In this mode, the user runs an individual `autogpt` agent directly via a subcommand (e.g., `autogpt arch`). Each agent operates independently without needing a networked orchestrator.
 
