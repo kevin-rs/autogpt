@@ -1,0 +1,10 @@
+[bumpversion]
+current_version = 0.1.0
+
+[bumpversion:file:Cargo.toml]
+search = version = "{current_version}"
+replace = version = "{new_version}"
+
+[bumpversion:file:Cargo.lock]
+search = version = "{current_version}"
+replace = version = "{new_version}"

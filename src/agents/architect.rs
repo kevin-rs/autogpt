@@ -925,10 +925,9 @@ impl Functions for ArchitectGPT {
                     }
 
                     for attempt in 1..=max_tries {
-                        let run_python = Command::new("timeout")
-                            .arg(format!("{}s", 10))
-                            .arg("python3")
-                            .arg(path)
+                        let run_python = Command::new("sh")
+                            .arg("-c")
+                            .arg(format!("timeout {} '.venv/bin/python' ./diagram.py", 10))
                             .current_dir(self.workspace.to_string())
                             .stdout(Stdio::piped())
                             .stderr(Stdio::piped())

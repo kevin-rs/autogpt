@@ -29,7 +29,7 @@
 | `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.0` | `docker pull kevinrsdev/orchgpt:0.1.0` |
 | `autogpt -h` <br> `orchgpt -h` |  `docker run autogpt -h` | `docker run orchgpt -h` |
 
-<video src="https://github.com/kevin-rs/kevin/assets/62179149/ba6f7204-849e-4b89-ae92-5b7faa0be68a"></video>
+<video src="https://github.com/user-attachments/assets/c785e94a-dd51-4c82-85f7-d0e40afa5ae6"></video>
 
 </div>
 
@@ -61,6 +61,8 @@ Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, runn
 AutoGPT supports two modes of operation, enabling both standalone and distributed use cases:
 
 ### 1. 🧠 Agentic Networkless Mode (Standalone)
+
+<video src="https://github.com/kevin-rs/kevin/assets/62179149/ba6f7204-849e-4b89-ae92-5b7faa0be68a"></video>
 
 In this mode, the user runs an individual `autogpt` agent directly via a subcommand (e.g., `autogpt arch`). Each agent operates independently without needing a networked orchestrator.
 
@@ -118,6 +120,8 @@ In this mode, the user runs an individual `autogpt` agent directly via a subcomm
 - 🔄 **Feedback Loop**: Continuous feedback updates users on project progress and addresses issues.
 
 ### 2. 🌐 Agentic Networking Mode (Orchestrated)
+
+<video src="https://github.com/user-attachments/assets/c785e94a-dd51-4c82-85f7-d0e40afa5ae6"></video>
 
 In networking mode, `autogpt` connects to an external orchestrator (`orchgpt`) over a secure TLS-encrypted TCP channel. This orchestrator manages agent lifecycles, routes commands, and enables rich inter-agent collaboration using a unified protocol.
 

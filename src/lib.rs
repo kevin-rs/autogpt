@@ -14,6 +14,3 @@ pub mod orchestrator;
 
 #[cfg(feature = "cli")]
 pub mod message;
-
-#[cfg(feature = "cli")]
-pub mod orchcli;

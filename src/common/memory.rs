@@ -27,9 +27,9 @@ async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<
                 .unwrap_or_default();
             gem_client.set_model(Model::Embedding);
             let response = gem_client.embeddings().create(params).await;
+            gem_client.set_model(Model::Flash20);
             match response {
                 Ok(embed_response) => {
-                    gem_client.set_model(Model::Flash20);
                     if let Some(embedding) = embed_response.embedding {
                         embedding.values
                     } else {
@@ -38,7 +38,6 @@ async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<
                     }
                 }
                 Err(err) => {
-                    gem_client.set_model(Model::Flash20);
                     error!("Gemini: Failed to embed content: {}", err);
                     vec![]
                 }
