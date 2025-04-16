@@ -1,3 +1,4 @@
+#[allow(unused)]
 pub(crate) const WEB_DESIGNER_PROMPT: &str = r#"
 Your task is to describe the web design layout elements based on the provided image. Describe each ui element from left to right, top to bottom.
 
@@ -13,6 +14,7 @@ Example:
   Description: "The web design features a modern layout with a prominent hero section showcasing a beach scene. The navigation bar is minimalist, and the content sections are organized with clean typography and ample whitespace."
 "#;
 
+#[allow(unused)]
 pub(crate) const IMGGET_PROMPT: &str = r#"
 Your task is to generate a web design based on the provided description.
 

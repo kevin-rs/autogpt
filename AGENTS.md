@@ -6,6 +6,8 @@ ManagerGPT serves as the orchestrator of your project, directing the other agent
 
 #### How ManagerGPT Works?
 
+<video src="https://github.com/user-attachments/assets/9c883a85-c82d-4ad3-9cc3-3c9ad551e504"></video>
+
 Let's say you want to develop a full-stack app that fetches today's weather in Python using FastAPI. ManagerGPT simplifies this process by breaking it down into specific tasks for each specialized agent:
 
 - **ArchitectGPT**: ManagerGPT instructs ArchitectGPT to design the application's structure, encompassing both backend and frontend components, utilizing Python and FastAPI:
@@ -83,6 +85,8 @@ BackendGPT handles all things related to server-side logic and data processing. 
 
 #### How BackendGPT Works
 
+<video src="https://github.com/user-attachments/assets/3f1a1e0a-8830-45fe-81cc-c01abe793a254"></video>
+
 Upon receiving instructions from ManagerGPT, BackendGPT will:
 
 - Develop the backend using FastAPI, implementing endpoints for retrieving weather data and handling user requests.
@@ -126,6 +130,8 @@ GitGPT is responsible for managing version control tasks inside your workspace. 
 
 #### How GitGPT Works
 
+<video src="https://github.com/user-attachments/assets/886b846b-b302-4773-be19-77ed75a29fa1"></video>
+
 Upon receiving a task from ManagerGPT, GitGPT will:
 
 - Monitor the agent's status to determine if changes are ready to be committed.
@@ -155,6 +161,8 @@ This makes GitGPT perfect for keeping a clean Git history without manual interve
 OptimizerGPT takes messy or monolithic frontend and backend code files and intelligently restructures them into clean, modular components. It improves maintainability, readability, and performance by automatically applying best practices in code organization.
 
 #### How OptimizerGPT Works
+
+<video src="https://github.com/user-attachments/assets/ea89c023-3de2-4281-af98-0add943322a6"></video>
 
 When activated by ManagerGPT, OptimizerGPT will:
 

@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
 
         let args: Cli = Cli::parse();
 
-        async fn run_client() -> Result<(), Box<dyn std::error::Error>> {
+        async fn run_client() -> Result<()> {
             let certs = load_certs("certs/cert.pem")?;
             let mut root = RootCertStore::empty();
             root.add_parsable_certificates(certs);
@@ -200,7 +200,7 @@ async fn main() -> Result<()> {
                     }
                     Err(e) => {
                         error!("Client error: {}", e);
-                        println!("[*] \"AGI\": 🔁 Reconnecting in 3s...");
+                        info!("{}", "[*] \"AGI\": 🔁 Reconnecting in 3s...".bright_green());
                         tokio::time::sleep(Duration::from_secs(3)).await;
                     }
                 }
@@ -245,7 +245,7 @@ async fn main() -> Result<()> {
                                     .bold()
                             );
 
-                            let _ = manager.execute(true, false, 3).await;
+                            let _ = manager.execute(true, true, 3).await;
                             info!("{}", "[*] \"AGI\": ✅ Done!".green().bold());
                         } else {
                             warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty project description? What exactly does that entail?"

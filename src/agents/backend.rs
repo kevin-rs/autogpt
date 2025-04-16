@@ -37,6 +37,7 @@
 //!
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "cli")]
 use crate::common::utils::strip_code_blocks;
 use crate::common::utils::{ClientType, Communication, Route, Status, Tasks};
 use crate::prompts::backend::{
@@ -48,7 +49,7 @@ use std::io::Read;
 use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
-use std::thread::sleep;
+// use std::thread::sleep;
 
 use anyhow::Result;
 use colored::*;
@@ -114,7 +115,8 @@ impl BackendGPT {
     /// - Initializes backend projects based on the specified language.
     /// - Initializes the GPT agent with the given objective and position.
     /// - Creates clients for interacting with Gemini or OpenAI API and making HTTP requests.
-    ///
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace/".to_string());
         let workspace = format!("{}/backend", base_workspace);
@@ -259,6 +261,8 @@ impl BackendGPT {
     /// - Logs the user request and assistant response as communication history in the agent's memory.
     /// - Writes the generated backend code to the appropriate file based on language.
     /// - Updates the task's backend code and the agent's status to `Completed`.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn generate_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = self.workspace.clone();
 
@@ -475,6 +479,8 @@ impl BackendGPT {
     /// - Logs the AI's response as a `Communication`.
     /// - Writes the improved backend code to the appropriate file.
     /// - Updates tasks and agent status accordingly.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn improve_backend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = self.workspace.clone();
 
@@ -677,6 +683,8 @@ impl BackendGPT {
     /// - Logs the response or any errors as assistant `Communication`s.
     /// - Writes the fixed backend code to the appropriate file.
     /// - Updates tasks and agent status accordingly.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
         let path = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace/backend".to_string());
 
@@ -866,6 +874,8 @@ impl BackendGPT {
     /// - Sends the request to the Gemini or OpenAI API to generate content for routes JSON.
     /// - Logs the AI's response as a `Communication`.
     /// - Updates agent status accordingly.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub async fn get_routes_json(&mut self) -> Result<String> {
         let path = self.workspace.clone();
 
@@ -1391,8 +1401,8 @@ impl Functions for BackendGPT {
                                 );
                             }
 
-                            let seconds_sleep = Duration::from_secs(3);
-                            sleep(seconds_sleep);
+                            // let seconds_sleep = Duration::from_secs(3);
+                            // sleep(seconds_sleep);
 
                             let endpoints: String = self.get_routes_json().await?;
 

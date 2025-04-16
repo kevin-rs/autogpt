@@ -3,6 +3,7 @@ use crate::agents::backend::BackendGPT;
 #[cfg(feature = "img")]
 use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
+#[cfg(feature = "git")]
 use crate::agents::git::GitGPT;
 use crate::common::utils::Tasks;
 use crate::traits::agent::Agent;
@@ -74,12 +75,14 @@ impl AgentType {
     /// # Business Logic
     ///
     /// - Retrieves the position of the agent based on its type.
-    ///
+    #[allow(unreachable_code)]
+    #[allow(unused)]
     pub fn position(&self) -> String {
         match self {
             AgentType::Architect(agent) => agent.get_agent().position().to_string(),
             AgentType::Backend(agent) => agent.get_agent().position().to_string(),
             AgentType::Frontend(agent) => agent.get_agent().position().to_string(),
+            #[cfg(feature = "git")]
             AgentType::Git(agent) => agent.get_agent().position().to_string(),
             _ => "Any".to_string(),
         }
