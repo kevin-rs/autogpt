@@ -26,10 +26,10 @@
 | 🏗️  `(Recommended)` | 🐋 | 🐋 |
 | :------: | :--------: | :--------: |
 | [![Crates.io Downloads](https://img.shields.io/crates/d/autogpt)](https://crates.io/crates/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/autogpt.svg)](https://hub.docker.com/r/kevinrsdev/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/orchgpt.svg)](https://hub.docker.com/r/kevinrsdev/orchgpt) |
-| `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.0` | `docker pull kevinrsdev/orchgpt:0.1.0` |
+| `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.1` | `docker pull kevinrsdev/orchgpt:0.1.1` |
 | `autogpt -h` <br> `orchgpt -h` |  `docker run autogpt -h` | `docker run orchgpt -h` |
 
-<video src="https://github.com/user-attachments/assets/c785e94a-dd51-4c82-85f7-d0e40afa5ae6"></video>
+<video src="https://github.com/user-attachments/assets/ecd82549-a48f-49c2-b751-23f74820bf3d"></video>
 
 </div>
 
@@ -121,7 +121,7 @@ In this mode, the user runs an individual `autogpt` agent directly via a subcomm
 
 ### 2. 🌐 Agentic Networking Mode (Orchestrated)
 
-<video src="https://github.com/user-attachments/assets/c785e94a-dd51-4c82-85f7-d0e40afa5ae6"></video>
+<video src="https://github.com/user-attachments/assets/ecd82549-a48f-49c2-b751-23f74820bf3d"></video>
 
 In networking mode, `autogpt` connects to an external orchestrator (`orchgpt`) over a secure TLS-encrypted TCP channel. This orchestrator manages agent lifecycles, routes commands, and enables rich inter-agent collaboration using a unified protocol.
 
