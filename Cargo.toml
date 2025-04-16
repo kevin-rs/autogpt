@@ -35,7 +35,7 @@ tracing = "0.1.40"
 getimg = { version = "0.0.1", optional = true }
 nylas = { version = "0.0.8", optional = true }
 webbrowser = "1.0.1"
-clap = { version = "4.5.4", features = ["derive"], optional = true }
+clap = { version = "4.5.36", features = ["derive"], optional = true }
 tracing-subscriber = { version = "0.3.18", features = ["std"], optional = true }
 tracing-appender = { version = "0.2.3", optional = true }
 git2 = { version = "0.20.1", optional = true }
