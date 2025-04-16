@@ -46,7 +46,7 @@ openai_dive = { version = "1.0.0", optional = true }
 prost = { version = "0.13.5", optional = true }
 prost-types = { version = "0.13.5", optional = true }
 tokio-rustls = { version = "0.26.2", optional = true }
-tokio = { version = "1.37.0", default-features = false, features = ["full"], optional = true }
+tokio = { version = "1.37.0", default-features = false, features = ["full"] }
 rustls = { version = "0.23.26", optional = true }
 rustls-pemfile = { version = "2.2.0", features = ["std"], optional = true }
 
@@ -61,7 +61,6 @@ mem = ["pinecone-sdk"]
 cli = [
     "clap",
     "prost",
-    "tokio",
     "rustls",
     "tokio-rustls",
     "rustls-pemfile",

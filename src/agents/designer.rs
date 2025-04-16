@@ -95,7 +95,7 @@ impl DesignerGPT {
     /// - Constructs the workspace directory path for `DesignerGPT`.
     /// - Initializes the GPT agent with the given objective and position.
     /// - Creates clients for generating images and interacting with Gemini or OpenAI API.
-    ///
+    #[allow(unreachable_code)]
     pub fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())

@@ -36,11 +36,4 @@ Instructions:
 Input:
   Filename: `utils/helpers.py`
   Full Project Code: <entire monolithic code>
-
-Output:
-def format_date(dt):
-    return dt.strftime("%Y-%m-%d")
-
-def validate_email(email):
-    return "@" in email
 "#;

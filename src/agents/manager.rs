@@ -9,6 +9,7 @@ use crate::agents::backend::BackendGPT;
 #[cfg(feature = "img")]
 use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
+#[cfg(feature = "git")]
 use crate::agents::git::GitGPT;
 use crate::agents::types::AgentType;
 use crate::common::utils::strip_code_blocks;
@@ -18,6 +19,7 @@ use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
 use anyhow::Result;
 use colored::*;
+#[cfg(feature = "gem")]
 use gems::Client;
 use std::borrow::Cow;
 use std::env::var;
@@ -148,6 +150,7 @@ impl ManagerGPT {
             "FrontendGPT",
             self.language,
         )));
+        #[cfg(feature = "git")]
         self.add_agent(AgentType::Git(GitGPT::new(
             "Handles git operations like staging and committing code",
             "GitGPT",
@@ -161,16 +164,16 @@ impl ManagerGPT {
     /// - Adds default agents to the collection if it is empty.
     ///
     pub async fn execute_prompt(&mut self, prompt: String) -> Result<String, anyhow::Error> {
-        let gemini_response = match &mut self.client {
+        let provider = var("AI_PROVIDER").unwrap_or_else(|_| "gemini".to_string());
+        let response = match &mut self.client {
             #[cfg(feature = "gem")]
-            ClientType::Gemini(gem_client) => {
+            ClientType::Gemini(gem_client) if provider == "gemini" => {
                 let parameters = ChatBuilder::default()
                     .messages(vec![Message::User {
                         content: Content::Text(prompt),
                         name: None,
                     }])
                     .build()?;
-
                 let result = gem_client.chat().generate(parameters).await;
 
                 match result {
@@ -198,7 +201,7 @@ impl ManagerGPT {
             }
 
             #[cfg(feature = "oai")]
-            ClientType::OpenAI(oai_client) => {
+            ClientType::OpenAI(oai_client) if provider == "openai" => {
                 use openai_dive::v1::resources::chat::*;
                 use openai_dive::v1::resources::model::*;
 
@@ -262,7 +265,7 @@ impl ManagerGPT {
             }
         };
 
-        Ok(gemini_response)
+        Ok(response)
     }
 
     /// Asynchronously executes the tasks described by the user request.
