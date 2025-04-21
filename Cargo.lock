@@ -129,7 +129,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "autogpt"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -694,9 +694,9 @@ dependencies = [
 
 [[package]]
 name = "gems"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2c74a4cbdc43b0c13590c2228fab07eb3816bd22e910291fbf714dc5d723a94"
+checksum = "e798f2146f21ee0ed37afaaac4283b5fc58f892f6adb04044fd88f37c004728b"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
