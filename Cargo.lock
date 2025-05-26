@@ -129,7 +129,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "autogpt"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1527,9 +1527,9 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "openai_dive"
-version = "1.0.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8731f8f3f709aee513dc9b1c9b0ffeec04895e5f91156ac18b3be4c4396bf055"
+checksum = "f8a0044e4dc46d00f6364f4a6f57d238da6770f4c081badcc2d93df1bf73847b"
 dependencies = [
  "bytes",
  "derive_builder",
