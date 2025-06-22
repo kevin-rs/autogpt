@@ -1,3 +1,4 @@
+use crate::agents::agent::AgentGPT;
 use crate::agents::architect::ArchitectGPT;
 use crate::agents::backend::BackendGPT;
 #[cfg(feature = "img")]
@@ -5,6 +6,7 @@ use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
 #[cfg(feature = "git")]
 use crate::agents::git::GitGPT;
+use crate::agents::optimizer::OptimizerGPT;
 use crate::common::utils::Tasks;
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;
@@ -25,6 +27,8 @@ pub enum AgentType {
     /// Git GPT agent.
     #[cfg(feature = "git")]
     Git(GitGPT),
+    /// Optimizer GPT agent.
+    Optimize(OptimizerGPT),
 }
 
 impl AgentType {
@@ -63,6 +67,7 @@ impl AgentType {
             AgentType::Designer(agent) => agent.execute(tasks, execute, browse, max_tries).await,
             #[cfg(feature = "git")]
             AgentType::Git(agent) => agent.execute(tasks, execute, browse, max_tries).await,
+            AgentType::Optimize(agent) => agent.execute(tasks, execute, browse, max_tries).await,
         }
     }
 
@@ -82,9 +87,32 @@ impl AgentType {
             AgentType::Architect(agent) => agent.get_agent().position().to_string(),
             AgentType::Backend(agent) => agent.get_agent().position().to_string(),
             AgentType::Frontend(agent) => agent.get_agent().position().to_string(),
+            AgentType::Optimize(agent) => agent.get_agent().position().to_string(),
+            #[cfg(feature = "img")]
+            AgentType::Designer(agent) => agent.get_agent().position().to_string(),
             #[cfg(feature = "git")]
             AgentType::Git(agent) => agent.get_agent().position().to_string(),
             _ => "Any".to_string(),
+        }
+    }
+
+    /// Retrieves the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`AgentGPT`): The agent.
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    pub fn get_agent(&self) -> &AgentGPT {
+        match self {
+            AgentType::Architect(agent) => agent.get_agent(),
+            AgentType::Backend(agent) => agent.get_agent(),
+            AgentType::Frontend(agent) => agent.get_agent(),
+            AgentType::Optimize(agent) => agent.get_agent(),
+            #[cfg(feature = "img")]
+            AgentType::Designer(agent) => agent.get_agent(),
+            #[cfg(feature = "git")]
+            AgentType::Git(agent) => agent.get_agent(),
         }
     }
 }
