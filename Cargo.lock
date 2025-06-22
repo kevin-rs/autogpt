@@ -134,6 +134,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored",
+ "derive_builder",
  "gems",
  "getimg",
  "git2",
