@@ -5,7 +5,7 @@ RUN apk update && apk upgrade
 RUN apk add --no-cache build-base pkgconfig libressl-dev
 
 WORKDIR /kevin
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock INSTALLATION.md ./
 COPY src/ src/
 COPY README.md ./
 RUN cargo build --release --all-features

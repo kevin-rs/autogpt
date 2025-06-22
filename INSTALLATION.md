@@ -21,7 +21,7 @@ docker run -it \
   -e GEMINI_API_KEY=<your_gemini_api_key> \
   -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
   -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
-  --rm --name autogpt kevinrsdev/autogpt:0.1.0 man
+  --rm --name autogpt kevinrsdev/autogpt man
 ```
 
 To install and run the OrchGPT CLI via Docker, use the following command:
@@ -31,7 +31,7 @@ docker run -it \
   -e GEMINI_API_KEY=<your_gemini_api_key> \
   -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
   -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
-  --rm --name orchgpt kevinrsdev/orchgpt:0.1.0
+  --rm --name orchgpt kevinrsdev/orchgpt
 ```
 
 ## 📦 Build From Source
@@ -438,7 +438,7 @@ docker run -i \
   -e GEMINI_API_KEY=<your_gemini_api_key> \
   -e PINECONE_API_KEY=<Your_Pinecone_API_Key> \
   -e PINECONE_INDEX_URL=<Your_Pinecone_Index_URL> \
-  --rm --name autogpt kevinrsdev/autogpt:0.1.0
+  --rm --name autogpt kevinrsdev/autogpt
 ```
 
 ---
