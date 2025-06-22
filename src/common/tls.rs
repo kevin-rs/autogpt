@@ -1,5 +1,5 @@
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls::{crypto::aws_lc_rs::default_provider, ServerConfig};
+use rustls::{ServerConfig, crypto::aws_lc_rs::default_provider};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use std::{
     fs::File,

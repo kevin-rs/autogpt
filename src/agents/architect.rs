@@ -35,9 +35,9 @@
 //! ```
 
 use crate::agents::agent::AgentGPT;
+use crate::common::utils::{ClientType, Communication, Scope, Status, Tasks};
 #[cfg(feature = "cli")]
 use crate::common::utils::{extract_array, extract_json_string, strip_code_blocks};
-use crate::common::utils::{ClientType, Communication, Scope, Status, Tasks};
 use crate::prompts::architect::{
     ARCHITECT_DIAGRAM_PROMPT, ARCHITECT_ENDPOINTS_PROMPT, ARCHITECT_SCOPE_PROMPT,
 };
@@ -63,6 +63,12 @@ use {
 
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
+
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
+};
 
 #[cfg(feature = "gem")]
 use gems::{
@@ -359,6 +365,71 @@ impl ArchitectGPT {
                 }
             }
 
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        serde_json::from_str(
+                            &extract_json_string(&response_text).unwrap_or_default(),
+                        )?
+                    }
+                    Err(err) => {
+                        error!("[*] {:?}: {:?}", self.agent.position(), err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error generating content: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error generating content: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(anyhow::anyhow!(
@@ -557,6 +628,72 @@ impl ArchitectGPT {
                     }
                 }
             }
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        debug!(
+                            "[*] {:?}: Got Response {:?}",
+                            self.agent.position(),
+                            response_text
+                        );
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        serde_json::from_str(&extract_array(&response_text).unwrap_or_default())?
+                    }
+
+                    Err(err) => {
+                        error!("[*] {:?}: {:?}", self.agent.position(), err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error getting URLs: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!("Error getting URLs: {}", err)),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
 
             #[allow(unreachable_patterns)]
             _ => {
@@ -699,6 +836,71 @@ impl ArchitectGPT {
                             ChatMessage::Tool { content, .. } => content.clone(),
                             _ => String::from(""),
                         };
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response)
+                    }
+                    Err(err) => {
+                        let error_msg = format!("Error generating diagram: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(error_msg),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                use anthropic_ai_sdk::types::message::{
+                    ContentBlock, CreateMessageParams, Message as AnthMessage,
+                    RequiredMessageParams, Role,
+                };
+
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
 
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),

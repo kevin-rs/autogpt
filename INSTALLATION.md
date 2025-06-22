@@ -331,6 +331,7 @@ To configure the CLI and or the SDK environment, follow these steps:
 1. **AI Provider Selection**: You can control which AI client is initialized at runtime using the `AI_PROVIDER` environment variable.
 
    - `openai` - Initializes the OpenAI client (**requires** the `oai` feature).
+   - `anthropic` - Initializes the Anthropic Claude client (**requires** the `cld` feature).
    - `gemini` - Initializes the Gemini client (**requires** the `gem` feature). This is the **default** if `AI_PROVIDER` is not set.
 
    ```sh
@@ -339,6 +340,9 @@ To configure the CLI and or the SDK environment, follow these steps:
 
    # Use Gemini (requires `--features gem`)
    export AI_PROVIDER=gemini
+
+   # Use Anthropic Claude (requires `--features cld`)
+   export AI_PROVIDER=anthropic
    ```
 
    Make sure to enable the corresponding Cargo features (`oai` or `gem`) when building your project.

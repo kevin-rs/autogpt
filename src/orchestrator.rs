@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::{
     io::AsyncReadExt,
     net::TcpListener,
-    sync::{mpsc, Mutex},
+    sync::{Mutex, mpsc},
 };
 use tracing::{error, info, warn};
 
@@ -19,11 +19,11 @@ use crate::common::utils::Tasks;
 use crate::message::parse_kv;
 use crate::{
     common::tls::load_tls_config,
-    message::{parse_message, Message},
+    message::{Message, parse_message},
 };
 use std::env;
 use tokio::io::AsyncWriteExt;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 /// Struct representing the orchestrator responsible for managing and coordinating multiple agents.
 ///

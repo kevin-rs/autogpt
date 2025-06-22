@@ -36,7 +36,7 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{similarity, ClientType, Communication, Status, Tasks};
+use crate::common::utils::{ClientType, Communication, Status, Tasks, similarity};
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;

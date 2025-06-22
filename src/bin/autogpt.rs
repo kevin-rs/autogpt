@@ -32,17 +32,17 @@ async fn main() -> Result<()> {
         use autogpt::agents::optimizer::OptimizerGPT;
         use autogpt::cli::autogpt::{Cli, Commands};
         use autogpt::common::input::read_user_input;
-        use autogpt::common::utils::ask_to_run_command;
-        use autogpt::common::utils::setup_logging;
         use autogpt::common::utils::Scope;
         use autogpt::common::utils::Tasks;
+        use autogpt::common::utils::ask_to_run_command;
+        use autogpt::common::utils::setup_logging;
         use autogpt::traits::functions::Functions;
         use clap::Parser;
         use std::env::var;
 
         use autogpt::common::tls::load_certs;
-        use autogpt::message::encode_message;
         use autogpt::message::Message;
+        use autogpt::message::encode_message;
         use colored::*;
         use rustls::pki_types::ServerName;
         use rustls::{ClientConfig, RootCertStore};
@@ -54,8 +54,8 @@ async fn main() -> Result<()> {
         use tokio::io::AsyncWriteExt;
         use tokio::net::TcpStream;
         use tokio::signal;
-        use tokio::time::timeout;
         use tokio::time::Duration;
+        use tokio::time::timeout;
         use tokio_rustls::TlsConnector;
         use tracing::{error, info, warn};
 

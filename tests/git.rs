@@ -17,7 +17,7 @@ async fn test_git_gpt_execute() {
         .init();
 
     let test_workspace = "workspace/";
-    env::set_var("AUTOGPT_WORKSPACE", "workspace/");
+    unsafe { env::set_var("AUTOGPT_WORKSPACE", "workspace/") };
 
     if Path::new(test_workspace).exists() {
         fs::remove_dir_all(test_workspace).unwrap();

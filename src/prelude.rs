@@ -1,8 +1,8 @@
 #![doc = include_str!("../INSTALLATION.md")]
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{strip_code_blocks, Communication, Scope, Status, Tasks};
 pub use crate::common::utils::{ClientType, Message, Model, Tool};
+use crate::common::utils::{Communication, Scope, Status, Tasks, strip_code_blocks};
 use crate::traits::functions::Functions;
 
 use crate::agents::architect::ArchitectGPT;
@@ -15,9 +15,8 @@ use crate::agents::manager::ManagerGPT;
 use crate::agents::optimizer::OptimizerGPT;
 use crate::traits::agent::Agent;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use derive_builder::Builder;
-use reqwest::Client as ReqClient;
 pub use std::borrow::Cow;
 use tracing::{debug, error};
 pub use uuid::Uuid;
@@ -30,6 +29,12 @@ use {
 
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
+
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient, MessageContent,
+    RequiredMessageParams, Role,
+};
 
 #[cfg(feature = "gem")]
 use gems::{
@@ -47,12 +52,8 @@ pub struct AutoGPT {
     pub provider: ClientType,
     /// Represents AI tools to be used by the AI provider.
     pub tools: Vec<Tool>,
-    /// Represents the workspace directory path for AutoGPT.
-    pub workspace: Cow<'static, str>,
     /// Represents the GPT agent responsible for handling architectural tasks.
     pub agent: AgentGPT,
-    /// Represents a client for making HTTP requests.
-    pub req_client: ReqClient,
 }
 
 impl AutoGPT {
@@ -69,6 +70,23 @@ impl AutoGPT {
                 content: Content::Text(text),
                 ..
             })) => text.clone(),
+
+            #[cfg(feature = "cld")]
+            Some(Message::Claude(AnthMessage {
+                role: Role::User,
+                content,
+                ..
+            })) => match content {
+                MessageContent::Text { content: text } => text.clone(),
+                MessageContent::Blocks { content: blocks } => blocks
+                    .iter()
+                    .filter_map(|block| match block {
+                        ContentBlock::Text { text, .. } => Some(text.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            },
 
             _ => "No task description provided.".to_string(),
         };
@@ -233,6 +251,67 @@ impl AutoGPT {
                     }
                 }
 
+                #[cfg(feature = "cld")]
+                ClientType::Anthropic(client) => {
+                    let body = CreateMessageParams::new(RequiredMessageParams {
+                        model: "claude-3-7-sonnet-latest".to_string(),
+                        messages: vec![AnthMessage::new_text(Role::User, request.to_string())],
+                        max_tokens: 1024,
+                    });
+
+                    match client.create_message(Some(&body)).await {
+                        Ok(chat_response) => {
+                            let response_text = chat_response
+                                .content
+                                .iter()
+                                .filter_map(|block| match block {
+                                    ContentBlock::Text { text, .. } => Some(text),
+                                    _ => None,
+                                })
+                                .cloned()
+                                .collect::<Vec<_>>()
+                                .join("\n");
+
+                            self.agent.add_communication(Communication {
+                                role: Cow::Borrowed("assistant"),
+                                content: Cow::Owned(response_text.clone()),
+                            });
+
+                            #[cfg(feature = "mem")]
+                            {
+                                let _ = self
+                                    .save_ltm(Communication {
+                                        role: Cow::Borrowed("assistant"),
+                                        content: Cow::Owned(response_text.clone()),
+                                    })
+                                    .await;
+                            }
+
+                            strip_code_blocks(&response_text)
+                        }
+
+                        Err(err) => {
+                            let error_message = format!("Error generating backend code: {}", err);
+
+                            self.agent.add_communication(Communication {
+                                role: Cow::Borrowed("assistant"),
+                                content: Cow::Owned(error_message.clone()),
+                            });
+
+                            #[cfg(feature = "mem")]
+                            {
+                                let _ = self
+                                    .save_ltm(Communication {
+                                        role: Cow::Borrowed("assistant"),
+                                        content: Cow::Owned(error_message.clone()),
+                                    })
+                                    .await;
+                            }
+
+                            Default::default()
+                        }
+                    }
+                }
                 #[allow(unreachable_patterns)]
                 _ => {
                     return Err(anyhow!(

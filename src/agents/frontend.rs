@@ -65,6 +65,12 @@ use {
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
+};
+
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
@@ -377,6 +383,51 @@ impl FrontendGPT {
                 }
             }
 
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_err) => {
+                        let error_msg = "Failed to generate content from Claude API.".to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(anyhow::anyhow!(
@@ -564,6 +615,52 @@ impl FrontendGPT {
                     Err(_err) => {
                         let error_msg =
                             "Failed to generate improved frontend code via OpenAI API.".to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_err) => {
+                        let error_msg =
+                            "Failed to generate improved frontend code via Claude API.".to_string();
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
@@ -777,6 +874,53 @@ impl FrontendGPT {
                     Err(_err) => {
                         let error_msg =
                             "Failed to generate bug-fixed frontend code via OpenAI API."
+                                .to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_err) => {
+                        let error_msg =
+                            "Failed to generate bug-fixed frontend code via Claude API."
                                 .to_string();
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
