@@ -35,9 +35,11 @@
 //! ```
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{ClientType, Communication, Scope, Status, Tasks};
-#[cfg(feature = "cli")]
-use crate::common::utils::{extract_array, extract_json_string, strip_code_blocks};
+#[allow(unused_imports)]
+use crate::common::utils::{
+    ClientType, Communication, Scope, Status, Tasks, extract_array, extract_json_string,
+    strip_code_blocks,
+};
 use crate::prompts::architect::{
     ARCHITECT_DIAGRAM_PROMPT, ARCHITECT_ENDPOINTS_PROMPT, ARCHITECT_SCOPE_PROMPT,
 };

@@ -37,9 +37,8 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-#[cfg(feature = "cli")]
-use crate::common::utils::strip_code_blocks;
-use crate::common::utils::{ClientType, Communication, Route, Status, Tasks};
+#[allow(unused_imports)]
+use crate::common::utils::{ClientType, Communication, Route, Status, Tasks, strip_code_blocks};
 use crate::prompts::backend::{
     API_ENDPOINTS_PROMPT, FIX_CODE_PROMPT, IMPROVED_WEBSERVER_CODE_PROMPT, WEBSERVER_CODE_PROMPT,
 };

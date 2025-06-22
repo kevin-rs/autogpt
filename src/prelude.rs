@@ -2,23 +2,30 @@
 
 use crate::agents::agent::AgentGPT;
 pub use crate::common::utils::{ClientType, Message, Model, Tool};
-use crate::common::utils::{Communication, Scope, Status, Tasks, strip_code_blocks};
-use crate::traits::functions::Functions;
 
-use crate::agents::architect::ArchitectGPT;
-use crate::agents::backend::BackendGPT;
-use crate::agents::designer::DesignerGPT;
-use crate::agents::frontend::FrontendGPT;
-use crate::agents::git::GitGPT;
-use crate::agents::mailer::MailerGPT;
-use crate::agents::manager::ManagerGPT;
-use crate::agents::optimizer::OptimizerGPT;
-use crate::traits::agent::Agent;
-
-use anyhow::{Result, anyhow};
 use derive_builder::Builder;
+#[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+use {
+    crate::agents::architect::ArchitectGPT,
+    crate::agents::backend::BackendGPT,
+    crate::agents::frontend::FrontendGPT,
+    crate::agents::manager::ManagerGPT,
+    crate::agents::optimizer::OptimizerGPT,
+    crate::common::utils::{Communication, Scope, Status, Tasks, strip_code_blocks},
+    crate::traits::agent::Agent,
+    crate::traits::functions::Functions,
+    anyhow::{Result, anyhow},
+    tracing::{debug, error},
+};
+
+#[cfg(feature = "img")]
+use crate::agents::designer::DesignerGPT;
+#[cfg(feature = "git")]
+use crate::agents::git::GitGPT;
+#[cfg(feature = "mail")]
+use crate::agents::mailer::MailerGPT;
+
 pub use std::borrow::Cow;
-use tracing::{debug, error};
 pub use uuid::Uuid;
 
 #[cfg(feature = "mem")]
@@ -44,6 +51,7 @@ use gems::{
 };
 
 #[derive(Builder, Default, Clone)]
+#[allow(unreachable_code)]
 #[builder(setter(into, strip_option), default)]
 pub struct AutoGPT {
     /// Unique identifier for the agent.
@@ -57,6 +65,7 @@ pub struct AutoGPT {
 }
 
 impl AutoGPT {
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
     pub async fn run(&mut self, messages: Vec<Message>) -> Result<String> {
         let description = match messages.first() {
             #[cfg(feature = "oai")]
@@ -325,10 +334,10 @@ impl AutoGPT {
 
         for tool in &self.tools {
             match tool {
-                Tool::Search => {
-                    debug!("Tool: Search -> Using ArchitectGPT");
+                Tool::Diagram => {
+                    debug!("Tool: Diagram -> Using ArchitectGPT");
                     let mut agent =
-                        ArchitectGPT::new("Design intelligent search-based systems", "Architect");
+                        ArchitectGPT::new("Design intelligent diagram-based systems", "Architect");
                     agent.execute(&mut tasks, true, false, 3).await?;
                 }
 
@@ -342,21 +351,21 @@ impl AutoGPT {
                     agent.execute(&mut tasks, true, false, 3).await?;
                 }
 
+                #[cfg(feature = "img")]
                 Tool::ImgGen => {
-                    #[cfg(feature = "img")]
-                    {
-                        debug!("Tool: ImgGen -> Using DesignerGPT");
-                        let mut agent = DesignerGPT::new("Design with visuals", "Designer");
-                        agent.execute(&mut tasks, true, false, 3).await?;
-                    }
+                    debug!("Tool: ImgGen -> Using DesignerGPT");
+                    let mut agent = DesignerGPT::new("Design with visuals", "Designer");
+                    agent.execute(&mut tasks, true, false, 3).await?;
                 }
 
+                #[cfg(feature = "git")]
                 Tool::Git => {
                     debug!("Tool: Git -> Using GitGPT");
                     let mut agent = GitGPT::new("Manage version control tasks", "GitGPT");
                     agent.execute(&mut tasks, true, false, 1).await?;
                 }
 
+                #[cfg(feature = "mail")]
                 Tool::Email => {
                     debug!("Tool: Email -> Using MailerGPT");
                     let mut agent = MailerGPT::new("Summarize and compose emails", "Mailer").await;

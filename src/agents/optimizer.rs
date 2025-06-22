@@ -62,9 +62,8 @@
 //! back to the workspace directory.
 
 use crate::agents::agent::AgentGPT;
-#[cfg(feature = "cli")]
-use crate::common::utils::strip_code_blocks;
-use crate::common::utils::{ClientType, Communication, Status, Tasks};
+#[allow(unused_imports)]
+use crate::common::utils::{ClientType, Communication, Status, Tasks, strip_code_blocks};
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::Functions;

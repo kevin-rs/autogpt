@@ -90,7 +90,9 @@ use {
 
 #[cfg(feature = "gem")]
 use gems::{
-    Client as GeminiClient, messages::Message as GeminiMessage, models::Model as GeminiModel,
+    Client as GeminiClient,
+    messages::{Content, Message as GeminiMessage},
+    models::Model as GeminiModel,
     traits::CTrait,
 };
 #[cfg(feature = "oai")]
@@ -581,7 +583,7 @@ impl Default for Model {
 
         #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
         {
-            compile_error!(
+            panic!(
                 "At least one of the features `oai`, `gem`, or `cld` must be enabled for Model::default()"
             );
         }
@@ -620,15 +622,15 @@ impl Default for Message {
 
         #[cfg(all(not(any(feature = "oai", feature = "cld")), feature = "gem"))]
         {
-            return Message::Gemini(GeminiMessage {
-                parts: vec!["Hello".to_string()],
-                role: "user".to_string(),
+            return Message::Gemini(GeminiMessage::User {
+                content: Content::Text("Hello".into()),
+                name: None,
             });
         }
 
         #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
         {
-            compile_error!(
+            panic!(
                 "At least one of the features `oai`, `gem`, or `cld` must be enabled for Message::default()"
             );
         }
@@ -636,33 +638,31 @@ impl Default for Message {
 }
 
 impl Message {
-    pub fn from_text(text: impl Into<String>) -> Self {
-        let text = text.into();
-
+    pub fn from_text(_text: impl Into<String>) -> Self {
         #[cfg(feature = "oai")]
         {
             Message::OpenAI(ChatMessage::User {
-                content: ChatMessageContent::Text(text),
+                content: ChatMessageContent::Text(_text.into()),
                 name: None,
             })
         }
 
         #[cfg(all(not(feature = "oai"), feature = "cld"))]
         {
-            return Message::Claude(AnthMessage::new_text(Role::User, text));
+            return Message::Claude(AnthMessage::new_text(Role::User, _text.into()));
         }
 
         #[cfg(all(not(any(feature = "oai", feature = "cld")), feature = "gem"))]
         {
-            return Message::Gemini(GeminiMessage {
-                parts: vec![text],
-                role: "user".to_string(),
+            return Message::Gemini(GeminiMessage::User {
+                content: Content::Text(_text.into()),
+                name: None,
             });
         }
 
         #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
         {
-            compile_error!(
+            panic!(
                 "At least one of the features `oai`, `gem`, or `cld` must be enabled for Message::from_text()"
             );
         }
