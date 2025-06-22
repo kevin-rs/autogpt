@@ -77,27 +77,33 @@ use std::env::var;
 #[cfg(feature = "cli")]
 use std::{io, io::Read, process::Command, process::Stdio};
 #[cfg(feature = "cli")]
-use webbrowser::{open_browser_with_options, Browser, BrowserOptions};
+use webbrowser::{Browser, BrowserOptions, open_browser_with_options};
 #[cfg(feature = "cli")]
 use {
     tracing::{error, info, warn},
     tracing_appender::rolling,
-    tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt,
     tracing_subscriber::Layer,
     tracing_subscriber::Registry,
+    tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt,
     tracing_subscriber::{filter, fmt},
 };
 
 #[cfg(feature = "gem")]
 use gems::{
-    messages::Message as GeminiMessage, models::Model as GeminiModel, traits::CTrait,
-    Client as GeminiClient,
+    Client as GeminiClient, messages::Message as GeminiMessage, models::Model as GeminiModel,
+    traits::CTrait,
 };
 #[cfg(feature = "oai")]
 use openai_dive::v1::{
     api::Client as OpenAIClient,
     models::FlagshipModel,
     resources::chat::{ChatMessage, ChatMessageContent},
+};
+
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::{
+    client::AnthropicClient,
+    types::message::{Message as AnthMessage, MessageError},
 };
 
 /// Enum representing supported AI clients.
@@ -110,6 +116,10 @@ pub enum ClientType {
     /// Google Gemini client.
     #[cfg(feature = "gem")]
     Gemini(GeminiClient),
+
+    /// Anthropic Gemini client.
+    #[cfg(feature = "cld")]
+    Anthropic(AnthropicClient),
 }
 
 impl Default for ClientType {
@@ -137,11 +147,19 @@ impl ClientType {
             return ClientType::Gemini(gemini_client);
         }
 
+        #[cfg(feature = "cld")]
+        if provider == "anthropic" {
+            let api_key = var("ANTHROPIC_API_KEY").expect("Missing ANTHROPIC_API_KEY");
+            let client = AnthropicClient::new::<MessageError>(api_key, "2023-06-01")
+                .expect("Failed to create Anthropic client");
+            return ClientType::Anthropic(client);
+        }
+
         #[allow(unreachable_code)]
         {
             panic!(
                 "Invalid AI_PROVIDER `{}` or missing required feature flags. \
-                Make sure to enable at least one of: `oai`, `gem`.",
+                Make sure to enable at least one of: `oai`, `gem`, `cld`.",
                 provider
             );
         }
@@ -538,6 +556,10 @@ pub enum Model {
     /// Google Gemini model.
     #[cfg(feature = "gem")]
     Gemini(GeminiModel),
+
+    /// Anthropic claude model.
+    #[cfg(feature = "cld")]
+    Claude(String), // Example: "claude-3-7-sonnet-latest"
 }
 
 impl Default for Model {
@@ -547,21 +569,26 @@ impl Default for Model {
             Model::OpenAI(FlagshipModel::Gpt4O)
         }
 
-        #[cfg(all(not(feature = "oai"), feature = "gem"))]
+        #[cfg(all(not(feature = "oai"), feature = "cld"))]
+        {
+            return Model::Claude("claude-3-7-sonnet-latest".to_string());
+        }
+
+        #[cfg(all(not(any(feature = "oai", feature = "cld")), feature = "gem"))]
         {
             return Model::Gemini(GeminiModel::Flash20);
         }
 
-        #[cfg(not(any(feature = "oai", feature = "gem")))]
+        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
         {
             compile_error!(
-                "At least one of the features `oai` or `gem` must be enabled for Model::default()"
+                "At least one of the features `oai`, `gem`, or `cld` must be enabled for Model::default()"
             );
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Message {
     /// OpenAI message type.
     #[cfg(feature = "oai")]
@@ -570,6 +597,10 @@ pub enum Message {
     /// Google message type.
     #[cfg(feature = "gem")]
     Gemini(GeminiMessage),
+
+    /// Anthropic claude type.
+    #[cfg(feature = "cld")]
+    Claude(AnthMessage),
 }
 
 impl Default for Message {
@@ -577,12 +608,17 @@ impl Default for Message {
         #[cfg(feature = "oai")]
         {
             Message::OpenAI(ChatMessage::User {
-                content: ChatMessageContent::Text("Hello".to_string()),
+                content: ChatMessageContent::Text("Hello".into()),
                 name: None,
             })
         }
 
-        #[cfg(all(not(feature = "oai"), feature = "gem"))]
+        #[cfg(all(not(feature = "oai"), feature = "cld"))]
+        {
+            return Message::Claude(AnthMessage::new_text(Role::User, "Hello"));
+        }
+
+        #[cfg(all(not(any(feature = "oai", feature = "cld")), feature = "gem"))]
         {
             return Message::Gemini(GeminiMessage {
                 parts: vec!["Hello".to_string()],
@@ -590,9 +626,11 @@ impl Default for Message {
             });
         }
 
-        #[cfg(not(any(feature = "oai", feature = "gem")))]
+        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
         {
-            compile_error!("At least one of the features `oai` or `gem` must be enabled for Message::default()");
+            compile_error!(
+                "At least one of the features `oai`, `gem`, or `cld` must be enabled for Message::default()"
+            );
         }
     }
 }
@@ -609,7 +647,12 @@ impl Message {
             })
         }
 
-        #[cfg(all(not(feature = "oai"), feature = "gem"))]
+        #[cfg(all(not(feature = "oai"), feature = "cld"))]
+        {
+            return Message::Claude(AnthMessage::new_text(Role::User, text));
+        }
+
+        #[cfg(all(not(any(feature = "oai", feature = "cld")), feature = "gem"))]
         {
             return Message::Gemini(GeminiMessage {
                 parts: vec![text],
@@ -617,9 +660,11 @@ impl Message {
             });
         }
 
-        #[cfg(not(any(feature = "oai", feature = "gem")))]
+        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
         {
-            compile_error!("At least one of the features `oai` or `gem` must be enabled for Message::from_text()");
+            compile_error!(
+                "At least one of the features `oai`, `gem`, or `cld` must be enabled for Message::from_text()"
+            );
         }
     }
 }

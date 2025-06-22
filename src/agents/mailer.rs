@@ -24,6 +24,12 @@ use {
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
+};
+
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
@@ -287,6 +293,51 @@ impl MailerGPT {
                 }
             }
 
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(
+                        Role::User,
+                        format!("User Request:{}\n\nEmails:{:?}", prompt, emails),
+                    )],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => chat_response
+                        .content
+                        .iter()
+                        .filter_map(|block| match block {
+                            ContentBlock::Text { text, .. } => Some(text),
+                            _ => None,
+                        })
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+
+                    Err(err) => {
+                        let error_msg =
+                            format!("Failed to generate content from Claude API: {}", err);
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(anyhow::anyhow!(

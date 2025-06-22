@@ -33,6 +33,12 @@ use {
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
+};
+
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
@@ -237,6 +243,52 @@ impl ManagerGPT {
 
                     Err(_err) => {
                         let error_msg = "Failed to generate content via OpenAI API.".to_string();
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("system"),
+                            content: Cow::Owned(error_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("system"),
+                                    content: Cow::Owned(error_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(error_msg));
+                    }
+                }
+            }
+
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) if provider == "claude" => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, prompt.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .filter_map(|block| match block {
+                                ContentBlock::Text { text, .. } => Some(text),
+                                _ => None,
+                            })
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(_) => {
+                        let error_msg = "Failed to generate content via Claude API.".to_string();
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),

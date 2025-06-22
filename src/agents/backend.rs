@@ -59,7 +59,7 @@ use std::env::var;
 use std::fs;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
-use webbrowser::{open_browser_with_options, Browser, BrowserOptions};
+use webbrowser::{Browser, BrowserOptions, open_browser_with_options};
 
 #[cfg(feature = "mem")]
 use {
@@ -69,6 +69,12 @@ use {
 
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
+
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
+};
 
 #[cfg(feature = "gem")]
 use gems::{
@@ -431,6 +437,68 @@ impl BackendGPT {
                 }
             }
 
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(format!("Error generating backend code: {}", err)),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(format!(
+                                        "Error generating backend code: {}",
+                                        err
+                                    )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(anyhow::anyhow!(
@@ -624,6 +692,66 @@ impl BackendGPT {
                                         "Error improving backend code: {}",
                                         err
                                     )),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        let err_msg = format!("Error improving backend code: {}", err);
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg),
                                 })
                                 .await;
                         }
@@ -830,6 +958,66 @@ impl BackendGPT {
                 }
             }
 
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        let err_msg = format!("Error fixing code bugs: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(anyhow::anyhow!(
@@ -1020,6 +1208,67 @@ impl BackendGPT {
                                 .save_ltm(Communication {
                                     role: Cow::Borrowed("assistant"),
                                     content: Cow::Owned(format!("Error fixing code bugs: {}", err)),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .map(|block| match block {
+                                ContentBlock::Text { text, .. } => text.as_str(),
+                                _ => "",
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        let err_msg = format!("Error fixing code bugs: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg),
                                 })
                                 .await;
                         }

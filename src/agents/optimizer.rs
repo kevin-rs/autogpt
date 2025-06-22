@@ -85,6 +85,12 @@ use {
 #[cfg(feature = "oai")]
 use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
 
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
+};
+
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
@@ -326,6 +332,67 @@ impl OptimizerGPT {
                     }
                     Err(err) => {
                         let err_msg = format!("Error retrieving OpenAI response: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg),
+                                })
+                                .await;
+                        }
+
+                        Default::default()
+                    }
+                }
+            }
+            #[cfg(feature = "cld")]
+            ClientType::Anthropic(client) => {
+                let body = CreateMessageParams::new(RequiredMessageParams {
+                    model: "claude-3-7-sonnet-latest".to_string(),
+                    messages: vec![AnthMessage::new_text(Role::User, request.to_string())],
+                    max_tokens: 1024,
+                });
+
+                match client.create_message(Some(&body)).await {
+                    Ok(chat_response) => {
+                        let response_text = chat_response
+                            .content
+                            .iter()
+                            .filter_map(|block| match block {
+                                ContentBlock::Text { text, .. } => Some(text),
+                                _ => None,
+                            })
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        let err_msg = format!("Error retrieving Claude response: {}", err);
 
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
