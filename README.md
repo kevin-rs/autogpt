@@ -26,7 +26,7 @@
 | 🏗️  `(Recommended)` | 🐋 | 🐋 |
 | :------: | :--------: | :--------: |
 | [![Crates.io Downloads](https://img.shields.io/crates/d/autogpt)](https://crates.io/crates/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/autogpt.svg)](https://hub.docker.com/r/kevinrsdev/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/orchgpt.svg)](https://hub.docker.com/r/kevinrsdev/orchgpt) |
-| `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.1` | `docker pull kevinrsdev/orchgpt:0.1.1` |
+| `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt` | `docker pull kevinrsdev/orchgpt` |
 | `autogpt -h` <br> `orchgpt -h` |  `docker run autogpt -h` | `docker run orchgpt -h` |
 
 <video src="https://github.com/user-attachments/assets/ecd82549-a48f-49c2-b751-23f74820bf3d"></video>

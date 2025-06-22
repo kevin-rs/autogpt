@@ -3,6 +3,7 @@
 
 pub mod agents;
 pub mod common;
+pub mod prelude;
 pub mod prompts;
 pub mod traits;
 

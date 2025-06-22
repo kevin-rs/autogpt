@@ -49,6 +49,7 @@ tokio-rustls = { version = "0.26.2", optional = true }
 tokio = { version = "1.37.0", default-features = false, features = ["full"] }
 rustls = { version = "0.23.26", optional = true }
 rustls-pemfile = { version = "2.2.0", features = ["std"], optional = true }
+derive_builder = "0.20.2"
 
 [features]
 default = []

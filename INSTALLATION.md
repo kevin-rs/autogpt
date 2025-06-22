@@ -178,6 +178,127 @@ The generated `cert.pem` and `key.pem` file must be made available in a **certs*
 
 ---
 
+## 🧰 SDK Usage
+
+The SDK offers a simple and flexible API for building and running intelligent agents in your applications. Before getting started, **make sure to configure the required environment variables**. For detailed setup, refer to the [Environment Variables Setup](#environment-variables-setup) section.
+
+Once the environment is ready, you can quickly spin up an agent like so:
+
+```rust
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let mut autogpt = AutoGPTBuilder::default()
+        .build()
+        .expect("Failed to build AutoGPT");
+
+    let msg = Message::default();
+
+    let result = autogpt.run(vec![msg.clone()]).await;
+    println!("{:?}", result);
+}
+```
+
+### 💡 Example Use Cases
+
+Below are a few example patterns to help you integrate agents for various tasks:
+
+#### 🧠 General Purpose Agent
+
+```rust
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let mut autogpt = AutoGPTBuilder::default()
+        .tools(vec![])
+        .build()
+        .unwrap();
+
+    let msg = Message::from_text("Draft a proposal for a startup accelerator.");
+    let response = autogpt.run(vec![msg]).await.unwrap();
+
+    println!("Proposal:\n{}", response);
+}
+```
+
+#### 🔎 Research Agent (Web + Calculator)
+
+```rust, no_run
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let mut agent = AutoGPTBuilder::default()
+        .tools(vec![Tool::Search, Tool::Calc])
+        .build()
+        .unwrap();
+
+    let task = Message::from_text("Compare the cost of living between Berlin and Tokyo.");
+    let output = agent.run(vec![task]).await.unwrap();
+
+    println!("Comparison:\n{}", output);
+}
+```
+
+#### 🎨 Designer Agent (Image UI Generator)
+
+```rust, no_run
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let mut agent = AutoGPTBuilder::default()
+        .tools(vec![Tool::ImgGen])
+        .build()
+        .unwrap();
+
+    let task = Message::from_text("Design a modern dashboard UI for a weather app.");
+    let result = agent.run(vec![task]).await.unwrap();
+
+    println!("Design output:\n{}", result);
+}
+```
+
+#### 🛠️ Backend API Generator
+
+```rust
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let mut agent = AutoGPTBuilder::default()
+        .tools(vec![Tool::Backend])
+        .build()
+        .unwrap();
+
+    let task = Message::from_text("Generate a FastAPI backend for a todo list app.");
+    let result = agent.run(vec![task]).await.unwrap();
+
+    println!("Generated backend:\n{}", result);
+}
+```
+
+#### 🧬 Custom Agent with No Tools
+
+```rust
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let mut agent = AutoGPTBuilder::default()
+        .tools(vec![])
+        .build()
+        .unwrap();
+
+    let task = Message::from_text("Brainstorm innovative fintech app ideas.");
+    let result = agent.run(vec![task]).await.unwrap();
+
+    println!("Ideas:\n{}", result);
+}
+```
+
 ## 🛠️ CLI Usage
 
 The CLI provides a convenient means to interact with the code generation ecosystem. The `autogpt` crate bundles two binaries in a single package:

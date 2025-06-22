@@ -103,11 +103,7 @@ pub async fn save_long_term_memory(
         Ok(client) => client,
         Err(e) => {
             error!("Error creating Pinecone client: {:?}", e);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to create Pinecone client",
-            )
-            .into());
+            return Err(std::io::Error::other("Failed to create Pinecone client").into());
         }
     };
 
@@ -118,11 +114,7 @@ pub async fn save_long_term_memory(
         Ok(index) => index,
         Err(e) => {
             error!("Error connecting to Pinecone index: {:?}", e);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to connect to Pinecone index",
-            )
-            .into());
+            return Err(std::io::Error::other("Failed to connect to Pinecone index").into());
         }
     };
 
@@ -176,11 +168,7 @@ pub async fn load_long_term_memory(agent_id: Cow<'static, str>) -> Result<Vec<Co
         Ok(client) => client,
         Err(e) => {
             error!("Error creating Pinecone client: {:?}", e);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to create Pinecone client",
-            )
-            .into());
+            return Err(std::io::Error::other("Failed to create Pinecone client").into());
         }
     };
 
@@ -191,11 +179,7 @@ pub async fn load_long_term_memory(agent_id: Cow<'static, str>) -> Result<Vec<Co
         Ok(index) => index,
         Err(e) => {
             error!("Error connecting to Pinecone index: {:?}", e);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to connect to Pinecone index",
-            )
-            .into());
+            return Err(std::io::Error::other("Failed to connect to Pinecone index").into());
         }
     };
 

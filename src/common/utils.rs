@@ -89,9 +89,16 @@ use {
 };
 
 #[cfg(feature = "gem")]
-use gems::{traits::CTrait, Client as GeminiClient};
+use gems::{
+    messages::Message as GeminiMessage, models::Model as GeminiModel, traits::CTrait,
+    Client as GeminiClient,
+};
 #[cfg(feature = "oai")]
-use openai_dive::v1::api::Client as OpenAIClient;
+use openai_dive::v1::{
+    api::Client as OpenAIClient,
+    models::FlagshipModel,
+    resources::chat::{ChatMessage, ChatMessageContent},
+};
 
 /// Enum representing supported AI clients.
 #[derive(Debug, Clone)]
@@ -103,6 +110,12 @@ pub enum ClientType {
     /// Google Gemini client.
     #[cfg(feature = "gem")]
     Gemini(GeminiClient),
+}
+
+impl Default for ClientType {
+    fn default() -> Self {
+        ClientType::from_env()
+    }
 }
 
 impl ClientType {
@@ -513,4 +526,178 @@ pub async fn ask_to_run_command(
     }
 
     Ok(())
+}
+
+/// Enum representing supported GPT models.
+#[derive(Debug, PartialEq, Clone)]
+pub enum Model {
+    /// OpenAI model.
+    #[cfg(feature = "oai")]
+    OpenAI(FlagshipModel),
+
+    /// Google Gemini model.
+    #[cfg(feature = "gem")]
+    Gemini(GeminiModel),
+}
+
+impl Default for Model {
+    fn default() -> Self {
+        #[cfg(feature = "oai")]
+        {
+            Model::OpenAI(FlagshipModel::Gpt4O)
+        }
+
+        #[cfg(all(not(feature = "oai"), feature = "gem"))]
+        {
+            return Model::Gemini(GeminiModel::Flash20);
+        }
+
+        #[cfg(not(any(feature = "oai", feature = "gem")))]
+        {
+            compile_error!(
+                "At least one of the features `oai` or `gem` must be enabled for Model::default()"
+            );
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Message {
+    /// OpenAI message type.
+    #[cfg(feature = "oai")]
+    OpenAI(ChatMessage),
+
+    /// Google message type.
+    #[cfg(feature = "gem")]
+    Gemini(GeminiMessage),
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        #[cfg(feature = "oai")]
+        {
+            Message::OpenAI(ChatMessage::User {
+                content: ChatMessageContent::Text("Hello".to_string()),
+                name: None,
+            })
+        }
+
+        #[cfg(all(not(feature = "oai"), feature = "gem"))]
+        {
+            return Message::Gemini(GeminiMessage {
+                parts: vec!["Hello".to_string()],
+                role: "user".to_string(),
+            });
+        }
+
+        #[cfg(not(any(feature = "oai", feature = "gem")))]
+        {
+            compile_error!("At least one of the features `oai` or `gem` must be enabled for Message::default()");
+        }
+    }
+}
+
+impl Message {
+    pub fn from_text(text: impl Into<String>) -> Self {
+        let text = text.into();
+
+        #[cfg(feature = "oai")]
+        {
+            Message::OpenAI(ChatMessage::User {
+                content: ChatMessageContent::Text(text),
+                name: None,
+            })
+        }
+
+        #[cfg(all(not(feature = "oai"), feature = "gem"))]
+        {
+            return Message::Gemini(GeminiMessage {
+                parts: vec![text],
+                role: "user".to_string(),
+            });
+        }
+
+        #[cfg(not(any(feature = "oai", feature = "gem")))]
+        {
+            compile_error!("At least one of the features `oai` or `gem` must be enabled for Message::from_text()");
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Default, Clone)]
+pub enum Tool {
+    /// Web & Information Retrieval
+    #[default]
+    Search,
+    Browser,
+    News,
+    Wiki,
+
+    /// Data & Computation
+    Calc,
+    Math,
+    Convert,
+    Format,
+    Sheet,
+
+    /// Programming & Code Execution
+    Exec,
+    Code,
+    Regex,
+    Box,
+
+    /// File & Document Handling
+    Read,
+    Write,
+    Pdf,
+    Summarize,
+
+    /// Communication & Scheduling
+    Email,
+    Sms,
+    Calendar,
+    Notes,
+
+    /// Natural Language Processing
+    Translate,
+    Sentiment,
+    Entities,
+    TLDR,
+    Classify,
+
+    /// Media Understanding & Generation
+    ImgGen,
+    ImgScan,
+    Transcribe,
+    VidSum,
+
+    /// Memory & Persistence
+    VSearch,
+    Memory,
+    KB,
+    Pad,
+
+    /// System & External Integration
+    Shell,
+    Git,
+    DB,
+    API,
+
+    /// Autonomy & Agentic Reasoning
+    Plan,
+    Spawn,
+    Judge,
+    Loop,
+
+    /// Simulation & Modeling
+    Diagram,
+    Sim,
+    Finance,
+
+    Optimize,
+    Frontend,
+    Backend,
+
+    /// Custom / Plugin Tool
+    Plugin(String),
 }
