@@ -89,6 +89,7 @@ use {
 };
 
 #[cfg(feature = "gem")]
+#[allow(unused_imports)]
 use gems::{
     Client as GeminiClient,
     messages::{Content, Message as GeminiMessage},

@@ -56,11 +56,11 @@ use gems::{
 pub struct AutoGPT {
     /// Unique identifier for the agent.
     pub id: Uuid,
-    /// Represents a provider for interacting with an AI API (OpenAI or Gemini).
+    /// Represents a provider for interacting with an AI API (OpenAI, Gemini, or Claude).
     pub provider: ClientType,
     /// Represents AI tools to be used by the AI provider.
     pub tools: Vec<Tool>,
-    /// Represents the GPT agent responsible for handling architectural tasks.
+    /// Represents the GPT agent responsible for handling tasks.
     pub agent: AgentGPT,
 }
 
@@ -339,6 +339,7 @@ impl AutoGPT {
                     let mut agent =
                         ArchitectGPT::new("Design intelligent diagram-based systems", "Architect");
                     agent.execute(&mut tasks, true, false, 3).await?;
+                    self.agent = agent.get_agent().clone();
                 }
 
                 Tool::Backend => {
@@ -349,6 +350,7 @@ impl AutoGPT {
                         "rust",
                     );
                     agent.execute(&mut tasks, true, false, 3).await?;
+                    self.agent = agent.get_agent().clone();
                 }
 
                 #[cfg(feature = "img")]
@@ -356,6 +358,7 @@ impl AutoGPT {
                     debug!("Tool: ImgGen -> Using DesignerGPT");
                     let mut agent = DesignerGPT::new("Design with visuals", "Designer");
                     agent.execute(&mut tasks, true, false, 3).await?;
+                    self.agent = agent.get_agent().clone();
                 }
 
                 #[cfg(feature = "git")]
@@ -363,6 +366,7 @@ impl AutoGPT {
                     debug!("Tool: Git -> Using GitGPT");
                     let mut agent = GitGPT::new("Manage version control tasks", "GitGPT");
                     agent.execute(&mut tasks, true, false, 1).await?;
+                    self.agent = agent.get_agent().clone();
                 }
 
                 #[cfg(feature = "mail")]
@@ -370,6 +374,7 @@ impl AutoGPT {
                     debug!("Tool: Email -> Using MailerGPT");
                     let mut agent = MailerGPT::new("Summarize and compose emails", "Mailer").await;
                     agent.execute(&mut tasks, true, false, 3).await?;
+                    self.agent = agent.get_agent().clone();
                 }
 
                 Tool::Plan => {
@@ -386,7 +391,8 @@ impl AutoGPT {
                 Tool::Optimize => {
                     debug!("Tool: Optimize -> Using OptimizerGPT");
                     let mut agent = OptimizerGPT::new("Optimize source code", "Optimizer", "rust");
-                    agent.generate_and_track(&tasks.description).await?;
+                    agent.execute(&mut tasks, true, false, 3).await?;
+                    self.agent = agent.get_agent().clone();
                 }
 
                 Tool::Frontend => {
@@ -394,6 +400,7 @@ impl AutoGPT {
                     let mut agent =
                         FrontendGPT::new("Develop high-performance UI", "frontend", "rust");
                     agent.execute(&mut tasks, true, false, 3).await?;
+                    self.agent = agent.get_agent().clone();
                 }
 
                 _ => {
