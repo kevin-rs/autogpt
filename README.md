@@ -21,7 +21,7 @@
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/kevin-rs/autogpt/main?filepath=examples/basic.ipynb)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kevin-rs/autogpt/blob/main/examples/basic.ipynb)
 
-![banner](https://github.com/kevin-rs/kevin/assets/62179149/8b54dea8-2231-4509-8c18-10ec414578d2)
+![banner](https://github.com/user-attachments/assets/c642e17a-f164-44b5-9cd1-bc1711cebbbf)
 
 | 🏗️  `(Recommended)` | 🐋 | 🐋 |
 | :------: | :--------: | :--------: |
