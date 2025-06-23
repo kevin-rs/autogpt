@@ -80,6 +80,7 @@ async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<
             }
         }
 
+        // TODO: Add embeddings for claude and xai
         #[allow(unreachable_patterns)]
         _ => {
             error!("Unsupported AI client for embedding.");

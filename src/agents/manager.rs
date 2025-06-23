@@ -23,7 +23,7 @@ use colored::*;
 use gems::Client;
 use std::borrow::Cow;
 use std::env::var;
-use tracing::info;
+use tracing::{debug, info};
 
 #[cfg(feature = "mem")]
 use {
@@ -44,6 +44,12 @@ use gems::{
     chat::ChatBuilder,
     messages::{Content, Message},
     traits::CTrait,
+};
+
+#[cfg(feature = "xai")]
+use x_ai::{
+    chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
+    traits::ChatCompletionsFetcher,
 };
 
 /// Struct representing a ManagerGPT, responsible for managing different types of GPT agents.
@@ -308,11 +314,80 @@ impl ManagerGPT {
                     }
                 }
             }
+            #[cfg(feature = "xai")]
+            ClientType::Xai(xai_client) => {
+                let messages = vec![XaiMessage {
+                    role: "user".into(),
+                    content: prompt.clone(),
+                }];
+
+                let rb = ChatCompletionsRequestBuilder::new(
+                    xai_client.clone(),
+                    "grok-beta".into(),
+                    messages,
+                )
+                .temperature(0.0)
+                .stream(false);
+
+                let req = rb.clone().build()?;
+                let resp = rb.create_chat_completion(req).await;
+
+                match resp {
+                    Ok(chat) => {
+                        let response_text = chat.choices[0].message.content.clone();
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        #[cfg(debug_assertions)]
+                        debug!(
+                            "[*] {:?}: Got XAI Output: {:?}",
+                            self.agent.position(),
+                            response_text
+                        );
+
+                        strip_code_blocks(&response_text)
+                    }
+
+                    Err(err) => {
+                        let err_msg = format!("Failed to generate content via XAI API: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(err_msg));
+                    }
+                }
+            }
 
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(anyhow::anyhow!(
-                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                    "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
                 ));
             }
         };

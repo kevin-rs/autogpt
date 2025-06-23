@@ -50,6 +50,7 @@ tokio = { version = "1.37.0", default-features = false, features = ["full"] }
 rustls = { version = "0.23.26", optional = true }
 rustls-pemfile = { version = "2.2.0", features = ["std"], optional = true }
 anthropic-ai-sdk = { version = "0.2.24", optional = true }
+x-ai = { version = "0.0.1", optional = true }
 derive_builder = "0.20.2"
 
 [features]
@@ -59,6 +60,7 @@ mail = ["nylas"]
 git = ["git2"]
 gem = ["gems"]
 oai = ["openai_dive"]
+xai = ["x-ai"]
 cld = ["anthropic-ai-sdk"]
 mem = ["pinecone-sdk"]
 cli = [
