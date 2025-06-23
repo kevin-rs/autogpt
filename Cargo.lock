@@ -1576,9 +1576,9 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "openai_dive"
-version = "1.0.0"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8731f8f3f709aee513dc9b1c9b0ffeec04895e5f91156ac18b3be4c4396bf055"
+checksum = "c380d863b100eb47675c894e44b9eb80ed8644adf687cccd41aa3b8347740863"
 dependencies = [
  "bytes",
  "derive_builder",
