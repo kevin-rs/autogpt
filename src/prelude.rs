@@ -50,13 +50,19 @@ use gems::{
     traits::CTrait,
 };
 
+#[cfg(feature = "xai")]
+use x_ai::{
+    chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
+    traits::ChatCompletionsFetcher,
+};
+
 #[derive(Builder, Default, Clone)]
 #[allow(unreachable_code)]
 #[builder(setter(into, strip_option), default)]
 pub struct AutoGPT {
     /// Unique identifier for the agent.
     pub id: Uuid,
-    /// Represents a provider for interacting with an AI API (OpenAI, Gemini, or Claude).
+    /// Represents a provider for interacting with an AI API (OpenAI, Gemini, Claude, or XAI).
     pub provider: ClientType,
     /// Represents AI tools to be used by the AI provider.
     pub tools: Vec<Tool>,
@@ -96,6 +102,9 @@ impl AutoGPT {
                     .collect::<Vec<_>>()
                     .join("\n"),
             },
+
+            #[cfg(feature = "xai")]
+            Some(Message::Xai(XaiMessage { role, content })) if role == "user" => content.clone(),
 
             _ => "No task description provided.".to_string(),
         };
@@ -321,6 +330,88 @@ impl AutoGPT {
                         }
                     }
                 }
+
+                #[cfg(feature = "xai")]
+                ClientType::Xai(xai_client) => {
+                    let messages = vec![XaiMessage {
+                        role: "user".to_string(),
+                        content: request.to_string(),
+                    }];
+
+                    let request_builder = ChatCompletionsRequestBuilder::new(
+                        xai_client.clone(),
+                        "grok-beta".to_string(),
+                        messages,
+                    )
+                    .temperature(0.0)
+                    .stream(false);
+
+                    let request = match request_builder.clone().build() {
+                        Ok(req) => req,
+                        Err(err) => {
+                            let error_message = format!("Failed to build Xai request: {}", err);
+                            self.agent.add_communication(Communication {
+                                role: Cow::Borrowed("assistant"),
+                                content: Cow::Owned(error_message.clone()),
+                            });
+                            #[cfg(feature = "mem")]
+                            {
+                                let _ = self
+                                    .save_ltm(Communication {
+                                        role: Cow::Borrowed("assistant"),
+                                        content: Cow::Owned(error_message.clone()),
+                                    })
+                                    .await;
+                            }
+                            return Err(anyhow!(error_message));
+                        }
+                    };
+
+                    let response = request_builder.create_chat_completion(request).await;
+                    match response {
+                        Ok(chat_response) => {
+                            let response_text = chat_response.choices[0].message.content.clone();
+
+                            self.agent.add_communication(Communication {
+                                role: Cow::Borrowed("assistant"),
+                                content: Cow::Owned(response_text.clone()),
+                            });
+
+                            #[cfg(feature = "mem")]
+                            {
+                                let _ = self
+                                    .save_ltm(Communication {
+                                        role: Cow::Borrowed("assistant"),
+                                        content: Cow::Owned(response_text.clone()),
+                                    })
+                                    .await;
+                            }
+
+                            strip_code_blocks(&response_text)
+                        }
+
+                        Err(err) => {
+                            let error_text = format!("Error generating backend code: {}", err);
+                            self.agent.add_communication(Communication {
+                                role: Cow::Borrowed("assistant"),
+                                content: Cow::Owned(error_text.clone()),
+                            });
+
+                            #[cfg(feature = "mem")]
+                            {
+                                let _ = self
+                                    .save_ltm(Communication {
+                                        role: Cow::Borrowed("assistant"),
+                                        content: Cow::Owned(error_text.clone()),
+                                    })
+                                    .await;
+                            }
+
+                            Default::default()
+                        }
+                    }
+                }
+
                 #[allow(unreachable_patterns)]
                 _ => {
                     return Err(anyhow!(

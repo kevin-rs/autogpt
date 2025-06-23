@@ -109,6 +109,9 @@ use anthropic_ai_sdk::{
     types::message::{Message as AnthMessage, MessageError},
 };
 
+#[cfg(feature = "xai")]
+use x_ai::{chat_compl::Message as XaiMessage, client::XaiClient, traits::ClientConfig};
+
 /// Enum representing supported AI clients.
 #[derive(Debug, Clone)]
 pub enum ClientType {
@@ -123,6 +126,10 @@ pub enum ClientType {
     /// Anthropic Gemini client.
     #[cfg(feature = "cld")]
     Anthropic(AnthropicClient),
+
+    /// XAI Grok client.
+    #[cfg(feature = "xai")]
+    Xai(XaiClient),
 }
 
 impl Default for ClientType {
@@ -158,11 +165,22 @@ impl ClientType {
             return ClientType::Anthropic(client);
         }
 
+        #[cfg(feature = "xai")]
+        if provider == "xai" {
+            let api_key = var("XAI_API_KEY").expect("Missing XAI_API_KEY");
+            let client = XaiClient::builder()
+                .build()
+                .expect("Failed to build XaiClient");
+
+            client.set_api_key(api_key);
+            return ClientType::Xai(client);
+        }
+
         #[allow(unreachable_code)]
         {
             panic!(
                 "Invalid AI_PROVIDER `{}` or missing required feature flags. \
-                Make sure to enable at least one of: `oai`, `gem`, `cld`.",
+                Make sure to enable at least one of: `oai`, `gem`, `cld`, `xai`.",
                 provider
             );
         }
@@ -562,7 +580,11 @@ pub enum Model {
 
     /// Anthropic claude model.
     #[cfg(feature = "cld")]
-    Claude(String), // Example: "claude-3-7-sonnet-latest"
+    Claude(String),
+
+    /// XAI grok model.
+    #[cfg(feature = "xai")]
+    Xai(String),
 }
 
 impl Default for Model {
@@ -582,10 +604,18 @@ impl Default for Model {
             return Model::Gemini(GeminiModel::Flash20);
         }
 
-        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
+        #[cfg(all(
+            not(any(feature = "oai", feature = "cld", feature = "gem")),
+            feature = "xai"
+        ))]
+        {
+            return Model::Xai("grok-beta".to_string());
+        }
+
+        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai")))]
         {
             panic!(
-                "At least one of the features `oai`, `gem`, or `cld` must be enabled for Model::default()"
+                "At least one of the features `oai`, `gem`, `cld`, or `xai` must be enabled for Model::default()"
             );
         }
     }
@@ -601,9 +631,13 @@ pub enum Message {
     #[cfg(feature = "gem")]
     Gemini(GeminiMessage),
 
-    /// Anthropic claude type.
+    /// Anthropic claude message type.
     #[cfg(feature = "cld")]
     Claude(AnthMessage),
+
+    /// Xai grok message type.
+    #[cfg(feature = "xai")]
+    Xai(XaiMessage),
 }
 
 impl Default for Message {
@@ -629,10 +663,21 @@ impl Default for Message {
             });
         }
 
-        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
+        #[cfg(all(
+            not(any(feature = "oai", feature = "cld", feature = "gem")),
+            feature = "xai"
+        ))]
+        {
+            return Message::Xai(XaiMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            });
+        }
+
+        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai")))]
         {
             panic!(
-                "At least one of the features `oai`, `gem`, or `cld` must be enabled for Message::default()"
+                "At least one of the features `oai`, `gem`, `cld`, or `xai` must be enabled for Message::default()"
             );
         }
     }
@@ -661,10 +706,21 @@ impl Message {
             });
         }
 
-        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld")))]
+        #[cfg(all(
+            not(any(feature = "oai", feature = "cld", feature = "gem")),
+            feature = "xai"
+        ))]
+        {
+            return Message::Xai(XaiMessage {
+                role: "user".to_string(),
+                content: _text.into(),
+            });
+        }
+
+        #[cfg(not(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai")))]
         {
             panic!(
-                "At least one of the features `oai`, `gem`, or `cld` must be enabled for Message::from_text()"
+                "At least one of the features `oai`, `gem`, `cld`, or `xai` must be enabled for Message::from_text()"
             );
         }
     }

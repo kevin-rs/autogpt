@@ -36,6 +36,13 @@ use gems::{
     messages::{Content, Message as GemMessage},
     traits::CTrait,
 };
+
+#[cfg(feature = "xai")]
+use x_ai::{
+    chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
+    traits::ChatCompletionsFetcher,
+};
+
 /// Struct representing a `MailerGPT`, which manages email processing and text generation using Nylas and Gemini API.
 pub struct MailerGPT {
     /// Represents the GPT agent responsible for handling email processing and text generation.
@@ -338,10 +345,80 @@ impl MailerGPT {
                     }
                 }
             }
+            #[cfg(feature = "xai")]
+            ClientType::Xai(xai_client) => {
+                let messages = vec![XaiMessage {
+                    role: "user".into(),
+                    content: format!("User Request:{}\n\nEmails:{:?}", prompt, emails),
+                }];
+
+                let rb = ChatCompletionsRequestBuilder::new(
+                    xai_client.clone(),
+                    "grok-beta".into(),
+                    messages,
+                )
+                .temperature(0.0)
+                .stream(false);
+
+                let req = rb.clone().build()?;
+                let resp = rb.create_chat_completion(req).await;
+
+                match resp {
+                    Ok(chat) => {
+                        let response_text = chat.choices[0].message.content.clone();
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(response_text.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(response_text.clone()),
+                                })
+                                .await;
+                        }
+
+                        #[cfg(debug_assertions)]
+                        debug!(
+                            "[*] {:?}: Got XAI Output: {:?}",
+                            self.agent.position(),
+                            response_text
+                        );
+
+                        response_text
+                    }
+
+                    Err(err) => {
+                        let err_msg = format!("Failed to generate content from emails: {}", err);
+
+                        self.agent.add_communication(Communication {
+                            role: Cow::Borrowed("assistant"),
+                            content: Cow::Owned(err_msg.clone()),
+                        });
+
+                        #[cfg(feature = "mem")]
+                        {
+                            let _ = self
+                                .save_ltm(Communication {
+                                    role: Cow::Borrowed("assistant"),
+                                    content: Cow::Owned(err_msg.clone()),
+                                })
+                                .await;
+                        }
+
+                        return Err(anyhow::anyhow!(err_msg));
+                    }
+                }
+            }
+
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(anyhow::anyhow!(
-                    "No valid AI client configured. Enable `gem` or `oai` feature."
+                    "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
                 ));
             }
         };
