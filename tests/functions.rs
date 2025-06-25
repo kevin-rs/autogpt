@@ -1,8 +1,10 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use autogpt::agents::agent::AgentGPT;
 use autogpt::common::utils::Communication;
 use autogpt::common::utils::{Route, Scope, Tasks};
 use autogpt::traits::agent::Agent;
+use autogpt::traits::functions::AsyncFunctions;
 use autogpt::traits::functions::Functions;
 use serde_json::json;
 use std::borrow::Cow;
@@ -17,10 +19,13 @@ impl Functions for MockFunctions {
     fn get_agent(&self) -> &AgentGPT {
         &self.agent
     }
+}
 
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+#[async_trait]
+impl AsyncFunctions for MockFunctions {
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,

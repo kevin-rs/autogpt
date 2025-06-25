@@ -3,15 +3,16 @@ use colored::*;
 use git2::{IndexAddOption, Repository, Signature};
 use std::borrow::Cow;
 use std::env::var;
-use std::fs;
-use std::path::Path;
+use tokio::fs;
+use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::Communication;
 use crate::common::utils::{Status, Tasks};
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
+use async_trait::async_trait;
 use std::fmt;
 
 /// Struct representing GitGPT, a thread-safe Git-aware task executor integrated with a GPT agent.
@@ -22,7 +23,9 @@ pub struct GitGPT {
     /// GPT-based agent handling task status and communication.
     agent: AgentGPT,
     /// A handle to the local Git repository.
-    repo: Repository,
+    repo: Mutex<Repository>,
+    /// Git repository path.
+    repo_path: String,
 }
 
 /// Implements manual cloning for GitGPT.
@@ -35,10 +38,12 @@ impl Clone for GitGPT {
         let repo = Repository::open(&*self.workspace)
             .expect("Failed to reopen Git repository during clone");
 
+        let repo_path = repo.path().to_string_lossy().to_string();
         Self {
             workspace: self.workspace.clone(),
             agent: self.agent.clone(),
-            repo,
+            repo: repo.into(),
+            repo_path,
         }
     }
 }
@@ -54,7 +59,7 @@ impl fmt::Debug for GitGPT {
             .field("workspace", &self.workspace)
             .field("agent", &self.agent)
             .field("repo", &"Repository { ... }")
-            .field("repo_path", &self.repo.path().to_str())
+            .field("repo_path", &self.repo_path)
             .finish()
     }
 }
@@ -76,22 +81,29 @@ impl GitGPT {
     /// - Sets up the Git workspace directory.
     /// - Initializes or opens a Git repository.
     /// - Creates a GPT agent with the provided objective and position.
-    pub fn new(objective: &'static str, position: &'static str) -> Self {
+    pub async fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace/".to_string());
 
-        if !Path::new(&workspace).exists() {
-            if let Err(e) = fs::create_dir_all(&workspace) {
-                error!("Failed to create workspace '{}': {}", workspace, e);
+        if !fs::try_exists(&workspace).await.unwrap_or(false) {
+            match fs::create_dir_all(&workspace).await {
+                Ok(_) => debug!("Directory '{}' created successfully!", workspace),
+                Err(e) => error!("Error creating directory '{}': {}", workspace, e),
             }
+        } else {
+            debug!("Workspace directory '{}' already exists.", workspace);
         }
 
         let agent = AgentGPT::new_borrowed(objective, position);
 
-        let repo = if Path::new(&format!("{}/.git", &workspace)).exists() {
+        let repo = if fs::try_exists(format!("{}/.git", &workspace))
+            .await
+            .unwrap_or(false)
+        {
             Repository::open(&workspace).expect("Failed to open existing repository")
         } else {
             Repository::init(&workspace).expect("Failed to initialize git repository")
         };
+        let repo_path = repo.path().to_string_lossy().to_string();
 
         info!(
             "{}",
@@ -100,8 +112,9 @@ impl GitGPT {
 
         Self {
             workspace: workspace.into(),
-            repo,
+            repo: Mutex::new(repo),
             agent,
+            repo_path,
         }
     }
 
@@ -129,8 +142,9 @@ impl GitGPT {
     /// # Errors
     ///
     /// Returns an error if file indexing or writing fails.
-    fn stage_all(&self) -> Result<()> {
-        let mut index = self.repo.index().context("Failed to get index")?;
+    async fn stage_all(&self) -> Result<()> {
+        let repo = self.repo.lock().await;
+        let mut index = repo.index().context("Failed to get index")?;
         index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
         index.write().context("Failed to write index")?;
         Ok(())
@@ -149,26 +163,26 @@ impl GitGPT {
     /// # Errors
     ///
     /// Returns an error if writing the tree or commit fails.
-    fn commit_changes(&self, message: &str) -> Result<()> {
+    async fn commit_changes(&self, message: &str) -> Result<()> {
+        let repo = self.repo.lock().await;
+
         let sig = self.author_signature();
 
         let tree_oid = {
-            let mut index = self.repo.index()?;
+            let mut index = repo.index()?;
             index.write_tree()?
         };
 
-        let tree = self.repo.find_tree(tree_oid)?;
+        let tree = repo.find_tree(tree_oid)?;
 
-        let parent_commit = match self.repo.head().ok().and_then(|h| h.target()) {
-            Some(oid) => vec![self.repo.find_commit(oid)?],
+        let parent_commit = match repo.head().ok().and_then(|h| h.target()) {
+            Some(oid) => vec![repo.find_commit(oid)?],
             None => vec![],
         };
 
         let parents: Vec<&git2::Commit> = parent_commit.iter().collect();
 
-        let commit_oid = self
-            .repo
-            .commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?;
+        let commit_oid = repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?;
 
         info!(
             "{}",
@@ -184,20 +198,24 @@ impl GitGPT {
     }
 }
 
-/// Implementation of the `Functions` trait for `GitGPT`.
-///
-/// Provides access to the agent and defines asynchronous task execution,
-/// including staging and committing changes in a Git repository.
 impl Functions for GitGPT {
-    /// Returns a reference to the internal agent.
+    /// Retrieves a reference to the agent.
     ///
     /// # Returns
     ///
-    /// (`&AgentGPT`): Reference to the embedded GPT agent.
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
     fn get_agent(&self) -> &AgentGPT {
         &self.agent
     }
+}
 
+/// Implementation of the `AsyncFunctions` trait for `GitGPT`.
+///
+/// Provides access to the agent and defines asynchronous task execution,
+/// including staging and committing changes in a Git repository.
+#[async_trait]
+impl AsyncFunctions for GitGPT {
     /// Executes a Git commit task asynchronously based on agent status.
     ///
     /// # Arguments
@@ -219,9 +237,9 @@ impl Functions for GitGPT {
     /// - Logs the task description.
     /// - If agent is idle, stages files and creates a commit.
     /// - Updates agent status to completed after successful commit.
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
@@ -246,9 +264,12 @@ impl Functions for GitGPT {
             Status::Idle => {
                 debug!("Agent is idle, proceeding to stage and commit files.");
 
-                self.stage_all().context("Staging files with git2 failed")?;
+                self.stage_all()
+                    .await
+                    .context("Staging files with git2 failed")?;
 
                 self.commit_changes(&tasks.description)
+                    .await
                     .context("Git commit failed")?;
 
                 self.agent.update(Status::Completed);
@@ -337,5 +358,47 @@ impl Functions for GitGPT {
             .map(|c| format!("{}: {}", c.role, c.content))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+}
+
+impl Default for GitGPT {
+    fn default() -> Self {
+        let temp_path = "/tmp/gitgpt";
+
+        let repo =
+            Repository::init(temp_path).expect("Failed to initialize default Git repository");
+
+        GitGPT {
+            workspace: Cow::Borrowed(temp_path),
+            agent: AgentGPT::default(),
+            repo: Mutex::new(repo),
+            repo_path: temp_path.to_string(),
+        }
+    }
+}
+
+impl Agent for GitGPT {
+    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
+        Default::default()
+    }
+
+    fn update(&mut self, status: Status) {
+        self.agent.update(status);
+    }
+
+    fn objective(&self) -> &Cow<'static, str> {
+        &self.agent.objective
+    }
+
+    fn position(&self) -> &Cow<'static, str> {
+        &self.agent.position
+    }
+
+    fn status(&self) -> &Status {
+        &self.agent.status
+    }
+
+    fn memory(&self) -> &Vec<Communication> {
+        &self.agent.memory
     }
 }

@@ -189,77 +189,31 @@ use autogpt::prelude::*;
 
 #[tokio::main]
 async fn main() {
-    let mut autogpt = AutoGPTBuilder::default()
+    let position = "Lead UX/UI Designer";
+
+    let prompt = "Generate a diagram for a simple web application running on Kubernetes.";
+
+    let agent = ArchitectGPT::new(prompt, position).await;
+
+    let autogpt = AutoGPT::default()
+        .with(agents![agent])
         .build()
         .expect("Failed to build AutoGPT");
 
-    let msg = Message::default();
-
-    let result = autogpt.run(vec![msg.clone()]).await;
-    println!("{:?}", result);
+    match autogpt.run().await {
+        Ok(response) => {
+            println!("{}", response);
+        }
+        Err(err) => {
+            eprintln!("Agent error: {:?}", err);
+        }
+    }
 }
 ```
 
 ### 💡 Example Use Cases
 
 Below are a few example patterns to help you integrate agents for various tasks:
-
-#### 🧠 General Purpose Agent
-
-```rust
-use autogpt::prelude::*;
-
-#[tokio::main]
-async fn main() {
-    let mut autogpt = AutoGPTBuilder::default()
-        .tools(vec![])
-        .build()
-        .unwrap();
-
-    let msg = Message::from_text("Draft a proposal for a startup accelerator.");
-    let response = autogpt.run(vec![msg]).await.unwrap();
-
-    println!("Proposal:\n{}", response);
-}
-```
-
-#### 🔎 Research Agent (Web + Calculator)
-
-```rust, no_run
-use autogpt::prelude::*;
-
-#[tokio::main]
-async fn main() {
-    let mut agent = AutoGPTBuilder::default()
-        .tools(vec![Tool::Search, Tool::Calc])
-        .build()
-        .unwrap();
-
-    let task = Message::from_text("Compare the cost of living between Berlin and Tokyo.");
-    let output = agent.run(vec![task]).await.unwrap();
-
-    println!("Comparison:\n{}", output);
-}
-```
-
-#### 🎨 Designer Agent (Image UI Generator)
-
-```rust, no_run
-use autogpt::prelude::*;
-
-#[tokio::main]
-async fn main() {
-    let mut agent = AutoGPTBuilder::default()
-        .tools(vec![Tool::ImgGen])
-        .build()
-        .unwrap();
-
-    let task = Message::from_text("Design a modern dashboard UI for a weather app.");
-    let result = agent.run(vec![task]).await.unwrap();
-
-    println!("Design output:\n{}", result);
-}
-```
 
 #### 🛠️ Backend API Generator
 
@@ -268,34 +222,170 @@ use autogpt::prelude::*;
 
 #[tokio::main]
 async fn main() {
-    let mut agent = AutoGPTBuilder::default()
-        .tools(vec![Tool::Backend])
+    let position = "Backend Developer";
+
+    let prompt = "Develop a weather backend apis in Rust using axum.";
+
+    let agent = BackendGPT::new(prompt, position, "rust").await;
+
+    let autogpt = AutoGPT::default()
+        .with(agents![agent])
         .build()
-        .unwrap();
+        .expect("Failed to build AutoGPT");
 
-    let task = Message::from_text("Generate a FastAPI backend for a todo list app.");
-    let result = agent.run(vec![task]).await.unwrap();
-
-    println!("Generated backend:\n{}", result);
+    match autogpt.run().await {
+        Ok(response) => {
+            println!("{}", response);
+        }
+        Err(err) => {
+            eprintln!("Agent error: {:?}", err);
+        }
+    }
 }
 ```
 
-#### 🧬 Custom Agent with No Tools
+#### 🎨 Frontend UI Designer
 
 ```rust
 use autogpt::prelude::*;
 
 #[tokio::main]
 async fn main() {
-    let mut agent = AutoGPTBuilder::default()
-        .tools(vec![])
+    let position = "UX/UI Designer";
+
+    let prompt = "Generate UI for a weather app using React JS.";
+
+    let agent = FrontendGPT::new(prompt, position, "javascript").await;
+
+    let autogpt = AutoGPT::default()
+        .with(agents![agent])
         .build()
-        .unwrap();
+        .expect("Failed to build AutoGPT");
 
-    let task = Message::from_text("Brainstorm innovative fintech app ideas.");
-    let result = agent.run(vec![task]).await.unwrap();
+    match autogpt.run().await {
+        Ok(response) => {
+            println!("{}", response);
+        }
+        Err(err) => {
+            eprintln!("Agent error: {:?}", err);
+        }
+    }
+}
+```
 
-    println!("Ideas:\n{}", result);
+#### 🧠 Custom General Purpose Agent
+
+```rust
+use autogpt::prelude::*;
+
+/// An agent must implement the `Agent`, `Functions` and `AsyncFunctions` traits to be run in AutoGPT.
+#[derive(Debug, Default)]
+pub struct MockAgent {
+    objective: Cow<'static, str>,
+    position: Cow<'static, str>,
+    status: Status,
+    agent: AgentGPT,
+    memory: Vec<Communication>,
+}
+
+impl Agent for MockAgent {
+    fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
+        Default::default()
+    }
+
+    fn update(&mut self, status: Status) {
+        self.status = status;
+    }
+
+    fn objective(&self) -> &Cow<'static, str> {
+        &self.objective
+    }
+
+    fn position(&self) -> &Cow<'static, str> {
+        &self.position
+    }
+
+    fn status(&self) -> &Status {
+        &self.status
+    }
+
+    fn memory(&self) -> &Vec<Communication> {
+        &self.memory
+    }
+}
+
+impl Functions for MockAgent {
+    fn get_agent(&self) -> &AgentGPT {
+        &self.agent
+    }
+}
+
+#[async_trait]
+impl AsyncFunctions for MockAgent {
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
+        _execute: bool,
+        _browse: bool,
+        _max_tries: u64,
+    ) -> Result<()> {
+        Ok(())
+    }
+    async fn save_ltm(&mut self, _communication: Communication) -> Result<()> {
+        Ok(())
+    }
+    async fn get_ltm(&self) -> Result<Vec<Communication>> {
+        Ok(vec![
+            Communication {
+                role: Cow::Borrowed("system"),
+                content: Cow::Borrowed("System initialized."),
+            },
+            Communication {
+                role: Cow::Borrowed("user"),
+                content: Cow::Borrowed("Hello, autogpt!"),
+            },
+        ])
+    }
+    async fn ltm_context(&self) -> String {
+        let comms = [
+            Communication {
+                role: Cow::Borrowed("system"),
+                content: Cow::Borrowed("System initialized."),
+            },
+            Communication {
+                role: Cow::Borrowed("user"),
+                content: Cow::Borrowed("Hello, autogpt!"),
+            },
+        ];
+        comms
+            .iter()
+            .map(|c| format!("{}: {}", c.role, c.content))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let position = "General Purpose Agent";
+
+    let prompt = "Can do anything.";
+
+    let agent = MockAgent::new(prompt.into(), position.into());
+
+    let autogpt = AutoGPT::default()
+        .with(agents![agent])
+        .build()
+        .expect("Failed to build AutoGPT");
+
+    match autogpt.run().await {
+        Ok(response) => {
+            println!("{}", response);
+        }
+        Err(err) => {
+            eprintln!("Agent error: {:?}", err);
+        }
+    }
 }
 ```
 

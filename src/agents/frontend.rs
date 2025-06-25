@@ -11,6 +11,7 @@
 //! use autogpt::agents::frontend::FrontendGPT;
 //! use autogpt::common::utils::Tasks;
 //! use autogpt::traits::functions::Functions;
+//! use autogpt::traits::functions::AsyncFunctions;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -18,7 +19,7 @@
 //!         "Generate frontend code",
 //!         "Frontend Developer",
 //!         "rust",
-//!     );
+//!     ).await;
 //!
 //!     let mut tasks = Tasks {
 //!         description: "Create a landing page with a sign-up form".into(),
@@ -43,17 +44,17 @@ use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
 use colored::*;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
-use std::fs;
-use std::io::Read;
-use std::process::Command;
 use std::process::Stdio;
 use std::time::Duration;
+use tokio::fs;
+use tokio::io::AsyncReadExt;
+use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 
 #[cfg(feature = "mem")]
@@ -77,6 +78,7 @@ use gems::{
     traits::CTrait,
 };
 
+use async_trait::async_trait;
 #[cfg(feature = "xai")]
 use x_ai::{
     chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
@@ -84,7 +86,7 @@ use x_ai::{
 };
 
 /// Struct representing a `FrontendGPT`, which manages frontend code generation and testing using Gemini API.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[allow(unused)]
 pub struct FrontendGPT {
     /// Represents the workspace directory path for `FrontendGPT`.
@@ -123,14 +125,23 @@ impl FrontendGPT {
     /// - Creates clients for interacting with Gemini API
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
+    pub async fn new(
+        objective: &'static str,
+        position: &'static str,
+        language: &'static str,
+    ) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())
             .to_owned()
             + "frontend";
 
-        if let Err(e) = fs::create_dir_all(workspace.clone()) {
-            error!("Error creating directory '{}': {}", workspace, e);
+        if !fs::try_exists(&workspace).await.unwrap_or(false) {
+            match fs::create_dir_all(&workspace).await {
+                Ok(_) => debug!("Directory '{}' created successfully!", workspace),
+                Err(e) => error!("Error creating directory '{}': {}", workspace, e),
+            }
+        } else {
+            debug!("Workspace directory '{}' already exists.", workspace);
         }
 
         match language {
@@ -144,17 +155,17 @@ impl FrontendGPT {
                     Ok(_) => debug!("Cargo project initialized successfully!"),
                     Err(e) => error!("Error initializing Cargo project: {}", e),
                 }
-                match fs::write(workspace.clone() + "/src/template.rs", "") {
+                match fs::write(workspace.clone() + "/src/template.rs", "").await {
                     Ok(_) => debug!("File 'template.rs' created successfully!"),
                     Err(e) => error!("Error creating file 'template.rs': {}", e),
                 };
             }
             "python" => {
-                match fs::write(workspace.clone() + "/main.py", "") {
+                match fs::write(workspace.clone() + "/main.py", "").await {
                     Ok(_) => debug!("File 'main.py' created successfully!"),
                     Err(e) => error!("Error creating file 'main.py': {}", e),
                 }
-                match fs::write(workspace.clone() + "/template.py", "") {
+                match fs::write(workspace.clone() + "/template.py", "").await {
                     Ok(_) => debug!("File 'template.py' created successfully!"),
                     Err(e) => error!("Error creating file 'template.py': {}", e),
                 };
@@ -168,7 +179,7 @@ impl FrontendGPT {
                     .spawn();
 
                 match npx_install {
-                    Ok(mut child) => match child.wait() {
+                    Ok(mut child) => match child.wait().await {
                         Ok(status) => {
                             if status.success() {
                                 debug!("React JS project initialized successfully!");
@@ -184,7 +195,7 @@ impl FrontendGPT {
                         error!("Error initializing React JS project: {}", e);
                     }
                 }
-                match fs::write(workspace.clone() + "/src/template.js", "") {
+                match fs::write(workspace.clone() + "/src/template.js", "").await {
                     Ok(_) => debug!("File 'template.js' created successfully!"),
                     Err(e) => error!("Error creating file 'template.js': {}", e),
                 };
@@ -274,7 +285,7 @@ impl FrontendGPT {
 
         debug!("[*] {:?}: {:?}", self.agent.position(), full_path);
 
-        let template = fs::read_to_string(&full_path)?;
+        let template = fs::read_to_string(&full_path).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -517,7 +528,7 @@ impl FrontendGPT {
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(&frontend_path, gemini_response.clone())?;
+        fs::write(&frontend_path, gemini_response.clone()).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -842,7 +853,7 @@ impl FrontendGPT {
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(&frontend_path, gemini_response.clone())?;
+        fs::write(&frontend_path, gemini_response.clone()).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -1175,7 +1186,7 @@ impl FrontendGPT {
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(&frontend_path, gemini_response.clone())?;
+        fs::write(&frontend_path, gemini_response.clone()).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -1235,7 +1246,19 @@ impl FrontendGPT {
     }
 }
 
-/// Implementation of the trait Functions for FrontendGPT.
+impl Functions for FrontendGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
+    fn get_agent(&self) -> &AgentGPT {
+        &self.agent
+    }
+}
+
+/// Implementation of the trait `AsyncFunctions` for FrontendGPT.
 /// Contains additional methods related to frontend tasks.
 ///
 /// This trait provides methods for:
@@ -1249,18 +1272,8 @@ impl FrontendGPT {
 /// - Executes frontend tasks asynchronously based on the current status of the agent.
 /// - Handles task execution including code generation, improvement, bug fixing, and testing.
 /// - Manages retries and error handling during task execution.
-///
-impl Functions for FrontendGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-
+#[async_trait]
+impl AsyncFunctions for FrontendGPT {
     /// Asynchronously executes frontend tasks associated with FrontendGPT.
     ///
     /// # Arguments
@@ -1283,9 +1296,9 @@ impl Functions for FrontendGPT {
     /// - Handles task execution including code generation, improvement, bug fixing, and testing.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         execute: bool,
         _browse: bool,
         max_tries: u64,
@@ -1392,12 +1405,12 @@ impl Functions for FrontendGPT {
                         Ok(mut child) => {
                             self.nb_bugs += 1;
                             let mut stderr_output = String::new();
-                            child
+                            let _ = child
                                 .stderr
                                 .as_mut()
                                 .expect("Failed to capture build stderr")
                                 .read_to_string(&mut stderr_output)
-                                .expect("Failed to read build stderr");
+                                .await;
                             if self.nb_bugs > max_tries {
                                 error!(
                                     "{}",
@@ -1496,5 +1509,31 @@ impl Functions for FrontendGPT {
     #[cfg(feature = "mem")]
     async fn ltm_context(&self) -> String {
         long_term_memory_context(self.agent.id.clone()).await
+    }
+}
+
+impl Agent for FrontendGPT {
+    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
+        Default::default()
+    }
+
+    fn update(&mut self, status: Status) {
+        self.agent.update(status);
+    }
+
+    fn objective(&self) -> &Cow<'static, str> {
+        &self.agent.objective
+    }
+
+    fn position(&self) -> &Cow<'static, str> {
+        &self.agent.position
+    }
+
+    fn status(&self) -> &Status {
+        &self.agent.status
+    }
+
+    fn memory(&self) -> &Vec<Communication> {
+        &self.agent.memory
     }
 }

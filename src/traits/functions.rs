@@ -1,6 +1,6 @@
-//! # `Functions` trait.
+//! # `Functions` and `AsyncFunctions` traits.
 //!
-//! This trait defines special functions for agents.
+//! These traits define special functions for agents.
 //!
 //! # Examples
 //!
@@ -9,7 +9,9 @@
 //! use autogpt::common::utils::Tasks;
 //! use anyhow::Result;
 //! use autogpt::traits::functions::Functions;
+//! use autogpt::traits::functions::AsyncFunctions;
 //! use autogpt::common::utils::Communication;
+//! use autogpt::prelude::async_trait;
 //! use std::borrow::Cow;
 //!
 //!
@@ -38,7 +40,10 @@
 //!     fn get_agent(&self) -> &AgentGPT {
 //!         &self.agent
 //!     }
+//! }
 //!
+//! #[async_trait]
+//! impl AsyncFunctions for SpecialFunctions {
 //!     /// Execute special functions for an agent.
 //!     ///
 //!     /// # Arguments
@@ -50,7 +55,13 @@
 //!     /// # Returns
 //!     ///
 //!     /// A result indicating success or failure.
-//!     async fn execute(&mut self, tasks: &mut Tasks, execute: bool, _browse: bool, max_tries: u64) -> Result<()> {
+//!     async fn execute<'a>(
+//!        &'a mut self,
+//!        tasks: &'a mut Tasks,
+//!        _execute: bool,
+//!        _browse: bool,
+//!        _max_tries: u64,
+//!     ) -> Result<()> {
 //!         Ok(())
 //!     }
 //!
@@ -116,8 +127,9 @@ use crate::agents::agent::AgentGPT;
 use crate::common::utils::Communication;
 use crate::common::utils::Tasks;
 use anyhow::Result;
+use async_trait::async_trait;
 
-/// Trait defining special functions for agents.
+/// Trait to retrieve an agent.
 pub trait Functions {
     /// Get attributes from an agent.
     ///
@@ -125,7 +137,11 @@ pub trait Functions {
     ///
     /// A reference to the agent.
     fn get_agent(&self) -> &AgentGPT;
+}
 
+/// Trait defining special functions for agents.\
+#[async_trait]
+pub trait AsyncFunctions: Send + Sync {
     /// Execute special functions for an agent.
     ///
     /// # Arguments
@@ -139,9 +155,9 @@ pub trait Functions {
     ///
     /// A result indicating success or failure.
     #[allow(async_fn_in_trait)]
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         execute: bool,
         browse: bool,
         max_tries: u64,
@@ -158,7 +174,7 @@ pub trait Functions {
     /// A result indicating success or failure.
     #[allow(async_fn_in_trait)]
     #[cfg(feature = "mem")]
-    async fn save_ltm(&mut self, communication: Communication) -> Result<()>;
+    async fn save_ltm<'a>(&'a mut self, communication: Communication) -> Result<()>;
 
     /// Get the long-term memory of an agent.
     ///
@@ -167,7 +183,7 @@ pub trait Functions {
     /// A result containing a vector of communications.
     #[allow(async_fn_in_trait)]
     #[cfg(feature = "mem")]
-    async fn get_ltm(&self) -> Result<Vec<Communication>>;
+    async fn get_ltm<'a>(&'a self) -> Result<Vec<Communication>>;
 
     /// Retrieve the long-term memory context as a string.
     ///
@@ -176,5 +192,5 @@ pub trait Functions {
     /// A string containing the concatenated context of the agent's memory.
     #[allow(async_fn_in_trait)]
     #[cfg(feature = "mem")]
-    async fn ltm_context(&self) -> String;
+    async fn ltm_context<'a>(&'a self) -> String;
 }

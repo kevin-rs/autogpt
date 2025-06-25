@@ -7,7 +7,7 @@
 use crate::agents::agent::AgentGPT;
 use crate::common::utils::{ClientType, Communication, Status, Tasks};
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
 use colored::*;
 use nylas::client::Nylas;
@@ -42,6 +42,8 @@ use x_ai::{
     chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
     traits::ChatCompletionsFetcher,
 };
+
+use async_trait::async_trait;
 
 /// Struct representing a `MailerGPT`, which manages email processing and text generation using Nylas and Gemini API.
 pub struct MailerGPT {
@@ -452,7 +454,19 @@ impl MailerGPT {
     }
 }
 
-/// Implementation of the trait Functions for MailerGPT.
+impl Functions for MailerGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
+    fn get_agent(&self) -> &AgentGPT {
+        &self.agent
+    }
+}
+
+/// Implementation of the trait `AsyncFunctions` for MailerGPT.
 /// Contains additional methods related to email processing and text generation.
 ///
 /// This trait provides methods for:
@@ -466,17 +480,8 @@ impl MailerGPT {
 /// - Executes email processing and text generation tasks asynchronously based on the current status of the agent.
 /// - Handles task execution including email retrieval and text generation.
 /// - Manages retries and error handling during task execution.
-impl Functions for MailerGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-
+#[async_trait]
+impl AsyncFunctions for MailerGPT {
     /// Asynchronously executes email processing and text generation tasks associated with MailerGPT.
     ///
     /// # Arguments
@@ -499,9 +504,9 @@ impl Functions for MailerGPT {
     /// - Handles task execution including email retrieval and text generation.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
