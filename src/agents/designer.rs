@@ -42,6 +42,7 @@ use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
+use async_trait::async_trait;
 use colored::*;
 use getimg::client::Client as ImgClient;
 use getimg::utils::save_image;
@@ -65,7 +66,6 @@ use gems::{
     vision::VisionBuilder,
 };
 
-use async_trait::async_trait;
 #[cfg(feature = "xai")]
 use x_ai::{
     chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},

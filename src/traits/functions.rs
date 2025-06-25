@@ -194,3 +194,15 @@ pub trait AsyncFunctions: Send + Sync {
     #[cfg(feature = "mem")]
     async fn ltm_context<'a>(&'a self) -> String;
 }
+
+#[async_trait]
+pub trait AgentExecutor {
+    #[allow(async_fn_in_trait)]
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
+        execute: bool,
+        browse: bool,
+        max_tries: u64,
+    ) -> Result<()>;
+}
