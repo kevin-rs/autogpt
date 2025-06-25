@@ -278,90 +278,31 @@ async fn main() {
 ```rust
 use autogpt::prelude::*;
 
-/// An agent must implement the `Agent`, `Functions` and `AsyncFunctions` traits to be run in AutoGPT.
-#[derive(Debug, Default)]
-pub struct MockAgent {
+/// To be compatible with AutoGPT, an agent must implement the `Agent`,
+/// `Functions`, and `AsyncFunctions` traits.
+/// These traits can be automatically derived using the `Auto` macro.
+/// The agent struct must contain at least the following fields.
+#[derive(Debug, Default, Auto)]
+pub struct CustomAgent {
     objective: Cow<'static, str>,
     position: Cow<'static, str>,
     status: Status,
     agent: AgentGPT,
+    client: ClientType,
     memory: Vec<Communication>,
 }
 
-impl Agent for MockAgent {
-    fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
-        Default::default()
-    }
-
-    fn update(&mut self, status: Status) {
-        self.status = status;
-    }
-
-    fn objective(&self) -> &Cow<'static, str> {
-        &self.objective
-    }
-
-    fn position(&self) -> &Cow<'static, str> {
-        &self.position
-    }
-
-    fn status(&self) -> &Status {
-        &self.status
-    }
-
-    fn memory(&self) -> &Vec<Communication> {
-        &self.memory
-    }
-}
-
-impl Functions for MockAgent {
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-}
-
 #[async_trait]
-impl AsyncFunctions for MockAgent {
+impl AgentExecutor for CustomAgent {
     async fn execute<'a>(
         &'a mut self,
         tasks: &'a mut Tasks,
-        _execute: bool,
-        _browse: bool,
-        _max_tries: u64,
+        execute: bool,
+        browse: bool,
+        max_tries: u64,
     ) -> Result<()> {
+        // Custom agent logic to interact with `client` (e.g. OpenAI, Gemini, XAI, etc).
         Ok(())
-    }
-    async fn save_ltm(&mut self, _communication: Communication) -> Result<()> {
-        Ok(())
-    }
-    async fn get_ltm(&self) -> Result<Vec<Communication>> {
-        Ok(vec![
-            Communication {
-                role: Cow::Borrowed("system"),
-                content: Cow::Borrowed("System initialized."),
-            },
-            Communication {
-                role: Cow::Borrowed("user"),
-                content: Cow::Borrowed("Hello, autogpt!"),
-            },
-        ])
-    }
-    async fn ltm_context(&self) -> String {
-        let comms = [
-            Communication {
-                role: Cow::Borrowed("system"),
-                content: Cow::Borrowed("System initialized."),
-            },
-            Communication {
-                role: Cow::Borrowed("user"),
-                content: Cow::Borrowed("Hello, autogpt!"),
-            },
-        ];
-        comms
-            .iter()
-            .map(|c| format!("{}: {}", c.role, c.content))
-            .collect::<Vec<_>>()
-            .join("\n")
     }
 }
 
@@ -371,7 +312,7 @@ async fn main() {
 
     let prompt = "Can do anything.";
 
-    let agent = MockAgent::new(prompt.into(), position.into());
+    let agent = CustomAgent::new(prompt.into(), position.into());
 
     let autogpt = AutoGPT::default()
         .with(agents![agent])

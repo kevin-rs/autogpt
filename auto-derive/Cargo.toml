@@ -1,0 +1,19 @@
+[package]
+name = "auto-derive"
+version = "0.0.1"
+edition = "2024"
+description = "autogpt macro crate."
+license = "MIT"
+keywords = ["autogpt", "autogpt-macro", "macro"]
+repository = "https://github.com/kevin-rs/autogpt"
+documentation = "https://docs.rs/auto-derive"
+authors = ["Mahmoud Harmouch <oss@wiseai.dev>"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0.104", features = ["full"] }
+quote = "1.0.40"
+proc-macro2 = "1.0.95"
+async-trait = "0.1.88"

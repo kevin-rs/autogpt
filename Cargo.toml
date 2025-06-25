@@ -53,6 +53,7 @@ anthropic-ai-sdk = { version = "0.2.24", optional = true }
 x-ai = { version = "0.0.1", optional = true }
 futures = "0.3.31"
 async-trait = "0.1.88"
+auto-derive = { path = "auto-derive", version = "0.0.1" }
 
 [features]
 default = []

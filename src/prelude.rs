@@ -1,12 +1,10 @@
 #![doc = include_str!("../INSTALLATION.md")]
 
-pub use crate::common::utils::{ClientType, Message, Model, Tool};
-
 #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
 #[allow(unused)]
 use {
-    crate::agents::git::GitGPT,
     crate::agents::designer::DesignerGPT,
+    crate::agents::git::GitGPT,
     crate::agents::mailer::MailerGPT,
     futures::future::join_all,
     tokio::task,
@@ -22,16 +20,32 @@ pub use {
     crate::agents::frontend::FrontendGPT,
     crate::agents::manager::ManagerGPT,
     crate::agents::optimizer::OptimizerGPT,
-    crate::common::utils::{Communication, Scope, Status, Tasks},
+    crate::common::utils::{ClientType, Communication, Message, Model, Scope, Status, Tasks, Tool},
     crate::traits::agent::Agent,
     crate::traits::composite::AgentFunctions,
-    crate::traits::functions::{AsyncFunctions, Functions},
+    crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions},
     anyhow::{Result, anyhow},
     async_trait::async_trait,
+    auto_derive::Auto,
     std::{borrow::Cow, sync::Arc},
     tokio::sync::Mutex,
     uuid::Uuid,
 };
+
+#[cfg(feature = "mem")]
+pub use {
+    crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
+    crate::common::memory::save_long_term_memory,
+};
+
+#[cfg(feature = "oai")]
+pub use openai_dive;
+
+#[cfg(feature = "gem")]
+pub use gems;
+
+#[cfg(feature = "xai")]
+pub use x_ai;
 
 #[derive(Default)]
 #[allow(unreachable_code)]
