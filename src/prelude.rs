@@ -1,15 +1,18 @@
 #![doc = include_str!("../INSTALLATION.md")]
 
 #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
-#[allow(unused)]
 use {
-    crate::agents::designer::DesignerGPT,
-    crate::agents::git::GitGPT,
-    crate::agents::mailer::MailerGPT,
     futures::future::join_all,
     tokio::task,
     tracing::{debug, error},
 };
+
+#[cfg(feature = "img")]
+pub use crate::agents::designer::DesignerGPT;
+#[cfg(feature = "git")]
+pub use crate::agents::git::GitGPT;
+#[cfg(feature = "mail")]
+pub use crate::agents::mailer::MailerGPT;
 
 #[allow(unused)]
 pub use {
