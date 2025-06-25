@@ -36,6 +36,7 @@ async fn main() -> Result<()> {
         use autogpt::common::utils::Tasks;
         use autogpt::common::utils::ask_to_run_command;
         use autogpt::common::utils::setup_logging;
+        use autogpt::traits::functions::AsyncFunctions;
         use autogpt::traits::functions::Functions;
         use clap::Parser;
         use std::env::var;
@@ -208,7 +209,7 @@ async fn main() -> Result<()> {
         } else if let Some(command) = args.command {
             // If a command is provided, operate in networkless (standalone agents) mode.
 
-            let mut git_agent = GitGPT::new("Commit all changes", "GitGPT");
+            let mut git_agent = GitGPT::new("Commit all changes", "GitGPT").await;
             let workspace = var("AUTOGPT_WORKSPACE")
                 .unwrap_or("workspace/".to_string())
                 .to_owned();
@@ -258,7 +259,7 @@ async fn main() -> Result<()> {
                     let objective = "Expertise at managing projects at scale";
                     let position = "ArchitectGPT";
 
-                    let mut architect_agent = ArchitectGPT::new(objective, position);
+                    let mut architect_agent = ArchitectGPT::new(objective, position).await;
 
                     let workspace = workspace + "architect";
                     info!(
@@ -343,7 +344,7 @@ async fn main() -> Result<()> {
                     let position = "FrontendGPT";
 
                     let workspace = workspace + "frontend";
-                    let mut frontend_agent = FrontendGPT::new(objective, position, language);
+                    let mut frontend_agent = FrontendGPT::new(objective, position, language).await;
 
                     info!(
                         "{}",
@@ -427,7 +428,7 @@ async fn main() -> Result<()> {
                         "Expertise lies in writing backend code for web servers and databases";
                     let position = "BackendGPT";
                     let workspace = workspace + "backend";
-                    let mut backend_gpt = BackendGPT::new(objective, position, language);
+                    let mut backend_gpt = BackendGPT::new(objective, position, language).await;
 
                     let mut tasks = Tasks {
                         description: Default::default(),
@@ -510,7 +511,7 @@ async fn main() -> Result<()> {
                 Commands::Design => {
                     let objective = "Crafts stunning web design layouts";
                     let position = "Web Designer";
-                    let mut designer_agent = DesignerGPT::new(objective, position);
+                    let mut designer_agent = DesignerGPT::new(objective, position).await;
 
                     let mut tasks = Tasks {
                         description: "".into(),
@@ -608,7 +609,7 @@ async fn main() -> Result<()> {
                     let objective = "Commit all changes";
                     let position = "GitGPT";
 
-                    let mut git_agent = GitGPT::new(objective, position);
+                    let mut git_agent = GitGPT::new(objective, position).await;
                     let mut tasks = Tasks {
                         description: "".into(),
                         scope: Some(Scope {
@@ -654,7 +655,8 @@ async fn main() -> Result<()> {
                     let objective = "Optimize and modularize backend code";
                     let position = "OptimizerGPT";
 
-                    let mut optimizer_agent = OptimizerGPT::new(objective, position, language);
+                    let mut optimizer_agent =
+                        OptimizerGPT::new(objective, position, language).await;
 
                     let mut tasks = Tasks {
                         description: "".into(),

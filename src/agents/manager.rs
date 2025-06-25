@@ -16,7 +16,7 @@ use crate::common::utils::strip_code_blocks;
 use crate::common::utils::{ClientType, Communication, Tasks};
 use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT, MANAGER_PROMPT};
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
 use colored::*;
 #[cfg(feature = "gem")]
@@ -142,31 +142,46 @@ impl ManagerGPT {
         self.agents.push(agent);
     }
 
-    fn spawn_default_agents(&mut self) {
-        self.add_agent(AgentType::Architect(ArchitectGPT::new(
-            "Creates innovative website designs and user experiences",
-            "ArchitectGPT",
-        )));
+    async fn spawn_default_agents(&mut self) {
+        self.add_agent(AgentType::Architect(
+            ArchitectGPT::new(
+                "Creates innovative website designs and user experiences",
+                "ArchitectGPT",
+            )
+            .await,
+        ));
         #[cfg(feature = "img")]
-        self.add_agent(AgentType::Designer(DesignerGPT::new(
-            "Creates innovative website designs and user experiences",
-            "DesignerGPT",
-        )));
-        self.add_agent(AgentType::Backend(BackendGPT::new(
-            "Expertise lies in writing backend code for web servers and JSON databases",
-            "BackendGPT",
-            self.language,
-        )));
-        self.add_agent(AgentType::Frontend(FrontendGPT::new(
-            "Expertise lies in writing frontend code for Yew rust framework",
-            "FrontendGPT",
-            self.language,
-        )));
+        self.add_agent(AgentType::Designer(
+            DesignerGPT::new(
+                "Creates innovative website designs and user experiences",
+                "DesignerGPT",
+            )
+            .await,
+        ));
+        self.add_agent(AgentType::Backend(
+            BackendGPT::new(
+                "Expertise lies in writing backend code for web servers and JSON databases",
+                "BackendGPT",
+                self.language,
+            )
+            .await,
+        ));
+        self.add_agent(AgentType::Frontend(
+            FrontendGPT::new(
+                "Expertise lies in writing frontend code for Yew rust framework",
+                "FrontendGPT",
+                self.language,
+            )
+            .await,
+        ));
         #[cfg(feature = "git")]
-        self.add_agent(AgentType::Git(GitGPT::new(
-            "Handles git operations like staging and committing code",
-            "GitGPT",
-        )));
+        self.add_agent(AgentType::Git(
+            GitGPT::new(
+                "Handles git operations like staging and committing code",
+                "GitGPT",
+            )
+            .await,
+        ));
     }
 
     /// Spawns default agents if the collection is empty.
@@ -503,7 +518,7 @@ impl ManagerGPT {
                 .await;
         }
         if self.agents.is_empty() {
-            self.spawn_default_agents();
+            self.spawn_default_agents().await;
             self.agent.add_communication(Communication {
                 role: Cow::Borrowed("system"),
                 content: Cow::Borrowed("No agents were available. Spawned default agents."),

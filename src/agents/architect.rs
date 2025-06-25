@@ -11,13 +11,14 @@
 //! use autogpt::agents::architect::ArchitectGPT;
 //! use autogpt::common::utils::Tasks;
 //! use autogpt::traits::functions::Functions;
+//! use autogpt::traits::functions::AsyncFunctions;
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     let mut architect_agent = ArchitectGPT::new(
 //!         "Create innovative website designs",
 //!         "Web wireframes and UIs",
-//!     );
+//!     ).await;
 //!
 //!     let mut tasks = Tasks {
 //!         description: "Design an architectural diagram for a modern chat application".into(),
@@ -44,17 +45,17 @@ use crate::prompts::architect::{
     ARCHITECT_DIAGRAM_PROMPT, ARCHITECT_ENDPOINTS_PROMPT, ARCHITECT_SCOPE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
+use async_trait::async_trait;
 use colored::*;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
-use std::fs;
-use std::path::Path;
-use std::process::Command;
 use std::process::Stdio;
 use std::time::Duration;
+use tokio::fs;
+use tokio::process::Command;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -86,7 +87,7 @@ use x_ai::{
 };
 
 /// Struct representing an ArchitectGPT, which orchestrates tasks related to architectural design using GPT.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ArchitectGPT {
     /// Represents the workspace directory path for ArchitectGPT.
     workspace: Cow<'static, str>,
@@ -118,14 +119,14 @@ impl ArchitectGPT {
     /// - Creates clients for interacting with Gemini or OpenAI API and making HTTP requests.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub fn new(objective: &'static str, position: &'static str) -> Self {
+    pub async fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())
             .to_owned()
             + "architect";
 
-        if !Path::new(&workspace).exists() {
-            match fs::create_dir_all(workspace.clone()) {
+        if !fs::try_exists(&workspace).await.unwrap_or(false) {
+            match fs::create_dir_all(&workspace).await {
                 Ok(_) => debug!("Directory '{}' created successfully!", workspace),
                 Err(e) => error!("Error creating directory '{}': {}", workspace, e),
             }
@@ -133,7 +134,7 @@ impl ArchitectGPT {
             debug!("Directory '{}' already exists.", workspace);
         }
 
-        match fs::write(workspace.clone() + "/diagram.py", "") {
+        match fs::write(workspace.clone() + "/diagram.py", "").await {
             Ok(_) => debug!("File 'diagram.py' created successfully!"),
             Err(e) => error!("Error creating file 'diagram.py': {}", e),
         }
@@ -144,7 +145,7 @@ impl ArchitectGPT {
             .arg(workspace.clone() + "/.venv")
             .status();
 
-        if let Ok(status) = create_venv {
+        if let Ok(status) = create_venv.await {
             if status.success() {
                 let pip_path = format!("{}/bin/pip", workspace.clone() + "/.venv");
                 let pip_install = Command::new(pip_path)
@@ -1142,7 +1143,20 @@ impl ArchitectGPT {
     }
 }
 
-/// Implementation of the trait `Functions` for `ArchitectGPT`.
+/// Implementation of the trait `AsyncFunctions` for `ArchitectGPT`.
+impl Functions for ArchitectGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
+    fn get_agent(&self) -> &AgentGPT {
+        &self.agent
+    }
+}
+
+/// Implementation of the trait `AsyncFunctions` for `ArchitectGPT`.
 /// Contains additional methods related to architectural tasks.
 ///
 /// This trait provides methods for:
@@ -1155,18 +1169,8 @@ impl ArchitectGPT {
 /// - Executes tasks asynchronously based on the current status of the agent.
 /// - Handles task execution including scope retrieval, URL retrieval, and diagram generation.
 /// - Manages retries in case of failures during task execution.
-///
-impl Functions for ArchitectGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-
+#[async_trait]
+impl AsyncFunctions for ArchitectGPT {
     /// Executes tasks asynchronously.
     ///
     /// # Arguments
@@ -1185,9 +1189,9 @@ impl Functions for ArchitectGPT {
     /// - Handles task execution including scope retrieval, URL retrieval, and diagram generation.
     /// - Manages retries in case of failures during task execution.
     ///
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         _execute: bool,
         _browse: bool,
         max_tries: u64,
@@ -1302,7 +1306,7 @@ impl Functions for ArchitectGPT {
                     let python_code = self.generate_diagram(tasks).await?;
 
                     // Write the content to the file
-                    match fs::write(path, python_code.clone()) {
+                    match fs::write(path, python_code.clone()).await {
                         Ok(_) => debug!("File 'diagram.py' created successfully!"),
                         Err(e) => error!("Error creating file 'diagram.py': {}", e),
                     }
@@ -1333,7 +1337,7 @@ impl Functions for ArchitectGPT {
                                         .into();
                                     let python_code = self.generate_diagram(tasks).await?;
 
-                                    match fs::write(path, python_code.clone()) {
+                                    match fs::write(path, python_code.clone()).await {
                                         Ok(_) => debug!("File 'diagram.py' created successfully!"),
                                         Err(e) => error!("Error creating file 'diagram.py': {}", e),
                                     }
@@ -1406,5 +1410,31 @@ impl Functions for ArchitectGPT {
     #[cfg(feature = "mem")]
     async fn ltm_context(&self) -> String {
         long_term_memory_context(self.agent.id.clone()).await
+    }
+}
+
+impl Agent for ArchitectGPT {
+    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
+        Default::default()
+    }
+
+    fn update(&mut self, status: Status) {
+        self.agent.update(status);
+    }
+
+    fn objective(&self) -> &Cow<'static, str> {
+        &self.agent.objective
+    }
+
+    fn position(&self) -> &Cow<'static, str> {
+        &self.agent.position
+    }
+
+    fn status(&self) -> &Status {
+        &self.agent.status
+    }
+
+    fn memory(&self) -> &Vec<Communication> {
+        &self.agent.memory
     }
 }

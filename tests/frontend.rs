@@ -16,7 +16,7 @@ async fn test_generate_frontend_code() {
     let objective = "Expertise lies in writing frontend code";
     let position = "Frontend Developer";
 
-    let mut frontend_gpt = FrontendGPT::new(objective, position, "python");
+    let mut frontend_gpt = FrontendGPT::new(objective, position, "python").await;
     let mut tasks = Tasks {
         description: "Generate a todo crud app using fastapi python framework.".into(),
         scope: Some(Scope {
@@ -44,7 +44,7 @@ async fn test_improve_frontend_code() {
     let objective = "Expertise lies in writing frontend code";
     let position = "Frontend Developer";
 
-    let mut frontend_gpt = FrontendGPT::new(objective, position, "rust");
+    let mut frontend_gpt = FrontendGPT::new(objective, position, "rust").await;
     let mut tasks = Tasks {
         description: "Generate a todo crud app using Yew Rust framework.".into(),
         scope: Some(Scope {
@@ -98,7 +98,7 @@ async fn test_fix_code_bugs() {
     let objective = "Expertise lies in writing frontend code";
     let position = "Frontend Developer";
 
-    let mut frontend_gpt = FrontendGPT::new(objective, position, "rust");
+    let mut frontend_gpt = FrontendGPT::new(objective, position, "rust").await;
     let mut tasks = Tasks {
         description: "Generate a todo crud app using Yew web framework.".into(),
         scope: Some(Scope {
@@ -394,7 +394,7 @@ async fn tests_frontend_dev_one() {
     let objective = "Expertise lies in writing frontend code.";
     let position = "Frontend Developer";
 
-    let _frontend_gpt = FrontendGPT::new(objective, position, "rust");
+    let _frontend_gpt = FrontendGPT::new(objective, position, "rust").await;
 
     let _tasks = Tasks {
         description:

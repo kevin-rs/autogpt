@@ -9,7 +9,7 @@ use crate::agents::git::GitGPT;
 use crate::agents::optimizer::OptimizerGPT;
 use crate::common::utils::Tasks;
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
 
 /// Enum representing different types of GPT agents.

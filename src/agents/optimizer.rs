@@ -12,6 +12,7 @@
 //! use autogpt::agents::optimizer::OptimizerGPT;
 //! use autogpt::common::utils::Tasks;
 //! use autogpt::traits::functions::Functions;
+//! use autogpt::traits::functions::AsyncFunctions;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -19,7 +20,7 @@
 //!         "Optimize and modularize backend code",
 //!         "OptimizerGPT",
 //!         "rust",
-//!     );
+//!     ).await;
 //!
 //!     let mut tasks = Tasks {
 //!         description: "Refactor backend code for better modularization".into(),
@@ -66,14 +67,15 @@ use crate::agents::agent::AgentGPT;
 use crate::common::utils::{ClientType, Communication, Status, Tasks, strip_code_blocks};
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
 use colored::*;
 use std::borrow::Cow;
 use std::env::var;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use tokio::fs;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -103,8 +105,10 @@ use x_ai::{
     traits::ChatCompletionsFetcher,
 };
 
+use async_trait::async_trait;
+
 /// Struct representing an `OptimizerGPT`, which manages code optimization and modularization tasks using the Gemini API.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OptimizerGPT {
     /// Represents the path to the workspace directory for the backend code.
     /// This directory is where all generated or modified code is stored.
@@ -148,15 +152,17 @@ impl OptimizerGPT {
     /// - Establishes the foundational state for performing code modularization or refactoring.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub fn new(objective: &'static str, position: &'static str, language: &str) -> Self {
+    pub async fn new(objective: &'static str, position: &'static str, language: &str) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or("workspace/".to_string());
         let workspace = format!("{}/backend", base_workspace);
 
-        if !Path::new(&workspace).exists() {
-            match fs::create_dir_all(&workspace) {
-                Ok(_) => debug!("Created directory: {}", workspace),
-                Err(e) => error!("Failed to create directory '{}': {}", workspace, e),
+        if !fs::try_exists(&workspace).await.unwrap_or(false) {
+            match fs::create_dir_all(&workspace).await {
+                Ok(_) => debug!("Directory '{}' created successfully!", workspace),
+                Err(e) => error!("Error creating directory '{}': {}", workspace, e),
             }
+        } else {
+            debug!("Workspace directory '{}' already exists.", workspace);
         }
 
         let agent = AgentGPT::new_borrowed(objective, position);
@@ -198,11 +204,11 @@ impl OptimizerGPT {
     /// # Business Logic
     ///
     /// - Supports the modularization process by persisting code modules created during optimization.
-    /// - Maintains a clean and structured file hierarchy within the agent’s workspace.
-    pub fn save_module(&self, filename: &str, content: &str) -> Result<()> {
+    /// - Maintains a clean and structured file hierarchy within the agent's workspace.
+    pub async fn save_module(&self, filename: &str, content: &str) -> Result<()> {
         let path = format!("{}/{}", self.workspace, filename);
         let parent = Path::new(&path).parent().unwrap();
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent).await?;
 
         let mut file = File::create(path)?;
         file.write_all(content.as_bytes())?;
@@ -516,7 +522,20 @@ impl OptimizerGPT {
         Ok(gemini_response)
     }
 }
-/// Implementation of the `Functions` trait for the `OptimizerGPT` struct.
+
+impl Functions for OptimizerGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
+    fn get_agent(&self) -> &AgentGPT {
+        &self.agent
+    }
+}
+
+/// Implementation of the `AsyncFunctions` trait for the `OptimizerGPT` struct.
 ///
 /// This implementation provides core functionality to interact with and operate
 /// the optimizer agent in a code refinement and enhancement pipeline. It defines
@@ -542,17 +561,8 @@ impl OptimizerGPT {
 ///
 /// This trait is designed to be shared among multiple AI roles (FrontendGPT, OptimizerGPT, etc.)
 /// to enforce a consistent interface for task execution across stages of the autonomous dev agent.
-impl Functions for OptimizerGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-
+#[async_trait]
+impl AsyncFunctions for OptimizerGPT {
     /// Asynchronously executes the modularization task for a given source code file.
     ///
     /// # Arguments
@@ -582,9 +592,9 @@ impl Functions for OptimizerGPT {
     /// - Updates the original source file with appropriate import statements for the new modules.
     /// - Persists all user and assistant messages to long-term memory (if enabled).
     /// - Updates the agent's status to `Completed` after successful execution.
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
@@ -605,7 +615,7 @@ impl Functions for OptimizerGPT {
             "javascript" => format!("{}/src/index.js", self.workspace),
             _ => panic!("Unsupported language."),
         };
-        let original_code = fs::read_to_string(&file_path)?;
+        let original_code = fs::read_to_string(&file_path).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
@@ -639,7 +649,7 @@ impl Functions for OptimizerGPT {
             );
             let response = self.generate_and_track(&split_prompt).await?;
 
-            self.save_module(filename, &response)?;
+            self.save_module(filename, &response).await?;
 
             self.agent.add_communication(Communication {
                 role: Cow::Borrowed("assistant"),
@@ -665,7 +675,7 @@ impl Functions for OptimizerGPT {
             .collect::<Vec<_>>()
             .join("\n");
         if !imports.is_empty() {
-            fs::write(file_path.clone(), &imports)?;
+            fs::write(file_path.clone(), &imports).await?;
             tasks.backend_code = Some(imports.clone().into());
         }
         self.agent.update(Status::Completed);
@@ -723,5 +733,31 @@ impl Functions for OptimizerGPT {
     #[cfg(feature = "mem")]
     async fn ltm_context(&self) -> String {
         long_term_memory_context(self.agent.id.clone()).await
+    }
+}
+
+impl Agent for OptimizerGPT {
+    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
+        Default::default()
+    }
+
+    fn update(&mut self, status: Status) {
+        self.agent.update(status);
+    }
+
+    fn objective(&self) -> &Cow<'static, str> {
+        &self.agent.objective
+    }
+
+    fn position(&self) -> &Cow<'static, str> {
+        &self.agent.position
+    }
+
+    fn status(&self) -> &Status {
+        &self.agent.status
+    }
+
+    fn memory(&self) -> &Vec<Communication> {
+        &self.agent.memory
     }
 }

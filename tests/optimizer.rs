@@ -1,6 +1,7 @@
 use autogpt::agents::optimizer::OptimizerGPT;
 use autogpt::common::utils::{Status, Tasks};
 use autogpt::traits::agent::Agent;
+use autogpt::traits::functions::AsyncFunctions;
 use autogpt::traits::functions::Functions;
 // use std::fs;
 use std::{fs::File, io::Write, path::Path};
@@ -19,7 +20,7 @@ async fn test_optimizer_gpt_execute() {
     let position = "OptimizerGPT";
     let language = "rust";
 
-    let mut optimizer_agent = OptimizerGPT::new(objective, position, language);
+    let mut optimizer_agent = OptimizerGPT::new(objective, position, language).await;
 
     let workspace = optimizer_agent.workspace.to_string();
     let workspace_path = Path::new(&workspace);
@@ -71,7 +72,7 @@ async fn test_optimizer_gpt_save_module() {
     let position = "OptimizerGPT";
     let language = "rust";
 
-    let optimizer_agent = OptimizerGPT::new(objective, position, language);
+    let optimizer_agent = OptimizerGPT::new(objective, position, language).await;
 
     let workspace = optimizer_agent.workspace.to_string();
     let workspace_path = Path::new(&workspace);
@@ -92,7 +93,7 @@ fn main() {
     let filename = "module.rs";
     let content = "// This is a refactored module";
 
-    let result = optimizer_agent.save_module(filename, content);
+    let result = optimizer_agent.save_module(filename, content).await;
     assert!(result.is_ok());
 
     let module_path = workspace_path.join(filename);
@@ -108,7 +109,7 @@ async fn test_generate_and_track() {
     let position = "OptimizerGPT";
     let language = "rust";
 
-    let mut optimizer_agent = OptimizerGPT::new(objective, position, language);
+    let mut optimizer_agent = OptimizerGPT::new(objective, position, language).await;
 
     let workspace = optimizer_agent.workspace.to_string();
     let workspace_path = Path::new(&workspace);

@@ -128,13 +128,13 @@ impl Orchestrator {
                                         let lang: &'static str = Box::leak(lang_str.into_boxed_str());
 
                                         let agent_type = match msg.to.as_str() {
-                                            "arch" => Some(AgentType::Architect(ArchitectGPT::new("Architect agent", "ArchitectGPT"))),
-                                            "back" => Some(AgentType::Backend(BackendGPT::new("Backend agent", "BackendGPT", lang))),
-                                            "front" => Some(AgentType::Frontend(FrontendGPT::new("Frontend agent", "FrontendGPT", lang))),
+                                            "arch" => Some(AgentType::Architect(ArchitectGPT::new("Architect agent", "ArchitectGPT").await)),
+                                            "back" => Some(AgentType::Backend(BackendGPT::new("Backend agent", "BackendGPT", lang).await)),
+                                            "front" => Some(AgentType::Frontend(FrontendGPT::new("Frontend agent", "FrontendGPT", lang).await)),
                                             #[cfg(feature = "img")]
-                                            "design" => Some(AgentType::Designer(DesignerGPT::new("Designer agent", "DesignerGPT"))),
+                                            "design" => Some(AgentType::Designer(DesignerGPT::new("Designer agent", "DesignerGPT").await)),
                                             #[cfg(feature = "git")]
-                                            "git" => Some(AgentType::Git(GitGPT::new("Git agent", "GitGPT"))),
+                                            "git" => Some(AgentType::Git(GitGPT::new("Git agent", "GitGPT").await)),
                                             _ => None,
                                         };
 
@@ -186,13 +186,13 @@ impl Orchestrator {
                             let payload = parse_kv(&msg.payload_json);
                             let lang: &'static str = Box::leak(payload.1.into_boxed_str());
                             let agent_type = match msg.to.as_str() {
-                                "arch" => Some(AgentType::Architect(ArchitectGPT::new("Architect agent", "ArchitectGPT"))),
-                                "back" => Some(AgentType::Backend(BackendGPT::new("Backend agent", "BackendGPT", lang))),
-                                "front" => Some(AgentType::Frontend(FrontendGPT::new("Frontend agent", "FrontendGPT", lang))),
+                                "arch" => Some(AgentType::Architect(ArchitectGPT::new("Architect agent", "ArchitectGPT").await)),
+                                "back" => Some(AgentType::Backend(BackendGPT::new("Backend agent", "BackendGPT", lang).await)),
+                                "front" => Some(AgentType::Frontend(FrontendGPT::new("Frontend agent", "FrontendGPT", lang).await)),
                                 #[cfg(feature = "img")]
-                                "design" => Some(AgentType::Designer(DesignerGPT::new("Designer agent", "DesignerGPT"))),
+                                "design" => Some(AgentType::Designer(DesignerGPT::new("Designer agent", "DesignerGPT").await)),
                                 #[cfg(feature = "git")]
-                                "git" => Some(AgentType::Git(GitGPT::new("Git agent", "GitGPT"))),
+                                "git" => Some(AgentType::Git(GitGPT::new("Git agent", "GitGPT").await)),
                                 _ => None,
                             };
 

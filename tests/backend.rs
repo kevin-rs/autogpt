@@ -19,7 +19,7 @@ async fn test_generate_backend_code() {
     let objective = "Expertise lies in writing backend code for web servers and JSON databases";
     let position = "Backend Developer";
 
-    let mut backend_gpt = BackendGPT::new(objective, position, "python");
+    let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
     let mut tasks = Tasks {
         description: "Generate a todo crud app using python FastAPI.".into(),
         scope: Some(Scope {
@@ -47,7 +47,7 @@ async fn test_improve_backend_code() {
     let objective = "Expertise lies in writing backend code for web servers and JSON databases";
     let position = "Backend Developer";
 
-    let mut backend_gpt = BackendGPT::new(objective, position, "python");
+    let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
     let mut tasks = Tasks {
         description: "Generate a todo crud app using Axum.".into(),
         scope: Some(Scope {
@@ -130,7 +130,7 @@ async fn test_fix_code_bugs() {
     let objective = "Expertise lies in writing backend code for web servers and JSON databases";
     let position = "Backend Developer";
 
-    let mut backend_gpt = BackendGPT::new(objective, position, "python");
+    let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
     let mut tasks = Tasks {
         description: "Generate a todo crud app using Axum.".into(),
         scope: Some(Scope {
@@ -248,7 +248,7 @@ async fn test_get_routes_json() {
     let objective = "Expertise lies in writing backend code for web servers and JSON databases";
     let position = "Backend Developer";
 
-    let mut backend_gpt = BackendGPT::new(objective, position, "python");
+    let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
 
     let result = backend_gpt.get_routes_json().await;
 
@@ -261,7 +261,7 @@ async fn tests_backend_dev_one() {
     let objective = "Expertise lies in writing backend code for web servers and JSON databases";
     let position = "Backend Developer";
 
-    let mut backend_gpt = BackendGPT::new(objective, position, "python");
+    let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
 
     let mut tasks = Tasks {
         description: "Generate a todo crud app using python FastAPI.".into(),

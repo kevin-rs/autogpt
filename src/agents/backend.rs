@@ -11,6 +11,7 @@
 //! use autogpt::agents::backend::BackendGPT;
 //! use autogpt::common::utils::Tasks;
 //! use autogpt::traits::functions::Functions;
+//! use autogpt::traits::functions::AsyncFunctions;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -18,7 +19,7 @@
 //!         "Generate backend code",
 //!         "Backend Developer",
 //!         "rust",
-//!     );
+//!     ).await;
 //!
 //!     let mut tasks = Tasks {
 //!         description: "Create REST API endpoints for user authentication".into(),
@@ -43,20 +44,21 @@ use crate::prompts::backend::{
     API_ENDPOINTS_PROMPT, FIX_CODE_PROMPT, IMPROVED_WEBSERVER_CODE_PROMPT, WEBSERVER_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
-use std::io::Read;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use std::path::Path;
-use std::process::Command;
 use std::process::Stdio;
 // use std::thread::sleep;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use colored::*;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
-use std::fs;
 use std::time::Duration;
+use tokio::fs;
+use tokio::io::AsyncReadExt;
+use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 use webbrowser::{Browser, BrowserOptions, open_browser_with_options};
 
@@ -89,7 +91,7 @@ use x_ai::{
 };
 
 /// Struct representing a BackendGPT, which manages backend development tasks using GPT.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BackendGPT {
     /// Represents the workspace directory path for BackendGPT.
     workspace: Cow<'static, str>,
@@ -128,15 +130,18 @@ impl BackendGPT {
     /// - Creates clients for interacting with Gemini or OpenAI API and making HTTP requests.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub fn new(objective: &'static str, position: &'static str, language: &'static str) -> Self {
+    pub async fn new(
+        objective: &'static str,
+        position: &'static str,
+        language: &'static str,
+    ) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace/".to_string());
         let workspace = format!("{}/backend", base_workspace);
 
-        if !Path::new(&workspace).exists() {
-            if let Err(e) = fs::create_dir_all(&workspace) {
-                error!("Error creating directory '{}': {}", workspace, e);
-            } else {
-                debug!("Workspace directory '{}' created successfully.", workspace);
+        if !fs::try_exists(&workspace).await.unwrap_or(false) {
+            match fs::create_dir_all(&workspace).await {
+                Ok(_) => debug!("Directory '{}' created successfully!", workspace),
+                Err(e) => error!("Error creating directory '{}': {}", workspace, e),
             }
         } else {
             debug!("Workspace directory '{}' already exists.", workspace);
@@ -162,7 +167,7 @@ impl BackendGPT {
 
                 let template_path = format!("{}/src/template.rs", workspace);
                 if !Path::new(&template_path).exists() {
-                    if let Err(e) = fs::write(&template_path, "") {
+                    if let Err(e) = fs::write(&template_path, "").await {
                         error!("Error creating file '{}': {}", template_path, e);
                     } else {
                         debug!("File '{}' created successfully.", template_path);
@@ -175,7 +180,7 @@ impl BackendGPT {
                 for file in files.iter() {
                     let full_path = format!("{}/{}", workspace, file);
                     if !Path::new(&full_path).exists() {
-                        if let Err(e) = fs::write(&full_path, "") {
+                        if let Err(e) = fs::write(&full_path, "").await {
                             error!("Error creating file '{}': {}", full_path, e);
                         } else {
                             debug!("File '{}' created successfully.", full_path);
@@ -194,7 +199,7 @@ impl BackendGPT {
                         .spawn();
 
                     match npx_install {
-                        Ok(mut child) => match child.wait() {
+                        Ok(mut child) => match child.wait().await {
                             Ok(status) => {
                                 if status.success() {
                                     debug!("React JS project initialized successfully.");
@@ -214,7 +219,7 @@ impl BackendGPT {
 
                 let template_path = format!("{}/src/template.js", workspace);
                 if !Path::new(&template_path).exists() {
-                    if let Err(e) = fs::write(&template_path, "") {
+                    if let Err(e) = fs::write(&template_path, "").await {
                         error!("Error creating file '{}': {}", template_path, e);
                     } else {
                         debug!("File '{}' created successfully.", template_path);
@@ -291,7 +296,7 @@ impl BackendGPT {
             self.agent.memory = self.get_ltm().await?;
         }
 
-        let template = fs::read_to_string(full_path)?;
+        let template = fs::read_to_string(full_path).await?;
 
         let request: String = format!(
             "{}\n\nCode Template: {}\nProject Description: {}\nPrevious Conversation: {:?}\n",
@@ -580,7 +585,7 @@ impl BackendGPT {
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(backend_path, response.clone())?;
+        fs::write(backend_path, response.clone()).await?;
 
         tasks.backend_code = Some(response.clone().into());
 
@@ -905,7 +910,7 @@ impl BackendGPT {
 
         debug!("[*] {:?}: {:?}", self.agent.position(), backend_path);
 
-        fs::write(backend_path, response.clone())?;
+        fs::write(backend_path, response.clone()).await?;
 
         tasks.backend_code = Some(response.clone().into());
 
@@ -1222,7 +1227,7 @@ impl BackendGPT {
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(backend_path, response.clone())?;
+        fs::write(backend_path, response.clone()).await?;
 
         tasks.backend_code = Some(response.clone().into());
 
@@ -1265,7 +1270,7 @@ impl BackendGPT {
 
         debug!("[*] {:?}: {:?}", self.agent.position(), full_path);
 
-        let backend_code = fs::read_to_string(full_path)?;
+        let backend_code = fs::read_to_string(full_path).await?;
 
         let request: String = format!(
             "{}\n\nHere is the backend code with all routes:{}",
@@ -1571,7 +1576,19 @@ impl BackendGPT {
     }
 }
 
-/// Implementation of the trait `Functions` for `BackendGPT`.
+impl Functions for BackendGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
+    fn get_agent(&self) -> &AgentGPT {
+        &self.agent
+    }
+}
+
+/// Implementation of the trait `AsyncFunctions` for `BackendGPT`.
 /// Contains additional methods related to backend tasks.
 ///
 /// This trait provides methods for:
@@ -1585,18 +1602,8 @@ impl BackendGPT {
 /// - Executes tasks asynchronously based on the current status of the agent.
 /// - Handles task execution including code generation, bug fixing, and testing.
 /// - Manages retries and error handling during task execution.
-///
-impl Functions for BackendGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-
+#[async_trait]
+impl AsyncFunctions for BackendGPT {
     /// Asynchronously executes tasks associated with BackendGPT.
     ///
     /// # Arguments
@@ -1620,9 +1627,9 @@ impl Functions for BackendGPT {
     /// - Handles task execution including code generation, bug fixing, and testing.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         execute: bool,
         browse: bool,
         max_tries: u64,
@@ -1713,6 +1720,7 @@ impl Functions for BackendGPT {
                                     .current_dir(path);
                                 let build_output = build_command
                                     .output()
+                                    .await
                                     .expect("Failed to build the backend application");
 
                                 if build_output.status.success() {
@@ -1746,10 +1754,11 @@ impl Functions for BackendGPT {
                                         .stderr(Stdio::null())
                                         .status();
 
-                                    if let Ok(status) = create_venv {
+                                    if let Ok(status) = create_venv.await {
                                         if status.success() {
                                             let main_py_path = format!("{}/main.py", path);
                                             let main_py_content = fs::read_to_string(&main_py_path)
+                                                .await
                                                 .expect("Failed to read main.py");
 
                                             let mut packages = vec![];
@@ -1785,7 +1794,7 @@ impl Functions for BackendGPT {
                                                         .stderr(Stdio::null())
                                                         .status();
 
-                                                    match install_status {
+                                                    match install_status.await {
                                                         Ok(status) if status.success() => {
                                                             info!(
                                                                 "{}",
@@ -1866,7 +1875,7 @@ impl Functions for BackendGPT {
                                 child.stderr.take().expect("Failed to capture build stderr");
 
                             let mut stderr_output = String::new();
-                            build_stderr.read_to_string(&mut stderr_output).unwrap();
+                            build_stderr.read_to_string(&mut stderr_output).await?;
 
                             if !stderr_output.trim().is_empty() {
                                 self.nb_bugs += 1;
@@ -1956,10 +1965,10 @@ impl Functions for BackendGPT {
                                 }
                             }
 
-                            let _ = child.kill();
+                            let _ = child.kill().await;
 
                             let backend_path = format!("{}/{}", path, "api.json");
-                            fs::write(&backend_path, endpoints)?;
+                            fs::write(&backend_path, endpoints).await?;
                             info!(
                                     "{}",
                                     format!(
@@ -2040,5 +2049,31 @@ impl Functions for BackendGPT {
     #[cfg(feature = "mem")]
     async fn ltm_context(&self) -> String {
         long_term_memory_context(self.agent.id.clone()).await
+    }
+}
+
+impl Agent for BackendGPT {
+    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
+        Default::default()
+    }
+
+    fn update(&mut self, status: Status) {
+        self.agent.update(status);
+    }
+
+    fn objective(&self) -> &Cow<'static, str> {
+        &self.agent.objective
+    }
+
+    fn position(&self) -> &Cow<'static, str> {
+        &self.agent.position
+    }
+
+    fn status(&self) -> &Status {
+        &self.agent.status
+    }
+
+    fn memory(&self) -> &Vec<Communication> {
+        &self.agent.memory
     }
 }

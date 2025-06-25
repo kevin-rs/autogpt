@@ -62,7 +62,9 @@ pub trait Agent: Debug {
     ///
     /// * `objective` - The objective of the agent.
     /// * `position` - The position of the agent.
-    fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self;
+    fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self
+    where
+        Self: Sized;
 
     /// Updates the status of the agent.
     ///

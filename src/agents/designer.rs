@@ -11,13 +11,14 @@
 //! use autogpt::agents::designer::DesignerGPT;
 //! use autogpt::common::utils::Tasks;
 //! use autogpt::traits::functions::Functions;
+//! use autogpt::traits::functions::AsyncFunctions;
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     let mut designer_agent = DesignerGPT::new(
 //!         "Create innovative website designs",
 //!         "UIs",
-//!     );
+//!     ).await;
 //!
 //!     let mut tasks = Tasks {
 //!         description: "Design a modern and minimalist homepage design layout for a tech company".into(),
@@ -39,15 +40,14 @@ use crate::agents::agent::AgentGPT;
 use crate::common::utils::{ClientType, Communication, Status, Tasks, similarity};
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
-use crate::traits::functions::Functions;
+use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
 use colored::*;
 use getimg::client::Client as ImgClient;
 use getimg::utils::save_image;
 use std::borrow::Cow;
 use std::env::var;
-use std::fs;
-use std::path::Path;
+use tokio::fs;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -65,6 +65,7 @@ use gems::{
     vision::VisionBuilder,
 };
 
+use async_trait::async_trait;
 #[cfg(feature = "xai")]
 use x_ai::{
     chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
@@ -102,19 +103,19 @@ impl DesignerGPT {
     /// - Initializes the GPT agent with the given objective and position.
     /// - Creates clients for generating images and interacting with Gemini or OpenAI API.
     #[allow(unreachable_code)]
-    pub fn new(objective: &'static str, position: &'static str) -> Self {
+    pub async fn new(objective: &'static str, position: &'static str) -> Self {
         let workspace = var("AUTOGPT_WORKSPACE")
             .unwrap_or("workspace/".to_string())
             .to_owned()
             + "designer";
 
-        if !Path::new(&workspace).exists() {
-            match fs::create_dir_all(workspace.clone()) {
+        if !fs::try_exists(&workspace).await.unwrap_or(false) {
+            match fs::create_dir_all(&workspace).await {
                 Ok(_) => debug!("Directory '{}' created successfully!", workspace),
                 Err(e) => error!("Error creating directory '{}': {}", workspace, e),
             }
         } else {
-            debug!("Directory '{}' already exists.", workspace);
+            debug!("Workspace directory '{}' already exists.", workspace);
         }
 
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
@@ -609,7 +610,19 @@ impl DesignerGPT {
     }
 }
 
-/// Implementation of the trait Functions for `DesignerGPT`.
+impl Functions for DesignerGPT {
+    /// Retrieves a reference to the agent.
+    ///
+    /// # Returns
+    ///
+    /// (`&AgentGPT`): A reference to the agent.
+    ///
+    fn get_agent(&self) -> &AgentGPT {
+        &self.agent
+    }
+}
+
+/// Implementation of the trait `AsyncFunctions` for `DesignerGPT`.
 /// Contains additional methods related to design tasks.
 ///
 /// This trait provides methods for:
@@ -623,18 +636,8 @@ impl DesignerGPT {
 /// - Executes tasks asynchronously based on the current status of the agent.
 /// - Handles task execution including image generation, text generation, and comparison.
 /// - Manages retries and error handling during task execution.
-///
-impl Functions for DesignerGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-
+#[async_trait]
+impl AsyncFunctions for DesignerGPT {
     /// Asynchronously executes tasks associated with DesignerGPT.
     ///
     /// # Arguments
@@ -657,9 +660,9 @@ impl Functions for DesignerGPT {
     /// - Handles task execution including image generation, text generation, and comparison.
     /// - Manages retries and error handling during task execution.
     ///
-    async fn execute(
-        &mut self,
-        tasks: &mut Tasks,
+    async fn execute<'a>(
+        &'a mut self,
+        tasks: &'a mut Tasks,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
@@ -760,3 +763,30 @@ impl Functions for DesignerGPT {
         long_term_memory_context(self.agent.id.clone()).await
     }
 }
+
+// TODO: Impl Default to make it compatible with AutoGPT
+// impl Agent for DesignerGPT {
+//     fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
+//         Default::default()
+//     }
+
+//     fn update(&mut self, status: Status) {
+//         self.agent.update(status);
+//     }
+
+//     fn objective(&self) -> &Cow<'static, str> {
+//         &self.agent.objective
+//     }
+
+//     fn position(&self) -> &Cow<'static, str> {
+//         &self.agent.position
+//     }
+
+//     fn status(&self) -> &Status {
+//         &self.agent.status
+//     }
+
+//     fn memory(&self) -> &Vec<Communication> {
+//         &self.agent.memory
+//     }
+// }

@@ -1,6 +1,7 @@
 use autogpt::agents::git::GitGPT;
 use autogpt::common::utils::{Status, Tasks};
 use autogpt::traits::agent::Agent;
+use autogpt::traits::functions::AsyncFunctions;
 use autogpt::traits::functions::Functions;
 use std::env;
 use std::fs;
@@ -23,7 +24,7 @@ async fn test_git_gpt_execute() {
         fs::remove_dir_all(test_workspace).unwrap();
     }
 
-    let mut git_agent = GitGPT::new("Commit all changes", "GitGPT");
+    let mut git_agent = GitGPT::new("Commit all changes", "GitGPT").await;
 
     let dummy_file_path = format!("{}/hello.txt", test_workspace);
     fs::create_dir_all(test_workspace).unwrap();

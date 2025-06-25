@@ -2,7 +2,7 @@
 use autogpt::agents::mailer::MailerGPT;
 use autogpt::common::utils::Scope;
 use autogpt::common::utils::Tasks;
-use autogpt::traits::functions::Functions;
+use autogpt::traits::functions::AsyncFunctions;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
