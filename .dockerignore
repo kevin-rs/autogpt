@@ -1,6 +1,6 @@
 .git
 .env
-Dockerfile
+Dockerfile.*
 tests/
 workspace/
 examples/

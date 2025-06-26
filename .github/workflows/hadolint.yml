@@ -1,0 +1,43 @@
+name: 🐳 Lint Dockerfiles
+
+on:
+  push:
+    paths:
+      - "Dockerfile.*"
+      - ".hadolint.yaml"
+      - ".github/workflows/hadolint.yml"
+  pull_request:
+    paths:
+      - "Dockerfile.*"
+      - ".hadolint.yaml"
+
+jobs:
+  hadolint:
+    runs-on: ubuntu-latest
+    name: 🚨 Dockerfile Lint Check
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Install Hadolint
+        run: |
+          echo "📦 Downloading Hadolint..."
+          curl -sSL -o hadolint "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64"
+          chmod +x hadolint
+          sudo mv hadolint /usr/local/bin/
+          echo "✅ Hadolint installed!"
+
+      - name: 🧽 Lint Dockerfiles
+        run: |
+          for file in Dockerfile.autogpt Dockerfile.orchgpt; do
+            echo "🔍 Linting $file..."
+            if [ -f ".hadolint.yaml" ]; then
+              hadolint --config .hadolint.yaml "$file"
+            else
+              hadolint "$file"
+            fi
+            echo "✅ Done linting $file"
+          done
+
+      - name: 🎉 Done!
+        run: echo "🚀 All Dockerfiles checked with Hadolint!"

@@ -1,0 +1,3 @@
+failure-threshold: style
+ignored:
+  - DL3018

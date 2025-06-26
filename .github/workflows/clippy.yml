@@ -1,0 +1,22 @@
+name: 🧹 Cargo Clippy Linter
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-clippy:
+    name: 🔍 Run Clippy Linter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🧪 Run Clippy
+        run: cargo clippy --tests --all-features -- -D warnings
