@@ -1,12 +1,19 @@
-FROM rust:alpine as builder
+FROM rust:alpine AS builder
+
 LABEL maintainer="kevin-rs <https://github.com/kevin-rs>"
 LABEL author="Mahmoud Harmouch <https://github.com/wiseaidev>"
 RUN apk update && apk upgrade
-RUN apk add --no-cache build-base pkgconfig libressl-dev
+RUN apk add --no-cache \
+    build-base \
+    pkgconfig \
+    openssl-dev \
+    openssl-libs-static \
+    git
 
 WORKDIR /kevin
 COPY Cargo.toml Cargo.lock INSTALLATION.md ./
 COPY src/ src/
+COPY auto-derive/ auto-derive/
 COPY README.md ./
 RUN cargo build --release --all-features
 
@@ -16,11 +23,9 @@ RUN addgroup -S kevin && \
 
 RUN apk add --no-cache sudo
 
-RUN addgroup -S sudo
-
-RUN addgroup kevin sudo
-
-RUN echo "%sudo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+RUN addgroup -S sudo && \
+    addgroup kevin sudo && \
+    echo "%sudo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 WORKDIR /home/kevin
 

@@ -67,7 +67,7 @@ async fn test_get_urls() {
     assert_eq!(architect_agent.get_agent().memory()[0].role, "user");
     assert_eq!(architect_agent.get_agent().memory()[1].role, "assistant");
 
-    assert!(tasks.urls.unwrap().len() >= 1);
+    assert!(!tasks.urls.unwrap().is_empty());
     assert_eq!(architect_agent.get_agent().status(), &Status::InUnitTesting);
 }
 
