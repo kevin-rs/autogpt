@@ -35,17 +35,30 @@
 
 AutoGPT is a pure rust framework that simplifies AI agent creation and management for various tasks. Its remarkable speed and versatility are complemented by a mesh of built-in interconnected GPTs, ensuring exceptional performance and adaptability.
 
----
+## 🧠 Framework Overview
 
-## 🚀 Features
+### ⚙️ Agent Core Architecture
 
-- **Agent Creation**: Easily create different types of agents tailored to specific tasks.
-- **Task Management**: Efficiently manage tasks and distribute them among agents.
-- **Extensible**: Extend functionality by adding new agent types and task handling capabilities.
-- **CLI Interface**: Command-line interface for seamless interaction with the framework.
-- **SDK Integration**: Software development kit for integrating AutoGPT into existing projects.
+AutoGPT agents are modular and autonomous, built from composable components:
 
----
+- 🔌 **Tools & Sensors**: Interface with the real world via actions (e.g., file I/O, APIs) and perception (e.g., audio, video, data).
+- 🧠 **Memory & Knowledge**: Combines long-term vector memory with structured knowledge bases for reasoning and recall.
+- 🧭 **Planner & Goals**: Breaks down complex tasks into subgoals and tracks progress dynamically.
+- 🧍 **Persona & Capabilities**: Customizable behavior profiles and access controls define how agents act.
+- 🧑‍🤝‍🧑 **Collaboration**: Agents can delegate, swarm, or work in teams with other agents.
+- 🪞 **Self-Reflection**: Introspection module to debug, adapt, or evolve internal strategies.
+- 🔄 **Context Management**: Manages active memory (context window) for ongoing tasks and conversations.
+- 📅 **Scheduler**: Time-based or reactive triggers for agent actions.
+
+### 🚀 Developer Features
+
+AutoGPT is designed for flexibility, integration, and scalability:
+
+- 🧪 **Custom Agent Creation**: Build tailored agents for different roles or domains.
+- 📋 **Task Orchestration**: Manage and distribute tasks across agents efficiently.
+- 🧱 **Extensibility**: Add new tools, behaviors, or agent types with ease.
+- 💻 **CLI Tools**: Command-line interface for rapid experimentation and control.
+- 🧰 **SDK Support**: Embed AutoGPT into existing projects or systems seamlessly.
 
 ## 📦 Installation
 
@@ -53,8 +66,6 @@ Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, runn
 
 > [!NOTE]
 > For optimal performance and compatibility, we strongly advise utilizing a Linux operating system to install this CLI.
-
----
 
 ## 🔄 Workflow
 
@@ -207,5 +218,3 @@ Contributions are welcome! See the [Contribution Guidelines](CONTRIBUTING.md) fo
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----

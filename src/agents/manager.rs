@@ -13,7 +13,7 @@ use crate::agents::frontend::FrontendGPT;
 use crate::agents::git::GitGPT;
 use crate::agents::types::AgentType;
 use crate::common::utils::strip_code_blocks;
-use crate::common::utils::{ClientType, Communication, Tasks};
+use crate::common::utils::{ClientType, Communication, Task};
 use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT, MANAGER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Functions};
@@ -59,7 +59,7 @@ pub struct ManagerGPT {
     /// Represents the GPT agent associated with the manager.
     agent: AgentGPT,
     /// Represents the tasks to be executed by the manager.
-    tasks: Tasks,
+    tasks: Task,
     /// Represents the programming language used in the tasks.
     language: &'static str,
     /// Represents a collection of GPT agents managed by the manager.
@@ -101,7 +101,7 @@ impl ManagerGPT {
 
         // let request = format!("{}\n\nUser Request: {}", MANAGER_PROMPT, request);
 
-        let tasks: Tasks = Tasks {
+        let tasks: Task = Task {
             description: request.to_string().into(),
             scope: None,
             urls: None,
@@ -570,7 +570,7 @@ impl ManagerGPT {
                     .await;
             }
 
-            self.tasks = Tasks {
+            self.tasks = Task {
                 description: refined_task.into(),
                 scope: None,
                 urls: None,
@@ -600,7 +600,7 @@ impl ManagerGPT {
         }
         info!(
             "{}",
-            format!("[*] {:?}: Completed Tasks:", self.agent.position())
+            format!("[*] {:?}: Completed Task:", self.agent.position())
                 .bright_white()
                 .bold()
         );

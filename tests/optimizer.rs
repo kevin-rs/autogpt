@@ -1,5 +1,5 @@
 use autogpt::agents::optimizer::OptimizerGPT;
-use autogpt::common::utils::{Status, Tasks};
+use autogpt::common::utils::{Status, Task};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::AsyncFunctions;
 use autogpt::traits::functions::Functions;
@@ -38,7 +38,7 @@ fn main() {
 "#;
     file.write_all(file_content.as_bytes()).unwrap();
 
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Refactor backend code for better modularization".into(),
         scope: None,
         urls: None,

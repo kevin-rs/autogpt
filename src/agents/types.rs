@@ -7,7 +7,7 @@ use crate::agents::frontend::FrontendGPT;
 #[cfg(feature = "git")]
 use crate::agents::git::GitGPT;
 use crate::agents::optimizer::OptimizerGPT;
-use crate::common::utils::Tasks;
+use crate::common::utils::Task;
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
@@ -54,7 +54,7 @@ impl AgentType {
     ///
     pub async fn execute(
         &mut self,
-        tasks: &mut Tasks,
+        tasks: &mut Task,
         execute: bool,
         browse: bool,
         max_tries: u64,

@@ -23,13 +23,17 @@ pub use {
     crate::agents::frontend::FrontendGPT,
     crate::agents::manager::ManagerGPT,
     crate::agents::optimizer::OptimizerGPT,
-    crate::common::utils::{ClientType, Communication, Message, Model, Scope, Status, Tasks, Tool},
+    crate::common::utils::{
+        Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner,
+        Reflection, Scope, Status, Task, TaskScheduler, Tool,
+    },
     crate::traits::agent::Agent,
     crate::traits::composite::AgentFunctions,
     crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions},
     anyhow::{Result, anyhow},
     async_trait::async_trait,
     auto_derive::Auto,
+    std::collections::HashSet,
     std::{borrow::Cow, sync::Arc},
     tokio::sync::Mutex,
     uuid::Uuid,
@@ -101,7 +105,7 @@ impl AutoGPT {
             let agent_clone = Arc::clone(&agent_arc);
             let agent_objective = agent_arc.lock().await.get_agent().objective().clone();
 
-            let tasks = Arc::new(Mutex::new(Tasks {
+            let tasks = Arc::new(Mutex::new(Task {
                 description: agent_objective.clone(),
                 scope: Some(Scope {
                     crud: true,

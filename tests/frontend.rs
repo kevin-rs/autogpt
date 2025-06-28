@@ -1,5 +1,5 @@
 use autogpt::agents::frontend::FrontendGPT;
-use autogpt::common::utils::{Scope, Tasks};
+use autogpt::common::utils::{Scope, Task};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::Functions;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
@@ -17,7 +17,7 @@ async fn test_generate_frontend_code() {
     let position = "Frontend Developer";
 
     let mut frontend_gpt = FrontendGPT::new(objective, position, "python").await;
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Generate a todo crud app using fastapi python framework.".into(),
         scope: Some(Scope {
             crud: true,
@@ -45,7 +45,7 @@ async fn test_improve_frontend_code() {
     let position = "Frontend Developer";
 
     let mut frontend_gpt = FrontendGPT::new(objective, position, "rust").await;
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Generate a todo crud app using Yew Rust framework.".into(),
         scope: Some(Scope {
             crud: true,
@@ -99,7 +99,7 @@ async fn test_fix_code_bugs() {
     let position = "Frontend Developer";
 
     let mut frontend_gpt = FrontendGPT::new(objective, position, "rust").await;
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Generate a todo crud app using Yew web framework.".into(),
         scope: Some(Scope {
             crud: true,
@@ -396,7 +396,7 @@ async fn tests_frontend_dev_one() {
 
     let _frontend_gpt = FrontendGPT::new(objective, position, "rust").await;
 
-    let _tasks = Tasks {
+    let _tasks = Task {
         description:
             "Build a website for an e-commerce platform with payment integration using rust yew framework.".into(),
         scope: Some(Scope {

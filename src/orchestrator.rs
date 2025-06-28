@@ -15,7 +15,7 @@ use crate::agents::designer::DesignerGPT;
 use crate::agents::frontend::FrontendGPT;
 use crate::agents::git::GitGPT;
 use crate::agents::types::AgentType;
-use crate::common::utils::Tasks;
+use crate::common::utils::Task;
 use crate::message::parse_kv;
 use crate::{
     common::tls::load_tls_config,
@@ -155,7 +155,7 @@ impl Orchestrator {
                                     },
                                     "run" => {
                                         if let Some(agent) = agents.get_mut(&msg.to) {
-                                            let mut tasks = Tasks::from_payload(&msg.payload_json);
+                                            let mut tasks = Task::from_payload(&msg.payload_json);
                                             let _ = agent.execute(&mut tasks, true, false, 3).await;
                                             let reply = format!("[*] \"Orchestrator\": ✅ Executed tasks for agent '{}'\n", msg.to);
                                             let _ = tls_stream.write_all(reply.as_bytes()).await;
@@ -209,7 +209,7 @@ impl Orchestrator {
                         },
                         "run" => {
                             if let Some(agent) = agents.get_mut(&msg.to) {
-                                let mut tasks = Tasks::from_payload(&msg.payload_json);
+                                let mut tasks = Task::from_payload(&msg.payload_json);
                                 let _ = agent.execute(&mut tasks, true, false, 3).await;
                                 info!("[*] \"Orchestrator\": Executed tasks for agent {}", msg.to);
                             } else {

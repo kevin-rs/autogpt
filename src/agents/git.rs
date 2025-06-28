@@ -4,24 +4,38 @@ use git2::{IndexAddOption, Repository, Signature};
 use std::borrow::Cow;
 use std::env::var;
 use tokio::fs;
-use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::Communication;
-use crate::common::utils::{Status, Tasks};
+use crate::common::utils::{
+    Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
+    Status, Task, TaskScheduler, Tool,
+};
 use crate::traits::agent::Agent;
-use crate::traits::functions::{AsyncFunctions, Functions};
+use crate::traits::composite::AgentFunctions;
+use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
 use async_trait::async_trait;
+use auto_derive::Auto;
 use std::fmt;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+#[cfg(feature = "mem")]
+use {
+    crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
+    crate::common::memory::save_long_term_memory,
+};
 
 /// Struct representing GitGPT, a thread-safe Git-aware task executor integrated with a GPT agent.
 #[allow(dead_code)]
+#[derive(Auto)]
 pub struct GitGPT {
     /// Path to the working directory used by the Git repository.
     workspace: Cow<'static, str>,
     /// GPT-based agent handling task status and communication.
     agent: AgentGPT,
+    /// Represents an OpenAI or Gemini client for interacting with their API.
+    client: ClientType,
     /// A handle to the local Git repository.
     repo: Mutex<Repository>,
     /// Git repository path.
@@ -43,6 +57,7 @@ impl Clone for GitGPT {
             workspace: self.workspace.clone(),
             agent: self.agent.clone(),
             repo: repo.into(),
+            client: self.client.clone(),
             repo_path,
         }
     }
@@ -61,6 +76,23 @@ impl fmt::Debug for GitGPT {
             .field("repo", &"Repository { ... }")
             .field("repo_path", &self.repo_path)
             .finish()
+    }
+}
+
+impl Default for GitGPT {
+    fn default() -> Self {
+        let temp_path = "/tmp/gitgpt";
+
+        let repo =
+            Repository::init(temp_path).expect("Failed to initialize default Git repository");
+
+        GitGPT {
+            workspace: Cow::Borrowed(temp_path),
+            agent: AgentGPT::default(),
+            repo: Mutex::new(repo),
+            repo_path: temp_path.to_string(),
+            client: ClientType::default(),
+        }
     }
 }
 
@@ -115,6 +147,7 @@ impl GitGPT {
             repo: Mutex::new(repo),
             agent,
             repo_path,
+            client: ClientType::default(),
         }
     }
 
@@ -198,24 +231,12 @@ impl GitGPT {
     }
 }
 
-impl Functions for GitGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-}
-
 /// Implementation of the `AsyncFunctions` trait for `GitGPT`.
 ///
 /// Provides access to the agent and defines asynchronous task execution,
 /// including staging and committing changes in a Git repository.
 #[async_trait]
-impl AsyncFunctions for GitGPT {
+impl AgentExecutor for GitGPT {
     /// Executes a Git commit task asynchronously based on agent status.
     ///
     /// # Arguments
@@ -239,7 +260,7 @@ impl AsyncFunctions for GitGPT {
     /// - Updates agent status to completed after successful commit.
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
@@ -283,122 +304,5 @@ impl AsyncFunctions for GitGPT {
         }
 
         Ok(())
-    }
-    /// Saves a communication to long-term memory for the agent.
-    ///
-    /// # Arguments
-    ///
-    /// * `communication` - The communication to save, which contains the role and content.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
-    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
-    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
-    async fn save_ltm(&mut self, _communication: Communication) -> Result<()> {
-        // dummy impl cz of no ai client
-        Ok(())
-    }
-
-    /// Retrieves all communications stored in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
-    /// - The function will return a list of communications that are indexed by the agent's unique ID.
-    /// - It handles the retrieval of the stored metadata and content for each communication.
-    async fn get_ltm(&self) -> Result<Vec<Communication>> {
-        // dummy impl cz of no ai client
-        Ok(vec![
-            Communication {
-                role: Cow::Borrowed("system"),
-                content: Cow::Borrowed("System initialized."),
-            },
-            Communication {
-                role: Cow::Borrowed("user"),
-                content: Cow::Borrowed("Hello, autogpt!"),
-            },
-        ])
-    }
-
-    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
-    /// - The context string is composed of each communication's role and content, joined by new lines.
-    /// - It provides a quick overview of the agent's memory in a human-readable format.
-    async fn ltm_context(&self) -> String {
-        // dummy impl cz of no ai client
-        let comms = [
-            Communication {
-                role: Cow::Borrowed("system"),
-                content: Cow::Borrowed("System initialized."),
-            },
-            Communication {
-                role: Cow::Borrowed("user"),
-                content: Cow::Borrowed("Hello, autogpt!"),
-            },
-        ];
-
-        comms
-            .iter()
-            .map(|c| format!("{}: {}", c.role, c.content))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-}
-
-impl Default for GitGPT {
-    fn default() -> Self {
-        let temp_path = "/tmp/gitgpt";
-
-        let repo =
-            Repository::init(temp_path).expect("Failed to initialize default Git repository");
-
-        GitGPT {
-            workspace: Cow::Borrowed(temp_path),
-            agent: AgentGPT::default(),
-            repo: Mutex::new(repo),
-            repo_path: temp_path.to_string(),
-        }
-    }
-}
-
-impl Agent for GitGPT {
-    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
-        Default::default()
-    }
-
-    fn update(&mut self, status: Status) {
-        self.agent.update(status);
-    }
-
-    fn objective(&self) -> &Cow<'static, str> {
-        &self.agent.objective
-    }
-
-    fn position(&self) -> &Cow<'static, str> {
-        &self.agent.position
-    }
-
-    fn status(&self) -> &Status {
-        &self.agent.status
-    }
-
-    fn memory(&self) -> &Vec<Communication> {
-        &self.agent.memory
     }
 }

@@ -5,7 +5,7 @@
 //! understands email contents and produces textual responses tailored to user requirements.
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{ClientType, Communication, Status, Tasks};
+use crate::common::utils::{ClientType, Communication, Status, Task};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Functions};
 use anyhow::Result;
@@ -506,7 +506,7 @@ impl AsyncFunctions for MailerGPT {
     ///
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,

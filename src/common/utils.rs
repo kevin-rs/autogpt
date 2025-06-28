@@ -8,7 +8,7 @@
 //! - `Status`: Represents the status of an agent.
 //! - `Route`: Represents a route object.
 //! - `Scope`: Represents the scope of a project.
-//! - `Tasks`: Represents a fact tasks.
+//! - `Task`: Represents a fact tasks.
 //!
 //! ## Functions
 //!
@@ -20,7 +20,7 @@
 //! # Examples
 //!
 //! ```
-//! use autogpt::common::utils::{Communication, Status, Route, Scope, Tasks, extract_json_string, extract_array, similarity, strip_code_blocks};
+//! use autogpt::common::utils::{Communication, Status, Route, Scope, Task, extract_json_string, extract_array, similarity, strip_code_blocks};
 //!
 //! let communication = Communication {
 //!     role: "Sender".into(),
@@ -43,7 +43,7 @@
 //!     external: false,
 //! };
 //!
-//! let tasks = Tasks {
+//! let tasks = Task {
 //!     description: "This is a task description.".into(),
 //!     scope: Some(scope),
 //!     urls: Some(vec!["https://kevin-rs.dev".into()]),
@@ -66,7 +66,7 @@
 
 #[cfg(feature = "cli")]
 use crate::agents::agent::AgentGPT;
-#[cfg(feature = "cli")]
+#[allow(unused_imports)]
 use crate::traits::agent::Agent;
 #[cfg(feature = "cli")]
 use colored::Colorize;
@@ -109,8 +109,12 @@ use anthropic_ai_sdk::{
     types::message::{Message as AnthMessage, MessageError},
 };
 
+use chrono::prelude::*;
+use std::collections::HashMap;
 #[cfg(feature = "xai")]
 use x_ai::{chat_compl::Message as XaiMessage, client::XaiClient, traits::ClientConfig};
+
+use derivative::Derivative;
 
 /// Enum representing supported AI clients.
 #[derive(Debug, Clone)]
@@ -188,7 +192,7 @@ impl ClientType {
 }
 
 /// Represents a communication between agents.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
 pub struct Communication {
     /// The role of the communication.
     pub role: Cow<'static, str>,
@@ -211,7 +215,7 @@ pub enum Status {
 }
 
 /// Represents a route object.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Eq, Debug, Serialize, Deserialize, Clone, PartialEq, Default, Hash)]
 pub struct Route {
     /// Indicates if the route is dynamic.
     pub dynamic: Cow<'static, str>,
@@ -226,7 +230,7 @@ pub struct Route {
 }
 
 /// Represents the scope of a project.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Default)]
+#[derive(Eq, Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Default, Hash)]
 pub struct Scope {
     /// Indicates if CRUD operations are required.
     pub crud: bool,
@@ -237,8 +241,8 @@ pub struct Scope {
 }
 
 /// Represents a fact tasks.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-pub struct Tasks {
+#[derive(Eq, Debug, Serialize, Deserialize, Clone, PartialEq, Default, Hash)]
+pub struct Task {
     /// The description of the project.
     pub description: Cow<'static, str>,
     /// The scope of the project.
@@ -253,9 +257,9 @@ pub struct Tasks {
     pub api_schema: Option<Vec<Route>>,
 }
 
-impl Tasks {
+impl Task {
     pub fn from_payload(payload: &str) -> Self {
-        Tasks {
+        Task {
             description: payload.to_string().into(),
             scope: None,
             urls: None,
@@ -726,8 +730,9 @@ impl Message {
     }
 }
 
-#[derive(Debug, PartialEq, Default, Clone)]
-pub enum Tool {
+/// Represents the standardized or custom name of a tool the agent can use.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub enum ToolName {
     /// Web & Information Retrieval
     #[default]
     Search,
@@ -796,10 +801,172 @@ pub enum Tool {
     Sim,
     Finance,
 
+    /// Optimization or code performance improvement
     Optimize,
+
+    /// UI development
     Frontend,
+
+    /// Backend and server logic development
     Backend,
 
-    /// Custom / Plugin Tool
+    /// Custom or plugin-based tool with a user-defined name.
     Plugin(String),
+}
+
+/// Represents a utility or function available to the agent, identified by a `ToolName`.
+#[derive(Derivative)]
+#[derivative(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct Tool {
+    /// The name/type of the tool.
+    pub name: ToolName,
+    /// A brief description of the tool's function.
+    pub description: Cow<'static, str>,
+    /// A function pointer to invoke the tool with a string input.
+    #[derivative(Default(value = "noop_tool"))]
+    pub invoke: fn(&str) -> String,
+}
+
+/// Represents a simple structured knowledge base for storing facts.
+#[derive(Derivative)]
+#[derivative(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct Knowledge {
+    /// A map of facts where the key is the identifier and the value is the explanation.
+    #[derivative(Hash = "ignore")]
+    pub facts: HashMap<Cow<'static, str>, Cow<'static, str>>,
+}
+
+/// Responsible for maintaining a current plan consisting of multiple goals.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct Planner {
+    /// The current sequence of goals the agent is working on.
+    pub current_plan: Vec<Goal>,
+}
+
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct Goal {
+    pub description: String,
+    pub priority: u8,
+    pub completed: bool,
+}
+
+/// Represents the personality and behavioral traits of the agent.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct Persona {
+    /// The name or label of the persona.
+    pub name: Cow<'static, str>,
+    /// Traits describing the agent's personality.
+    pub traits: Vec<Cow<'static, str>>,
+    /// Optional behavior script (e.g., a DSL or JSON configuration).
+    pub behavior_script: Option<Cow<'static, str>>,
+}
+
+/// A module for evaluating and reflecting on the agent's actions and thoughts.
+#[derive(Derivative)]
+#[derivative(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct Reflection {
+    /// A log of recent activities or messages.
+    pub recent_logs: Vec<Cow<'static, str>>,
+    /// A function for evaluating the agent's internal state.
+    #[derivative(Default(value = "default_eval_fn"))]
+    pub evaluation_fn: fn(&dyn Agent) -> Cow<'static, str>,
+}
+
+/// A scheduler for managing the agent's future tasks.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct TaskScheduler {
+    /// A list of scheduled tasks with specific times.
+    pub scheduled_tasks: Vec<ScheduledTask>,
+}
+
+/// Represents a task that is scheduled to occur at a certain time.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct ScheduledTask {
+    /// The scheduled time for the task.
+    pub time: DateTime<Utc>,
+    /// The goal associated with the task.
+    pub task: Task,
+}
+
+/// Represents a sensor or input modality that the agent can use.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub enum Sensor {
+    /// Watches a file for changes.
+    FileWatcher(Cow<'static, str>),
+    /// Listens to an API endpoint for updates.
+    ApiListener(Cow<'static, str>),
+    /// Captures audio input.
+    #[default]
+    AudioInput,
+    /// Uses a camera input stream.
+    Camera,
+    /// A custom sensor defined by a string identifier.
+    Custom(Cow<'static, str>),
+}
+
+/// Enumerates possible capabilities the agent can possess.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub enum Capability {
+    /// Can generate code from prompts.
+    #[default]
+    CodeGen,
+    /// Can perform live web searches.
+    WebSearch,
+    /// Can access SQL databases.
+    SQLAccess,
+    /// Can control robotic hardware.
+    RobotControl,
+    /// Can interact with APIs.
+    ApiIntegration,
+    /// Can convert text to speech.
+    TextToSpeech,
+}
+
+/// Manages recent communication and topics of focus for context maintenance.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub struct ContextManager {
+    /// Recent messages exchanged by the agent.
+    pub recent_messages: Vec<Communication>,
+    /// Topics currently prioritized or focused on.
+    pub focus_topics: Vec<Cow<'static, str>>,
+}
+
+/// Represents the primary mission or intent of an agent.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub enum Objective {
+    /// Explore a given environment or dataset.
+    #[default]
+    Explore,
+    /// Defend a target or state.
+    Defend,
+    /// Perform research and gather information.
+    Research,
+    /// Assist other agents or users.
+    Assist,
+    /// A custom objective specified by the user.
+    Custom(Cow<'static, str>),
+}
+
+/// Represents the spatial or logical location of an agent.
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub enum Position {
+    /// Frontline position (e.g., high activity).
+    #[default]
+    Frontline,
+    /// Support position.
+    Support,
+    /// Reconnaissance or scout role.
+    Recon,
+    /// Strategic or command-level position.
+    Strategic,
+    /// A custom-defined position.
+    Custom(Cow<'static, str>),
+}
+
+fn default_eval_fn(_: &dyn Agent) -> Cow<'static, str> {
+    Cow::Borrowed("default evaluation")
+}
+
+fn noop_tool(_: &str) -> String {
+    "default tool output".to_string()
 }

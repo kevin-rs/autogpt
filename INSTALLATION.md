@@ -296,7 +296,7 @@ pub struct CustomAgent {
 impl AgentExecutor for CustomAgent {
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         execute: bool,
         browse: bool,
         max_tries: u64,

@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use autogpt::agents::backend::BackendGPT;
-use autogpt::common::utils::{Scope, Tasks};
+use autogpt::common::utils::{Scope, Task};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::Functions;
 use std::fs;
@@ -20,7 +20,7 @@ async fn test_generate_backend_code() {
     let position = "Backend Developer";
 
     let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Generate a todo crud app using python FastAPI.".into(),
         scope: Some(Scope {
             crud: true,
@@ -48,7 +48,7 @@ async fn test_improve_backend_code() {
     let position = "Backend Developer";
 
     let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Generate a todo crud app using Axum.".into(),
         scope: Some(Scope {
             crud: true,
@@ -131,7 +131,7 @@ async fn test_fix_code_bugs() {
     let position = "Backend Developer";
 
     let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Generate a todo crud app using Axum.".into(),
         scope: Some(Scope {
             crud: true,
@@ -263,7 +263,7 @@ async fn tests_backend_dev_one() {
 
     let mut backend_gpt = BackendGPT::new(objective, position, "python").await;
 
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Generate a todo crud app using python FastAPI.".into(),
         scope: Some(Scope {
             crud: true,
