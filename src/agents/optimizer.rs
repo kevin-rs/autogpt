@@ -10,7 +10,7 @@
 //!
 //! ```rust
 //! use autogpt::agents::optimizer::OptimizerGPT;
-//! use autogpt::common::utils::Tasks;
+//! use autogpt::common::utils::Task;
 //! use autogpt::traits::functions::Functions;
 //! use autogpt::traits::functions::AsyncFunctions;
 //!
@@ -22,7 +22,7 @@
 //!         "rust",
 //!     ).await;
 //!
-//!     let mut tasks = Tasks {
+//!     let mut tasks = Task {
 //!         description: "Refactor backend code for better modularization".into(),
 //!         scope: None,
 //!         urls: None,
@@ -61,21 +61,29 @@
 //! large functions into smaller ones, improve code readability, and add necessary imports to the main file.
 //! The agent interacts with the Gemini API to make recommendations, refactor the code, and save the modules
 //! back to the workspace directory.
+#![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
 #[allow(unused_imports)]
-use crate::common::utils::{ClientType, Communication, Status, Tasks, strip_code_blocks};
+use crate::common::utils::{
+    Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
+    Route, Scope, Status, Task, TaskScheduler, Tool, strip_code_blocks,
+};
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
-use crate::traits::functions::{AsyncFunctions, Functions};
+use crate::traits::composite::AgentFunctions;
+use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
 use anyhow::Result;
+use auto_derive::Auto;
 use colored::*;
 use std::borrow::Cow;
 use std::env::var;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::sync::Arc;
 use tokio::fs;
+use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -108,7 +116,7 @@ use x_ai::{
 use async_trait::async_trait;
 
 /// Struct representing an `OptimizerGPT`, which manages code optimization and modularization tasks using the Gemini API.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Auto)]
 pub struct OptimizerGPT {
     /// Represents the path to the workspace directory for the backend code.
     /// This directory is where all generated or modified code is stored.
@@ -523,19 +531,7 @@ impl OptimizerGPT {
     }
 }
 
-impl Functions for OptimizerGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-}
-
-/// Implementation of the `AsyncFunctions` trait for the `OptimizerGPT` struct.
+/// Implementation of the `AgentExecutor` trait for the `OptimizerGPT` struct.
 ///
 /// This implementation provides core functionality to interact with and operate
 /// the optimizer agent in a code refinement and enhancement pipeline. It defines
@@ -562,12 +558,12 @@ impl Functions for OptimizerGPT {
 /// This trait is designed to be shared among multiple AI roles (FrontendGPT, OptimizerGPT, etc.)
 /// to enforce a consistent interface for task execution across stages of the autonomous dev agent.
 #[async_trait]
-impl AsyncFunctions for OptimizerGPT {
+impl AgentExecutor for OptimizerGPT {
     /// Asynchronously executes the modularization task for a given source code file.
     ///
     /// # Arguments
     ///
-    /// * `tasks` - Mutable reference to the `Tasks` struct containing task details.
+    /// * `tasks` - Mutable reference to the `Task` struct containing task details.
     /// * `_execute` - Boolean flag indicating whether to execute the task (currently unused).
     /// * `_browse` - Boolean flag indicating whether browsing capabilities are enabled (currently unused).
     /// * `_max_tries` - Maximum number of execution attempts (currently unused).
@@ -594,7 +590,7 @@ impl AsyncFunctions for OptimizerGPT {
     /// - Updates the agent's status to `Completed` after successful execution.
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
@@ -681,83 +677,5 @@ impl AsyncFunctions for OptimizerGPT {
         self.agent.update(Status::Completed);
 
         Ok(())
-    }
-
-    /// Saves a communication to long-term memory for the agent.
-    ///
-    /// # Arguments
-    ///
-    /// * `communication` - The communication to save, which contains the role and content.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
-    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
-    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
-    #[cfg(feature = "mem")]
-    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
-        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
-    }
-
-    /// Retrieves all communications stored in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
-    /// - The function will return a list of communications that are indexed by the agent's unique ID.
-    /// - It handles the retrieval of the stored metadata and content for each communication.
-    #[cfg(feature = "mem")]
-    async fn get_ltm(&self) -> Result<Vec<Communication>> {
-        load_long_term_memory(self.agent.id.clone()).await
-    }
-
-    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
-    /// - The context string is composed of each communication's role and content, joined by new lines.
-    /// - It provides a quick overview of the agent's memory in a human-readable format.
-    #[cfg(feature = "mem")]
-    async fn ltm_context(&self) -> String {
-        long_term_memory_context(self.agent.id.clone()).await
-    }
-}
-
-impl Agent for OptimizerGPT {
-    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
-        Default::default()
-    }
-
-    fn update(&mut self, status: Status) {
-        self.agent.update(status);
-    }
-
-    fn objective(&self) -> &Cow<'static, str> {
-        &self.agent.objective
-    }
-
-    fn position(&self) -> &Cow<'static, str> {
-        &self.agent.position
-    }
-
-    fn status(&self) -> &Status {
-        &self.agent.status
-    }
-
-    fn memory(&self) -> &Vec<Communication> {
-        &self.agent.memory
     }
 }

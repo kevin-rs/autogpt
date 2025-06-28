@@ -9,7 +9,7 @@
 //!
 //! ```rust
 //! use autogpt::agents::architect::ArchitectGPT;
-//! use autogpt::common::utils::Tasks;
+//! use autogpt::common::utils::Task;
 //! use autogpt::traits::functions::Functions;
 //! use autogpt::traits::functions::AsyncFunctions;
 //!
@@ -20,7 +20,7 @@
 //!         "Web wireframes and UIs",
 //!     ).await;
 //!
-//!     let mut tasks = Tasks {
+//!     let mut tasks = Task {
 //!         description: "Design an architectural diagram for a modern chat application".into(),
 //!         scope: None,
 //!         urls: None,
@@ -34,18 +34,21 @@
 //!     }
 //! }
 //! ```
+#![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
 #[allow(unused_imports)]
 use crate::common::utils::{
-    ClientType, Communication, Scope, Status, Tasks, extract_array, extract_json_string,
+    Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
+    Scope, Status, Task, TaskScheduler, Tool, extract_array, extract_json_string,
     strip_code_blocks,
 };
 use crate::prompts::architect::{
     ARCHITECT_DIAGRAM_PROMPT, ARCHITECT_ENDPOINTS_PROMPT, ARCHITECT_SCOPE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::functions::{AsyncFunctions, Functions};
+use crate::traits::composite::AgentFunctions;
+use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
 use anyhow::Result;
 use async_trait::async_trait;
 use colored::*;
@@ -53,9 +56,11 @@ use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
 use tokio::process::Command;
+use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -86,8 +91,10 @@ use x_ai::{
     traits::ChatCompletionsFetcher,
 };
 
+use auto_derive::Auto;
+
 /// Struct representing an ArchitectGPT, which orchestrates tasks related to architectural design using GPT.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Auto)]
 pub struct ArchitectGPT {
     /// Represents the workspace directory path for ArchitectGPT.
     workspace: Cow<'static, str>,
@@ -222,7 +229,7 @@ impl ArchitectGPT {
     /// - Updates the agent status to `Completed`.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub async fn get_scope(&mut self, tasks: &mut Tasks) -> Result<Scope> {
+    pub async fn get_scope(&mut self, tasks: &mut Task) -> Result<Scope> {
         let request: String = format!(
             "{}\n\nHere is the User Request:{}",
             ARCHITECT_SCOPE_PROMPT, tasks.description
@@ -534,7 +541,7 @@ impl ArchitectGPT {
     /// - Updates the agent status to `InUnitTesting`.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub async fn get_urls(&mut self, tasks: &mut Tasks) -> Result<()> {
+    pub async fn get_urls(&mut self, tasks: &mut Task) -> Result<()> {
         let request: String = format!(
             "{}\n\nHere is the Project Description:{}",
             ARCHITECT_ENDPOINTS_PROMPT, tasks.description
@@ -853,7 +860,7 @@ impl ArchitectGPT {
     /// - Returns the cleaned-up diagram content.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub async fn generate_diagram(&mut self, tasks: &mut Tasks) -> Result<String> {
+    pub async fn generate_diagram(&mut self, tasks: &mut Task) -> Result<String> {
         let request: String = format!(
             "{}\n\nUser Request:{}",
             ARCHITECT_DIAGRAM_PROMPT, tasks.description
@@ -1143,20 +1150,7 @@ impl ArchitectGPT {
     }
 }
 
-/// Implementation of the trait `AsyncFunctions` for `ArchitectGPT`.
-impl Functions for ArchitectGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-}
-
-/// Implementation of the trait `AsyncFunctions` for `ArchitectGPT`.
+/// Implementation of the trait `AgentExecutor` for `ArchitectGPT`.
 /// Contains additional methods related to architectural tasks.
 ///
 /// This trait provides methods for:
@@ -1170,7 +1164,7 @@ impl Functions for ArchitectGPT {
 /// - Handles task execution including scope retrieval, URL retrieval, and diagram generation.
 /// - Manages retries in case of failures during task execution.
 #[async_trait]
-impl AsyncFunctions for ArchitectGPT {
+impl AgentExecutor for ArchitectGPT {
     /// Executes tasks asynchronously.
     ///
     /// # Arguments
@@ -1191,7 +1185,7 @@ impl AsyncFunctions for ArchitectGPT {
     ///
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         _execute: bool,
         _browse: bool,
         max_tries: u64,
@@ -1359,82 +1353,5 @@ impl AsyncFunctions for ArchitectGPT {
         }
 
         Ok(())
-    }
-    /// Saves a communication to long-term memory for the agent.
-    ///
-    /// # Arguments
-    ///
-    /// * `communication` - The communication to save, which contains the role and content.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
-    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
-    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
-    #[cfg(feature = "mem")]
-    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
-        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
-    }
-
-    /// Retrieves all communications stored in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
-    /// - The function will return a list of communications that are indexed by the agent's unique ID.
-    /// - It handles the retrieval of the stored metadata and content for each communication.
-    #[cfg(feature = "mem")]
-    async fn get_ltm(&self) -> Result<Vec<Communication>> {
-        load_long_term_memory(self.agent.id.clone()).await
-    }
-
-    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
-    /// - The context string is composed of each communication's role and content, joined by new lines.
-    /// - It provides a quick overview of the agent's memory in a human-readable format.
-    #[cfg(feature = "mem")]
-    async fn ltm_context(&self) -> String {
-        long_term_memory_context(self.agent.id.clone()).await
-    }
-}
-
-impl Agent for ArchitectGPT {
-    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
-        Default::default()
-    }
-
-    fn update(&mut self, status: Status) {
-        self.agent.update(status);
-    }
-
-    fn objective(&self) -> &Cow<'static, str> {
-        &self.agent.objective
-    }
-
-    fn position(&self) -> &Cow<'static, str> {
-        &self.agent.position
-    }
-
-    fn status(&self) -> &Status {
-        &self.agent.status
-    }
-
-    fn memory(&self) -> &Vec<Communication> {
-        &self.agent.memory
     }
 }

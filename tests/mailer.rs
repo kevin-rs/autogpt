@@ -1,7 +1,7 @@
 #[cfg(feature = "mail")]
 use autogpt::agents::mailer::MailerGPT;
 use autogpt::common::utils::Scope;
-use autogpt::common::utils::Tasks;
+use autogpt::common::utils::Task;
 use autogpt::traits::functions::AsyncFunctions;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
@@ -21,7 +21,7 @@ async fn test_mailer_gpt() {
     let position = "Mailer";
 
     let mut mailer = MailerGPT::new(objective, position).await;
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: request.into(),
         scope: Some(Scope {
             crud: true,

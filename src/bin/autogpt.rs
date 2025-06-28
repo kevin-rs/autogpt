@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
         use autogpt::cli::autogpt::{Cli, Commands};
         use autogpt::common::input::read_user_input;
         use autogpt::common::utils::Scope;
-        use autogpt::common::utils::Tasks;
+        use autogpt::common::utils::Task;
         use autogpt::common::utils::ask_to_run_command;
         use autogpt::common::utils::setup_logging;
         use autogpt::traits::functions::AsyncFunctions;
@@ -279,7 +279,7 @@ async fn main() -> Result<()> {
                                     .bright_yellow()
                                     .bold()
                             );
-                            let mut tasks = Tasks {
+                            let mut tasks = Task {
                                 description: input.into(),
                                 scope: Some(Scope {
                                     crud: true,
@@ -364,7 +364,7 @@ async fn main() -> Result<()> {
                                     .bold()
                             );
 
-                            let mut tasks = Tasks {
+                            let mut tasks = Task {
                                 description: input.into(),
                                 scope: Some(Scope {
                                     crud: true,
@@ -430,7 +430,7 @@ async fn main() -> Result<()> {
                     let workspace = workspace + "backend";
                     let mut backend_gpt = BackendGPT::new(objective, position, language).await;
 
-                    let mut tasks = Tasks {
+                    let mut tasks = Task {
                         description: Default::default(),
                         scope: Some(Scope {
                             crud: true,
@@ -513,7 +513,7 @@ async fn main() -> Result<()> {
                     let position = "Web Designer";
                     let mut designer_agent = DesignerGPT::new(objective, position).await;
 
-                    let mut tasks = Tasks {
+                    let mut tasks = Task {
                         description: "".into(),
                         scope: None,
                         urls: None,
@@ -564,7 +564,7 @@ async fn main() -> Result<()> {
                     let position = "Mailer";
 
                     let mut mailer_agent = MailerGPT::new(objective, position).await;
-                    let mut tasks = Tasks {
+                    let mut tasks = Task {
                         description: "".into(),
                         scope: Some(Scope {
                             crud: true,
@@ -610,7 +610,7 @@ async fn main() -> Result<()> {
                     let position = "GitGPT";
 
                     let mut git_agent = GitGPT::new(objective, position).await;
-                    let mut tasks = Tasks {
+                    let mut tasks = Task {
                         description: "".into(),
                         scope: Some(Scope {
                             crud: true,
@@ -658,7 +658,7 @@ async fn main() -> Result<()> {
                     let mut optimizer_agent =
                         OptimizerGPT::new(objective, position, language).await;
 
-                    let mut tasks = Tasks {
+                    let mut tasks = Task {
                         description: "".into(),
                         scope: None,
                         urls: None,

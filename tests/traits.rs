@@ -1,40 +1,50 @@
 use autogpt::common::utils::{Communication, Status};
+use autogpt::prelude::*;
 use autogpt::traits::agent::Agent;
 use std::borrow::Cow;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MockAgent {
     objective: Cow<'static, str>,
     position: Cow<'static, str>,
     status: Status,
     memory: Vec<Communication>,
-}
-
-impl MockAgent {
-    pub fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
-        Self {
-            objective,
-            position,
-            status: Status::Idle,
-            memory: Vec::new(),
-        }
-    }
+    tools: Vec<Tool>,
+    knowledge: Knowledge,
+    planner: Option<Planner>,
+    persona: Persona,
+    collaborators: Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>,
+    reflection: Option<Reflection>,
+    scheduler: Option<TaskScheduler>,
+    capabilities: HashSet<Capability>,
+    context: ContextManager,
+    tasks: Vec<Task>,
 }
 
 impl Agent for MockAgent {
-    fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
-        Self::new(objective, position)
+    fn new(
+        objective: std::borrow::Cow<'static, str>,
+        position: std::borrow::Cow<'static, str>,
+    ) -> Self {
+        let mut agent = MockAgent {
+            objective: objective.clone(),
+            position: position.clone(),
+            ..Default::default()
+        };
+        agent.objective = objective;
+        agent.position = position;
+        agent
     }
 
     fn update(&mut self, status: Status) {
         self.status = status;
     }
 
-    fn objective(&self) -> &Cow<'static, str> {
+    fn objective(&self) -> &std::borrow::Cow<'static, str> {
         &self.objective
     }
 
-    fn position(&self) -> &Cow<'static, str> {
+    fn position(&self) -> &std::borrow::Cow<'static, str> {
         &self.position
     }
 
@@ -44,6 +54,46 @@ impl Agent for MockAgent {
 
     fn memory(&self) -> &Vec<Communication> {
         &self.memory
+    }
+
+    fn tools(&self) -> &Vec<Tool> {
+        &self.tools
+    }
+
+    fn knowledge(&self) -> &Knowledge {
+        &self.knowledge
+    }
+
+    fn planner(&self) -> Option<&Planner> {
+        self.planner.as_ref()
+    }
+
+    fn persona(&self) -> &Persona {
+        &self.persona
+    }
+
+    fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>> {
+        &self.collaborators
+    }
+
+    fn reflection(&self) -> Option<&Reflection> {
+        self.reflection.as_ref()
+    }
+
+    fn scheduler(&self) -> Option<&TaskScheduler> {
+        self.scheduler.as_ref()
+    }
+
+    fn capabilities(&self) -> &std::collections::HashSet<Capability> {
+        &self.capabilities
+    }
+
+    fn context(&self) -> &ContextManager {
+        &self.context
+    }
+
+    fn tasks(&self) -> &Vec<Task> {
+        &self.tasks
     }
 }
 

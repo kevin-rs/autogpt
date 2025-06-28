@@ -9,7 +9,7 @@
 //!
 //! ```rust
 //! use autogpt::agents::designer::DesignerGPT;
-//! use autogpt::common::utils::Tasks;
+//! use autogpt::common::utils::Task;
 //! use autogpt::traits::functions::Functions;
 //! use autogpt::traits::functions::AsyncFunctions;
 //!
@@ -20,7 +20,7 @@
 //!         "UIs",
 //!     ).await;
 //!
-//!     let mut tasks = Tasks {
+//!     let mut tasks = Task {
 //!         description: "Design a modern and minimalist homepage design layout for a tech company".into(),
 //!         scope: None,
 //!         urls: None,
@@ -37,18 +37,25 @@
 //!
 
 use crate::agents::agent::AgentGPT;
-use crate::common::utils::{ClientType, Communication, Status, Tasks, similarity};
+use crate::common::utils::{
+    Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
+    Status, Task, TaskScheduler, Tool, similarity,
+};
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
-use crate::traits::functions::{AsyncFunctions, Functions};
+use crate::traits::composite::AgentFunctions;
+use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
 use anyhow::Result;
 use async_trait::async_trait;
+use auto_derive::Auto;
 use colored::*;
 use getimg::client::Client as ImgClient;
 use getimg::utils::save_image;
 use std::borrow::Cow;
 use std::env::var;
+use std::sync::Arc;
 use tokio::fs;
+use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -72,8 +79,11 @@ use x_ai::{
     traits::ChatCompletionsFetcher,
 };
 
+use derivative::Derivative;
+
 /// Struct representing a DesignerGPT, which manages design-related tasks using Gemini or OpenAI API.
-#[derive(Debug, Clone)]
+#[derive(Derivative, Auto)]
+#[derivative(Debug, Clone)]
 pub struct DesignerGPT {
     /// Represents the workspace directory path for DesignerGPT.
     workspace: Cow<'static, str>,
@@ -83,6 +93,17 @@ pub struct DesignerGPT {
     img_client: ImgClient,
     /// Represents an OpenAI or Gemini client for interacting with their API.
     client: ClientType,
+}
+
+impl Default for DesignerGPT {
+    fn default() -> Self {
+        Self {
+            workspace: Cow::Borrowed("default_workspace"),
+            agent: AgentGPT::default(),
+            img_client: ImgClient::new("default", "default"),
+            client: ClientType::default(),
+        }
+    }
 }
 
 impl DesignerGPT {
@@ -162,7 +183,7 @@ impl DesignerGPT {
     /// - Adds communication logs to the agent memory for traceability.
     /// - Generates an image from the text prompt using the getimg client.
     /// - Saves the generated image to the workspace directory.
-    pub async fn generate_image_from_text(&mut self, tasks: &Tasks) -> Result<()> {
+    pub async fn generate_image_from_text(&mut self, tasks: &Task) -> Result<()> {
         let img_path = self.workspace.to_string() + "/img.jpg";
 
         let text_prompt: String =
@@ -594,7 +615,7 @@ impl DesignerGPT {
     ///
     pub async fn compare_text_and_image_prompts(
         &mut self,
-        tasks: &mut Tasks,
+        tasks: &mut Task,
         generated_text: &str,
     ) -> Result<bool> {
         let getimg_prompt = &tasks.description;
@@ -610,19 +631,7 @@ impl DesignerGPT {
     }
 }
 
-impl Functions for DesignerGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-}
-
-/// Implementation of the trait `AsyncFunctions` for `DesignerGPT`.
+/// Implementation of the trait `AgentExecutor` for `DesignerGPT`.
 /// Contains additional methods related to design tasks.
 ///
 /// This trait provides methods for:
@@ -637,7 +646,7 @@ impl Functions for DesignerGPT {
 /// - Handles task execution including image generation, text generation, and comparison.
 /// - Manages retries and error handling during task execution.
 #[async_trait]
-impl AsyncFunctions for DesignerGPT {
+impl AgentExecutor for DesignerGPT {
     /// Asynchronously executes tasks associated with DesignerGPT.
     ///
     /// # Arguments
@@ -662,7 +671,7 @@ impl AsyncFunctions for DesignerGPT {
     ///
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
@@ -711,82 +720,4 @@ impl AsyncFunctions for DesignerGPT {
 
         Ok(())
     }
-    /// Saves a communication to long-term memory for the agent.
-    ///
-    /// # Arguments
-    ///
-    /// * `communication` - The communication to save, which contains the role and content.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
-    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
-    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
-    #[cfg(feature = "mem")]
-    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
-        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
-    }
-
-    /// Retrieves all communications stored in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
-    /// - The function will return a list of communications that are indexed by the agent's unique ID.
-    /// - It handles the retrieval of the stored metadata and content for each communication.
-    #[cfg(feature = "mem")]
-    async fn get_ltm(&self) -> Result<Vec<Communication>> {
-        load_long_term_memory(self.agent.id.clone()).await
-    }
-
-    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
-    /// - The context string is composed of each communication's role and content, joined by new lines.
-    /// - It provides a quick overview of the agent's memory in a human-readable format.
-    #[cfg(feature = "mem")]
-    async fn ltm_context(&self) -> String {
-        long_term_memory_context(self.agent.id.clone()).await
-    }
 }
-
-// TODO: Impl Default to make it compatible with AutoGPT
-// impl Agent for DesignerGPT {
-//     fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
-//         Default::default()
-//     }
-
-//     fn update(&mut self, status: Status) {
-//         self.agent.update(status);
-//     }
-
-//     fn objective(&self) -> &Cow<'static, str> {
-//         &self.agent.objective
-//     }
-
-//     fn position(&self) -> &Cow<'static, str> {
-//         &self.agent.position
-//     }
-
-//     fn status(&self) -> &Status {
-//         &self.agent.status
-//     }
-
-//     fn memory(&self) -> &Vec<Communication> {
-//         &self.agent.memory
-//     }
-// }

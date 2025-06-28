@@ -47,7 +47,7 @@ implementation within the same module. So don't import anything from the current
 
 Instructions:
 - The user will provide a project description and a code template for a website backend build.
-- Tasks:
+- Task:
   1. Fix any bugs in the code and add minor additional functionality.
   2. Ensure compliance with all backend requirements specified in the project description. Add any missing features.
   3. Write the code without any commentary.

@@ -1,5 +1,5 @@
 use autogpt::agents::git::GitGPT;
-use autogpt::common::utils::{Status, Tasks};
+use autogpt::common::utils::{Status, Task};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::AsyncFunctions;
 use autogpt::traits::functions::Functions;
@@ -30,7 +30,7 @@ async fn test_git_gpt_execute() {
     fs::create_dir_all(test_workspace).unwrap();
     fs::write(&dummy_file_path, "Hello, GitGPT!").unwrap();
 
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Initial commit - Added hello.txt".into(),
         scope: None,
         urls: None,

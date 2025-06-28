@@ -10,32 +10,71 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let expanded = quote! {
         impl Agent for #name {
-            fn new(objective: std::borrow::Cow<'static, str>, position: std::borrow::Cow<'static, str>) -> Self {
-                Self {
-                    objective,
-                    position,
-                    ..Default::default()
-                }
+            fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
+                let mut agent = Self::default();
+                agent.agent.objective = objective;
+                agent.agent.position = position;
+                agent
             }
 
             fn update(&mut self, status: Status) {
-                self.status = status;
+                self.agent.update(status);
             }
 
             fn objective(&self) -> &std::borrow::Cow<'static, str> {
-                &self.objective
+                &self.agent.objective
             }
 
             fn position(&self) -> &std::borrow::Cow<'static, str> {
-                &self.position
+                &self.agent.position
             }
 
             fn status(&self) -> &Status {
-                &self.status
+                &self.agent.status
             }
 
             fn memory(&self) -> &Vec<Communication> {
-                &self.memory
+                &self.agent.memory
+            }
+
+            fn tools(&self) -> &Vec<Tool> {
+                &self.agent.tools
+            }
+
+            fn knowledge(&self) -> &Knowledge {
+                &self.agent.knowledge
+            }
+
+            fn planner(&self) -> Option<&Planner> {
+                self.agent.planner.as_ref()
+            }
+
+            fn persona(&self) -> &Persona {
+                &self.agent.persona
+            }
+
+            fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>> {
+                &self.agent.collaborators
+            }
+
+            fn reflection(&self) -> Option<&Reflection> {
+                self.agent.reflection.as_ref()
+            }
+
+            fn scheduler(&self) -> Option<&TaskScheduler> {
+                self.agent.scheduler.as_ref()
+            }
+
+            fn capabilities(&self) -> &std::collections::HashSet<Capability> {
+                &self.agent.capabilities
+            }
+
+            fn context(&self) -> &ContextManager {
+                &self.agent.context
+            }
+
+            fn tasks(&self) -> &Vec<Task> {
+                &self.agent.tasks
             }
         }
 
@@ -49,7 +88,7 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         impl AsyncFunctions for #name {
             async fn execute<'a>(
                 &'a mut self,
-                tasks: &'a mut Tasks,
+                tasks: &'a mut Task,
                 execute: bool,
                 browse: bool,
                 max_tries: u64,

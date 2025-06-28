@@ -5,17 +5,34 @@
 //! # Examples
 //!
 //! ```rust
-//! use autogpt::common::utils::{Communication, Status};
+//! use autogpt::common::utils::{
+//!     Capability, Communication, ContextManager, Knowledge, Persona, Planner,
+//!     Reflection, Status, TaskScheduler, Tool, Task
+//! };
 //! use autogpt::traits::agent::Agent;
+//! use autogpt::traits::composite::AgentFunctions;
 //! use std::borrow::Cow;
+//! use std::collections::HashSet;
+//! use tokio::sync::Mutex;
+//! use std::sync::Arc;
 //!
-//! /// A simple agent implementation.
+//! /// A simple agent implementation that satisfies the full Agent trait.
 //! #[derive(Debug)]
 //! struct SimpleAgent {
 //!     objective: Cow<'static, str>,
 //!     position: Cow<'static, str>,
 //!     status: Status,
 //!     memory: Vec<Communication>,
+//!     tools: Vec<Tool>,
+//!     knowledge: Knowledge,
+//!     planner: Option<Planner>,
+//!     persona: Persona,
+//!     collaborators: Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>,
+//!     reflection: Option<Reflection>,
+//!     scheduler: Option<TaskScheduler>,
+//!     capabilities: HashSet<Capability>,
+//!     context: ContextManager,
+//!     tasks: Vec<Task>,
 //! }
 //!
 //! impl Agent for SimpleAgent {
@@ -24,7 +41,24 @@
 //!             objective,
 //!             position,
 //!             status: Status::Idle,
-//!             memory: Vec::new(),
+//!             memory: vec![],
+//!             tools: vec![],
+//!             knowledge: Knowledge::default(),
+//!             planner: None,
+//!             persona: Persona {
+//!                 name: Cow::Borrowed("Default"),
+//!                 traits: vec![],
+//!                 behavior_script: None,
+//!             },
+//!             collaborators: vec![],
+//!             reflection: None,
+//!             scheduler: None,
+//!             capabilities: HashSet::new(),
+//!             context: ContextManager {
+//!                 recent_messages: vec![],
+//!                 focus_topics: vec![],
+//!             },
+//!             tasks: vec![],
 //!         }
 //!     }
 //!
@@ -47,12 +81,60 @@
 //!     fn memory(&self) -> &Vec<Communication> {
 //!         &self.memory
 //!     }
+//!
+//!     fn tools(&self) -> &Vec<Tool> {
+//!         &self.tools
+//!     }
+//!
+//!     fn knowledge(&self) -> &Knowledge {
+//!         &self.knowledge
+//!     }
+//!
+//!     fn planner(&self) -> Option<&Planner> {
+//!         self.planner.as_ref()
+//!     }
+//!
+//!     fn persona(&self) -> &Persona {
+//!         &self.persona
+//!     }
+//!
+//!     fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>> {
+//!         &self.collaborators
+//!     }
+//!
+//!     fn reflection(&self) -> Option<&Reflection> {
+//!         self.reflection.as_ref()
+//!     }
+//!
+//!     fn scheduler(&self) -> Option<&TaskScheduler> {
+//!         self.scheduler.as_ref()
+//!     }
+//!
+//!     fn capabilities(&self) -> &HashSet<Capability> {
+//!         &self.capabilities
+//!     }
+//!
+//!     fn context(&self) -> &ContextManager {
+//!         &self.context
+//!     }
+//!
+//!     fn tasks(&self) -> &Vec<Task> {
+//!         &self.tasks
+//!     }
 //! }
+//! ```
 //!
 
-use crate::common::utils::{Communication, Status};
+use crate::common::utils::{
+    Capability, Communication, ContextManager, Knowledge, Persona, Planner, Reflection, Status,
+    Task, TaskScheduler, Tool,
+};
+use crate::prelude::Mutex;
+use crate::traits::composite::AgentFunctions;
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 /// A trait defining basic functionalities for agents.
 pub trait Agent: Debug {
@@ -84,4 +166,34 @@ pub trait Agent: Debug {
 
     /// Retrieves the memory of the agent containing exchanged messages.
     fn memory(&self) -> &Vec<Communication>;
+
+    /// Returns the agent's tools
+    fn tools(&self) -> &Vec<Tool>;
+
+    /// Returns the knowledge base
+    fn knowledge(&self) -> &Knowledge;
+
+    /// Returns a mutable reference to the planner (if any)
+    fn planner(&self) -> Option<&Planner>;
+
+    /// Returns the agent's persona
+    fn persona(&self) -> &Persona;
+
+    /// Returns a list of collaborators agents
+    fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>;
+
+    /// Returns optional self-reflection module
+    fn reflection(&self) -> Option<&Reflection>;
+
+    /// Returns optional task scheduler
+    fn scheduler(&self) -> Option<&TaskScheduler>;
+
+    /// Returns the agent's capabilities
+    fn capabilities(&self) -> &HashSet<Capability>;
+
+    /// Returns the agent's context manager
+    fn context(&self) -> &ContextManager;
+
+    /// Returns the current list of tasks
+    fn tasks(&self) -> &Vec<Task>;
 }

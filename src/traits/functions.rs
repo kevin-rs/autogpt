@@ -6,7 +6,7 @@
 //!
 //! ```rust
 //! use autogpt::agents::agent::AgentGPT;
-//! use autogpt::common::utils::Tasks;
+//! use autogpt::common::utils::Task;
 //! use anyhow::Result;
 //! use autogpt::traits::functions::Functions;
 //! use autogpt::traits::functions::AsyncFunctions;
@@ -57,7 +57,7 @@
 //!     /// A result indicating success or failure.
 //!     async fn execute<'a>(
 //!        &'a mut self,
-//!        tasks: &'a mut Tasks,
+//!        tasks: &'a mut Task,
 //!        _execute: bool,
 //!        _browse: bool,
 //!        _max_tries: u64,
@@ -125,7 +125,7 @@
 use crate::agents::agent::AgentGPT;
 #[cfg(feature = "mem")]
 use crate::common::utils::Communication;
-use crate::common::utils::Tasks;
+use crate::common::utils::Task;
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -157,7 +157,7 @@ pub trait AsyncFunctions: Send + Sync {
     #[allow(async_fn_in_trait)]
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         execute: bool,
         browse: bool,
         max_tries: u64,
@@ -200,7 +200,7 @@ pub trait AgentExecutor {
     #[allow(async_fn_in_trait)]
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         execute: bool,
         browse: bool,
         max_tries: u64,

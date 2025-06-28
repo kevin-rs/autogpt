@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use autogpt::agents::agent::AgentGPT;
 use autogpt::common::utils::Communication;
-use autogpt::common::utils::{Route, Scope, Tasks};
+use autogpt::common::utils::{Route, Scope, Task};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::AsyncFunctions;
 use autogpt::traits::functions::Functions;
@@ -25,7 +25,7 @@ impl Functions for MockFunctions {
 impl AsyncFunctions for MockFunctions {
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         _execute: bool,
         _browse: bool,
         _max_tries: u64,
@@ -93,8 +93,8 @@ async fn test_functions_execution() {
     let position = "Position";
     let agent = AgentGPT::new_borrowed(objective, position);
 
-    let mut tasks = Tasks {
-        description: Cow::Borrowed("Tasks"),
+    let mut tasks = Task {
+        description: Cow::Borrowed("Task"),
         scope: Some(Scope {
             crud: true,
             auth: false,

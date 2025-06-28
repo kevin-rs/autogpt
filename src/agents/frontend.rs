@@ -9,7 +9,7 @@
 //!
 //! ```rust
 //! use autogpt::agents::frontend::FrontendGPT;
-//! use autogpt::common::utils::Tasks;
+//! use autogpt::common::utils::Task;
 //! use autogpt::traits::functions::Functions;
 //! use autogpt::traits::functions::AsyncFunctions;
 //!
@@ -21,7 +21,7 @@
 //!         "rust",
 //!     ).await;
 //!
-//!     let mut tasks = Tasks {
+//!     let mut tasks = Task {
 //!         description: "Create a landing page with a sign-up form".into(),
 //!         scope: None,
 //!         urls: None,
@@ -36,25 +36,33 @@
 //! }
 //! ```
 //!
+#![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
 #[allow(unused_imports)]
-use crate::common::utils::{ClientType, Communication, Status, Tasks, strip_code_blocks};
+use crate::common::utils::{
+    Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
+    Route, Scope, Status, Task, TaskScheduler, Tool, strip_code_blocks,
+};
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::functions::{AsyncFunctions, Functions};
+use crate::traits::composite::AgentFunctions;
+use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
 use anyhow::Result;
+use auto_derive::Auto;
 use colored::*;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
+use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
 #[cfg(feature = "mem")]
@@ -86,7 +94,7 @@ use x_ai::{
 };
 
 /// Struct representing a `FrontendGPT`, which manages frontend code generation and testing using Gemini API.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Auto)]
 #[allow(unused)]
 pub struct FrontendGPT {
     /// Represents the workspace directory path for `FrontendGPT`.
@@ -253,7 +261,7 @@ impl FrontendGPT {
     /// - Writes the generated frontend code to the appropriate file.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub async fn generate_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
+    pub async fn generate_frontend_code(&mut self, tasks: &mut Task) -> Result<String> {
         let path = self.workspace.clone();
 
         self.agent.add_communication(Communication {
@@ -580,7 +588,7 @@ impl FrontendGPT {
     /// - Writes the improved frontend code to the appropriate file.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub async fn improve_frontend_code(&mut self, tasks: &mut Tasks) -> Result<String> {
+    pub async fn improve_frontend_code(&mut self, tasks: &mut Task) -> Result<String> {
         let path = self.workspace.clone();
 
         self.agent.add_communication(Communication {
@@ -905,7 +913,7 @@ impl FrontendGPT {
     /// - Writes the fixed frontend code to the appropriate file.
     #[allow(unreachable_code)]
     #[allow(unused)]
-    pub async fn fix_code_bugs(&mut self, tasks: &mut Tasks) -> Result<String> {
+    pub async fn fix_code_bugs(&mut self, tasks: &mut Task) -> Result<String> {
         let path = self.workspace.clone();
 
         self.agent.add_communication(Communication {
@@ -1246,19 +1254,7 @@ impl FrontendGPT {
     }
 }
 
-impl Functions for FrontendGPT {
-    /// Retrieves a reference to the agent.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the agent.
-    ///
-    fn get_agent(&self) -> &AgentGPT {
-        &self.agent
-    }
-}
-
-/// Implementation of the trait `AsyncFunctions` for FrontendGPT.
+/// Implementation of the trait `AgentExecutor` for FrontendGPT.
 /// Contains additional methods related to frontend tasks.
 ///
 /// This trait provides methods for:
@@ -1273,7 +1269,7 @@ impl Functions for FrontendGPT {
 /// - Handles task execution including code generation, improvement, bug fixing, and testing.
 /// - Manages retries and error handling during task execution.
 #[async_trait]
-impl AsyncFunctions for FrontendGPT {
+impl AgentExecutor for FrontendGPT {
     /// Asynchronously executes frontend tasks associated with FrontendGPT.
     ///
     /// # Arguments
@@ -1298,7 +1294,7 @@ impl AsyncFunctions for FrontendGPT {
     ///
     async fn execute<'a>(
         &'a mut self,
-        tasks: &'a mut Tasks,
+        tasks: &'a mut Task,
         execute: bool,
         _browse: bool,
         max_tries: u64,
@@ -1458,82 +1454,5 @@ impl AsyncFunctions for FrontendGPT {
             }
         }
         Ok(())
-    }
-    /// Saves a communication to long-term memory for the agent.
-    ///
-    /// # Arguments
-    ///
-    /// * `communication` - The communication to save, which contains the role and content.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<()>`): Result indicating the success or failure of saving the communication.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method uses the `save_long_term_memory` util function to save the communication into the agent's long-term memory.
-    /// - The communication is embedded and stored using the agent's unique ID as the namespace.
-    /// - It handles the embedding and metadata for the communication, ensuring it's stored correctly.
-    #[cfg(feature = "mem")]
-    async fn save_ltm(&mut self, communication: Communication) -> Result<()> {
-        save_long_term_memory(&mut self.client, self.agent.id.clone(), communication).await
-    }
-
-    /// Retrieves all communications stored in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`Result<Vec<Communication>>`): A result containing a vector of communications retrieved from the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method fetches the stored communications for the agent by interacting with the `load_long_term_memory` function.
-    /// - The function will return a list of communications that are indexed by the agent's unique ID.
-    /// - It handles the retrieval of the stored metadata and content for each communication.
-    #[cfg(feature = "mem")]
-    async fn get_ltm(&self) -> Result<Vec<Communication>> {
-        load_long_term_memory(self.agent.id.clone()).await
-    }
-
-    /// Retrieves the concatenated context of all communications in the agent's long-term memory.
-    ///
-    /// # Returns
-    ///
-    /// (`String`): A string containing the concatenated role and content of all communications stored in the agent's long-term memory.
-    ///
-    /// # Business Logic
-    ///
-    /// - This method calls the `long_term_memory_context` function to generate a string representation of the agent's entire long-term memory.
-    /// - The context string is composed of each communication's role and content, joined by new lines.
-    /// - It provides a quick overview of the agent's memory in a human-readable format.
-    #[cfg(feature = "mem")]
-    async fn ltm_context(&self) -> String {
-        long_term_memory_context(self.agent.id.clone()).await
-    }
-}
-
-impl Agent for FrontendGPT {
-    fn new(_objective: Cow<'static, str>, _position: Cow<'static, str>) -> Self {
-        Default::default()
-    }
-
-    fn update(&mut self, status: Status) {
-        self.agent.update(status);
-    }
-
-    fn objective(&self) -> &Cow<'static, str> {
-        &self.agent.objective
-    }
-
-    fn position(&self) -> &Cow<'static, str> {
-        &self.agent.position
-    }
-
-    fn status(&self) -> &Status {
-        &self.agent.status
-    }
-
-    fn memory(&self) -> &Vec<Communication> {
-        &self.agent.memory
     }
 }

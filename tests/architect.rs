@@ -1,5 +1,5 @@
 use autogpt::agents::architect::ArchitectGPT;
-use autogpt::common::utils::{Scope, Status, Tasks};
+use autogpt::common::utils::{Scope, Status, Task};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::{AsyncFunctions, Functions};
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
@@ -18,7 +18,7 @@ async fn test_get_scope() {
 
     let mut architect_agent = ArchitectGPT::new(objective, position).await;
 
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Create a blog platform for publishing articles and comments.".into(),
         scope: None,
         urls: None,
@@ -48,7 +48,7 @@ async fn test_get_urls() {
 
     let mut architect_agent = ArchitectGPT::new(objective, position).await;
 
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Create a weather forecast website for global cities.".into(),
         scope: Some(Scope {
             crud: true,
@@ -78,7 +78,7 @@ async fn test_architect_agent() {
 
     let mut architect_agent = ArchitectGPT::new(objective, position).await;
 
-    let mut tasks = Tasks {
+    let mut tasks = Task {
         description: "Create a weather forecast website for global cities.".into(),
         scope: Some(Scope {
             crud: true,
