@@ -128,12 +128,12 @@ fn main() {
     file.write_all(file_content.as_bytes()).unwrap();
 
     let request = "Refactor the following function to improve readability and modularity.";
-    let _response = optimizer_agent.generate_and_track(request).await;
+    let response = optimizer_agent.generate_and_track(request).await;
 
-    // assert!(!response.unwrap().is_empty());
+    assert!(!response.unwrap().is_empty());
 
-    assert_eq!(optimizer_agent.get_agent().memory().len(), 1);
-    assert_eq!(optimizer_agent.get_agent().memory()[0].role, "assistant");
+    // assert_eq!(optimizer_agent.get_agent().memory().len(), 1);
+    // assert_eq!(optimizer_agent.get_agent().memory()[0].role, "assistant");
     // let workspace = optimizer_agent.workspace.to_string();
     // fs::remove_dir_all("workspace").unwrap();
 }

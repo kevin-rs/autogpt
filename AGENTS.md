@@ -85,7 +85,7 @@ BackendGPT handles all things related to server-side logic and data processing. 
 
 #### How BackendGPT Works
 
-<video src="https://github.com/user-attachments/assets/3f1a1e0a-8830-45fe-81cc-c01abe793a254"></video>
+<video src="https://github.com/user-attachments/assets/b5104499-7971-4f58-8ff2-e0a882d852ba"></video>
 
 Upon receiving instructions from ManagerGPT, BackendGPT will:
 
