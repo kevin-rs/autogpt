@@ -196,4 +196,13 @@ pub trait Agent: Debug {
 
     /// Returns the current list of tasks
     fn tasks(&self) -> &Vec<Task>;
+
+    /// Mutable access to memory (messages)
+    fn memory_mut(&mut self) -> &mut Vec<Communication>;
+
+    /// Mutable access to planner (if any)
+    fn planner_mut(&mut self) -> Option<&mut Planner>;
+
+    /// Mutable access to context manager
+    fn context_mut(&mut self) -> &mut ContextManager;
 }

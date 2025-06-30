@@ -44,7 +44,7 @@ use crate::common::utils::{
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
-use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
+use crate::traits::functions::{Executor, AsyncFunctions, Functions};
 use anyhow::Result;
 use async_trait::async_trait;
 use auto_derive::Auto;
@@ -69,7 +69,10 @@ use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*
 
 #[cfg(feature = "gem")]
 use gems::{
-    messages::Content, messages::Message, traits::CTrait, utils::load_and_encode_image,
+    chat::ChatBuilder,
+    messages::{Content, Message},
+    traits::CTrait,
+    utils::load_and_encode_image,
     vision::VisionBuilder,
 };
 
@@ -77,6 +80,12 @@ use gems::{
 use x_ai::{
     chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
     traits::ChatCompletionsFetcher,
+};
+
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
 };
 
 use derivative::Derivative;
@@ -631,7 +640,7 @@ impl DesignerGPT {
     }
 }
 
-/// Implementation of the trait `AgentExecutor` for `DesignerGPT`.
+/// Implementation of the trait `Executor` for `DesignerGPT`.
 /// Contains additional methods related to design tasks.
 ///
 /// This trait provides methods for:
@@ -646,7 +655,7 @@ impl DesignerGPT {
 /// - Handles task execution including image generation, text generation, and comparison.
 /// - Manages retries and error handling during task execution.
 #[async_trait]
-impl AgentExecutor for DesignerGPT {
+impl Executor for DesignerGPT {
     /// Asynchronously executes tasks associated with DesignerGPT.
     ///
     /// # Arguments

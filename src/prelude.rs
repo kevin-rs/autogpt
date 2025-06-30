@@ -29,7 +29,7 @@ pub use {
     },
     crate::traits::agent::Agent,
     crate::traits::composite::AgentFunctions,
-    crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions},
+    crate::traits::functions::{Executor, AsyncFunctions, Functions},
     anyhow::{Result, anyhow},
     async_trait::async_trait,
     auto_derive::Auto,
@@ -124,7 +124,7 @@ impl AutoGPT {
                 let mut locked_tasks = tasks_clone.lock().await;
                 let mut agent = agent_clone.lock().await;
 
-                match agent.execute(&mut locked_tasks, true, false, 3).await {
+                match agent.execute(&mut locked_tasks, true, false, 1).await {
                     Ok(_) => {
                         debug!("Agent {} ({}) executed successfully", i, agent_objective);
                         Ok::<(), anyhow::Error>(())

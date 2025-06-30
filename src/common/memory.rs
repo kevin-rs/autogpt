@@ -153,8 +153,9 @@ pub async fn save_long_term_memory(
             ]),
         }),
     };
-
-    index.upsert(&[vector], &namespace.into()).await.unwrap();
+    if let Err(_e) = index.upsert(&[vector], &namespace.into()).await {
+        tracing::warn!("Failed to upsert vector");
+    }
     Ok(())
 }
 
@@ -191,26 +192,40 @@ pub async fn load_long_term_memory(agent_id: Cow<'static, str>) -> Result<Vec<Co
         .unwrap();
 
     let ids: Vec<&str> = list.vectors.iter().map(|v| v.id.as_str()).collect();
-    let fetched = index.fetch(&ids, &namespace.into()).await.unwrap();
 
-    let communications = fetched
-        .vectors
-        .values()
-        .map(|v| {
-            let metadata = v.metadata.as_ref().unwrap();
+    let fetched_result = index.fetch(&ids, &namespace.into()).await;
 
-            Communication {
-                role: match metadata.fields.get("role").and_then(|v| v.kind.as_ref()) {
-                    Some(Kind::StringValue(val)) => Cow::Owned(val.clone()),
-                    _ => Cow::Borrowed("unknown"),
-                },
-                content: match metadata.fields.get("content").and_then(|v| v.kind.as_ref()) {
-                    Some(Kind::StringValue(val)) => Cow::Owned(val.clone()),
-                    _ => Cow::Borrowed(""),
-                },
-            }
-        })
-        .collect();
+    let communications = if let Ok(fetched) = fetched_result {
+        fetched
+            .vectors
+            .values()
+            .map(|v| {
+                let metadata_opt = v.metadata.as_ref();
+
+                let role = metadata_opt
+                    .and_then(|meta| meta.fields.get("role"))
+                    .and_then(|v| v.kind.as_ref())
+                    .and_then(|kind| match kind {
+                        Kind::StringValue(val) => Some(Cow::Owned(val.clone())),
+                        _ => None,
+                    })
+                    .unwrap_or(Cow::Borrowed("unknown"));
+
+                let content = metadata_opt
+                    .and_then(|meta| meta.fields.get("content"))
+                    .and_then(|v| v.kind.as_ref())
+                    .and_then(|kind| match kind {
+                        Kind::StringValue(val) => Some(Cow::Owned(val.clone())),
+                        _ => None,
+                    })
+                    .unwrap_or(Cow::Borrowed(""));
+
+                Communication { role, content }
+            })
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
 
     Ok(communications)
 }

@@ -39,28 +39,34 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "cli")]
+use crate::common::utils::spinner;
 #[allow(unused_imports)]
 use crate::common::utils::{
-    Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
-    Route, Scope, Status, Task, TaskScheduler, Tool, strip_code_blocks,
+    Capability, ClientType, Communication, ContextManager, GenerationOutput, Goal, Knowledge,
+    OutputKind, Persona, Planner, Reflection, Route, Scope, Status, Task, TaskScheduler, Tool,
+    extract_array, strip_code_blocks,
 };
+
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
-use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
+use crate::traits::functions::{Executor, AsyncFunctions, Functions};
 use anyhow::Result;
 use auto_derive::Auto;
 use colored::*;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
+use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
+use tokio::process::Child;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
@@ -131,8 +137,6 @@ impl FrontendGPT {
     /// - Constructs the workspace directory path for FrontendGPT.
     /// - Initializes the GPT agent with the given objective, position, and language.
     /// - Creates clients for interacting with Gemini API
-    #[allow(unreachable_code)]
-    #[allow(unused)]
     pub async fn new(
         objective: &'static str,
         position: &'static str,
@@ -210,8 +214,10 @@ impl FrontendGPT {
             }
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
+        #[allow(unused)]
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
 
+        #[allow(unused)]
         let client = ClientType::from_env();
 
         info!(
@@ -234,6 +240,79 @@ impl FrontendGPT {
             bugs: None,
             language,
             nb_bugs: 0,
+        }
+    }
+    pub async fn generate(
+        &mut self,
+        prompt: &str,
+        tasks: &mut Task,
+        output_type: OutputKind,
+    ) -> Result<GenerationOutput> {
+        #[cfg(feature = "mem")]
+        {
+            self.agent.memory = self.get_ltm().await?;
+        }
+
+        let request: String = format!(
+            "{}\n\nTask Description: {}\nPrevious Conversation: {:?}",
+            prompt,
+            tasks.description,
+            self.agent.memory(),
+        );
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("user"),
+            content: Cow::Owned(request.clone()),
+        });
+
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("user"),
+                    content: Cow::Owned(request.clone()),
+                })
+                .await;
+        }
+
+        #[allow(unused)]
+        let mut response_text = String::new();
+
+        #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+        {
+            response_text = self.send_request(&request).await?;
+        }
+
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(response_text.clone()),
+        });
+
+        #[cfg(feature = "mem")]
+        {
+            let _ = self
+                .save_ltm(Communication {
+                    role: Cow::Borrowed("assistant"),
+                    content: Cow::Owned(response_text.clone()),
+                })
+                .await;
+        }
+
+        debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
+
+        match output_type {
+            OutputKind::Text => Ok(GenerationOutput::Text(strip_code_blocks(&response_text))),
+            OutputKind::UrlList => {
+                let urls: Vec<Cow<'static, str>> =
+                    serde_json::from_str(&extract_array(&response_text).unwrap_or_default())?;
+                tasks.urls = Some(urls.clone());
+                self.agent.update(Status::InUnitTesting);
+                Ok(GenerationOutput::UrlList(urls))
+            }
+            OutputKind::Scope => {
+                let scope: Scope = serde_json::from_str(&strip_code_blocks(&response_text))?;
+                Ok(GenerationOutput::Scope(scope))
+            }
         }
     }
 
@@ -259,10 +338,22 @@ impl FrontendGPT {
     /// - Constructs a request for generating frontend code using the template and project description.
     /// - Sends the request to the Gemini API to generate frontend code.
     /// - Writes the generated frontend code to the appropriate file.
-    #[allow(unreachable_code)]
-    #[allow(unused)]
     pub async fn generate_frontend_code(&mut self, tasks: &mut Task) -> Result<String> {
         let path = self.workspace.clone();
+
+        let frontend_path = match self.language {
+            "rust" => format!("{}/{}", path, "src/template.rs"),
+            "python" => format!("{}/{}", path, "template.py"),
+            "javascript" => format!("{}/{}", path, "src/template.js"),
+            _ => panic!("Unsupported language, consider opening an Issue/PR"),
+        };
+
+        let template = fs::read_to_string(&frontend_path).await?;
+
+        let prompt = format!(
+            "{}\n\nCode Template: {}\nProject Description: {}",
+            FRONTEND_CODE_PROMPT, template, tasks.description
+        );
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
@@ -284,265 +375,32 @@ impl FrontendGPT {
                 })
                 .await;
         }
-        let full_path = match self.language {
-            "rust" => format!("{}/{}", path, "src/template.rs"),
-            "python" => format!("{}/{}", path, "template.py"),
-            "javascript" => format!("{}/{}", path, "src/template.js"),
-            _ => panic!("Unsupported language, consider open an Issue/PR"),
-        };
 
-        debug!("[*] {:?}: {:?}", self.agent.position(), full_path);
+        let output = self.generate(&prompt, tasks, OutputKind::Text).await?;
 
-        let template = fs::read_to_string(&full_path).await?;
-
-        self.agent.add_communication(Communication {
-            role: Cow::Borrowed("assistant"),
-            content: Cow::Owned(format!(
-                "Generating frontend code using template from '{}' and project description.",
-                full_path
-            )),
-        });
-
-        #[cfg(feature = "mem")]
-        {
-            let _ = self
-                .save_ltm(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(format!(
-                    "Generating frontend code using template from '{}' and project description.",
-                    full_path
-                )),
-                })
-                .await;
-        }
-        let request = format!(
-            "{}\n\nCode Template: {}\nProject Description: {}",
-            FRONTEND_CODE_PROMPT, template, tasks.description
-        );
-
-        let gemini_response: String = match &mut self.client {
-            #[cfg(feature = "gem")]
-            ClientType::Gemini(gem_client) => {
-                let parameters = ChatBuilder::default()
-                    .messages(vec![Message::User {
-                        content: Content::Text(request),
-                        name: None,
-                    }])
-                    .build()?;
-
-                let result = gem_client.chat().generate(parameters).await;
-
-                match result {
-                    Ok(response) => strip_code_blocks(&response),
-                    Err(_err) => {
-                        let error_msg = "Failed to generate content from Gemini API.".to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-
-            #[cfg(feature = "oai")]
-            ClientType::OpenAI(oai_client) => {
-                let parameters = ChatCompletionParametersBuilder::default()
-                    .model(FlagshipModel::Gpt4O.to_string())
-                    .messages(vec![ChatMessage::User {
-                        content: ChatMessageContent::Text(request.clone()),
-                        name: None,
-                    }])
-                    .response_format(ChatCompletionResponseFormat::Text)
-                    .build()?;
-
-                let result = oai_client.chat().create(parameters).await;
-
-                match result {
-                    Ok(chat_response) => {
-                        let message = &chat_response.choices[0].message;
-
-                        let response_text = match message {
-                            ChatMessage::Assistant {
-                                content: Some(chat_content),
-                                ..
-                            } => chat_content.to_string(),
-                            ChatMessage::User { content, .. } => content.to_string(),
-                            ChatMessage::System { content, .. } => content.to_string(),
-                            ChatMessage::Developer { content, .. } => content.to_string(),
-                            ChatMessage::Tool { content, .. } => content.clone(),
-                            _ => String::from(""),
-                        };
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(_err) => {
-                        let error_msg = "Failed to generate content from OpenAI API.".to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-
-            #[cfg(feature = "cld")]
-            ClientType::Anthropic(client) => {
-                let body = CreateMessageParams::new(RequiredMessageParams {
-                    model: "claude-3-7-sonnet-latest".to_string(),
-                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
-                    max_tokens: 1024,
-                });
-
-                match client.create_message(Some(&body)).await {
-                    Ok(chat_response) => {
-                        let response_text = chat_response
-                            .content
-                            .iter()
-                            .map(|block| match block {
-                                ContentBlock::Text { text, .. } => text.as_str(),
-                                _ => "",
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(_err) => {
-                        let error_msg = "Failed to generate content from Claude API.".to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-            #[cfg(feature = "xai")]
-            ClientType::Xai(xai_client) => {
-                let messages = vec![XaiMessage {
-                    role: "user".into(),
-                    content: request.clone(),
-                }];
-
-                let rb = ChatCompletionsRequestBuilder::new(
-                    xai_client.clone(),
-                    "grok-beta".into(),
-                    messages,
-                )
-                .temperature(0.0)
-                .stream(false);
-
-                let req = rb.clone().build()?;
-                let resp = rb.create_chat_completion(req).await;
-
-                match resp {
-                    Ok(chat) => {
-                        let response_text = chat.choices[0].message.content.clone();
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(response_text.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(response_text.clone()),
-                                })
-                                .await;
-                        }
-
-                        #[cfg(debug_assertions)]
-                        debug!(
-                            "[*] {:?}: Got XAI Output: {:?}",
-                            self.agent.position(),
-                            response_text
-                        );
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(err) => {
-                        let err_msg = format!("Failed to generate content from XAI API: {}", err);
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(err_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(err_msg));
-                    }
-                }
-            }
-
-            #[allow(unreachable_patterns)]
+        let code = match output {
+            GenerationOutput::Text(code) => code,
             _ => {
                 return Err(anyhow::anyhow!(
-                    "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
+                    "Expected text output for frontend code generation"
                 ));
             }
         };
 
-        let frontend_path = match self.language {
+        let frontend_main_path = match self.language {
             "rust" => format!("{}/{}", path, "src/main.rs"),
             "python" => format!("{}/{}", path, "main.py"),
             "javascript" => format!("{}/{}", path, "src/index.js"),
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(&frontend_path, gemini_response.clone()).await?;
+        fs::write(&frontend_main_path, &code).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
             content: Cow::Owned(format!(
                 "Frontend code generated and saved to '{}'",
-                frontend_path
+                frontend_main_path
             )),
         });
 
@@ -553,19 +411,19 @@ impl FrontendGPT {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!(
                         "Frontend code generated and saved to '{}'",
-                        frontend_path
+                        frontend_main_path
                     )),
                 })
                 .await;
         }
 
-        tasks.frontend_code = Some(gemini_response.clone().into());
-
+        tasks.frontend_code = Some(code.clone().into());
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
-        Ok(gemini_response)
+        Ok(code)
     }
+
     /// Asynchronously improves existing frontend code based on tasks.
     ///
     /// # Arguments
@@ -586,8 +444,6 @@ impl FrontendGPT {
     /// - Logs communication entries for tracing user intent and AI response.
     /// - Sends the request to the Gemini API to improve the frontend code.
     /// - Writes the improved frontend code to the appropriate file.
-    #[allow(unreachable_code)]
-    #[allow(unused)]
     pub async fn improve_frontend_code(&mut self, tasks: &mut Task) -> Result<String> {
         let path = self.workspace.clone();
 
@@ -611,6 +467,7 @@ impl FrontendGPT {
                 })
                 .await;
         }
+
         let existing_code = tasks.clone().frontend_code.unwrap_or_default();
 
         self.agent.add_communication(Communication {
@@ -631,225 +488,19 @@ impl FrontendGPT {
                 })
                 .await;
         }
-        let request = format!(
+
+        let prompt = format!(
             "{}\n\nCode Template: {}\nProject Description: {}",
             IMPROVED_FRONTEND_CODE_PROMPT, existing_code, tasks.description
         );
 
-        let gemini_response: String = match &mut self.client {
-            #[cfg(feature = "gem")]
-            ClientType::Gemini(gem_client) => {
-                let parameters = ChatBuilder::default()
-                    .messages(vec![Message::User {
-                        content: Content::Text(request),
-                        name: None,
-                    }])
-                    .build()?;
+        let output = self.generate(&prompt, tasks, OutputKind::Text).await?;
 
-                let result = gem_client.chat().generate(parameters).await;
-
-                match result {
-                    Ok(response) => strip_code_blocks(&response),
-                    Err(_err) => {
-                        let error_msg =
-                            "Failed to generate improved frontend code via Gemini API.".to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-
-            #[cfg(feature = "oai")]
-            ClientType::OpenAI(oai_client) => {
-                let parameters = ChatCompletionParametersBuilder::default()
-                    .model(FlagshipModel::Gpt4O.to_string())
-                    .messages(vec![ChatMessage::User {
-                        content: ChatMessageContent::Text(request.clone()),
-                        name: None,
-                    }])
-                    .response_format(ChatCompletionResponseFormat::Text)
-                    .build()?;
-
-                let result = oai_client.chat().create(parameters).await;
-
-                match result {
-                    Ok(chat_response) => {
-                        let message = &chat_response.choices[0].message;
-
-                        let response_text = match message {
-                            ChatMessage::Assistant {
-                                content: Some(chat_content),
-                                ..
-                            } => chat_content.to_string(),
-                            ChatMessage::User { content, .. } => content.to_string(),
-                            ChatMessage::System { content, .. } => content.to_string(),
-                            ChatMessage::Developer { content, .. } => content.to_string(),
-                            ChatMessage::Tool { content, .. } => content.clone(),
-                            _ => String::from(""),
-                        };
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(_err) => {
-                        let error_msg =
-                            "Failed to generate improved frontend code via OpenAI API.".to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-
-            #[cfg(feature = "cld")]
-            ClientType::Anthropic(client) => {
-                let body = CreateMessageParams::new(RequiredMessageParams {
-                    model: "claude-3-7-sonnet-latest".to_string(),
-                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
-                    max_tokens: 1024,
-                });
-
-                match client.create_message(Some(&body)).await {
-                    Ok(chat_response) => {
-                        let response_text = chat_response
-                            .content
-                            .iter()
-                            .map(|block| match block {
-                                ContentBlock::Text { text, .. } => text.as_str(),
-                                _ => "",
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(_err) => {
-                        let error_msg =
-                            "Failed to generate improved frontend code via Claude API.".to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-            #[cfg(feature = "xai")]
-            ClientType::Xai(xai_client) => {
-                let messages = vec![XaiMessage {
-                    role: "user".into(),
-                    content: request.clone(),
-                }];
-
-                let rb = ChatCompletionsRequestBuilder::new(
-                    xai_client.clone(),
-                    "grok-beta".into(),
-                    messages,
-                )
-                .temperature(0.0)
-                .stream(false);
-
-                let req = rb.clone().build()?;
-                let resp = rb.create_chat_completion(req).await;
-
-                match resp {
-                    Ok(chat) => {
-                        let response_text = chat.choices[0].message.content.clone();
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(response_text.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(response_text.clone()),
-                                })
-                                .await;
-                        }
-
-                        #[cfg(debug_assertions)]
-                        debug!(
-                            "[*] {:?}: Got XAI Output: {:?}",
-                            self.agent.position(),
-                            response_text
-                        );
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(err) => {
-                        let err_msg = format!(
-                            "Failed to generate improved frontend code via XAI API: {}",
-                            err
-                        );
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(err_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(err_msg));
-                    }
-                }
-            }
-
-            #[allow(unreachable_patterns)]
+        let improved_code = match output {
+            GenerationOutput::Text(code) => code,
             _ => {
                 return Err(anyhow::anyhow!(
-                    "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
+                    "Expected text output for improved frontend code generation"
                 ));
             }
         };
@@ -861,7 +512,7 @@ impl FrontendGPT {
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(&frontend_path, gemini_response.clone()).await?;
+        fs::write(&frontend_path, &improved_code).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -884,13 +535,14 @@ impl FrontendGPT {
                 .await;
         }
 
-        tasks.frontend_code = Some(gemini_response.clone().into());
+        tasks.frontend_code = Some(improved_code.clone().into());
 
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
-        Ok(gemini_response)
+        Ok(improved_code)
     }
+
     /// Asynchronously fixes bugs in the frontend code based on tasks.
     ///
     /// # Arguments
@@ -911,18 +563,19 @@ impl FrontendGPT {
     /// - Logs communications throughout the process.
     /// - Sends the request to the Gemini API to fix bugs in the frontend code.
     /// - Writes the fixed frontend code to the appropriate file.
-    #[allow(unreachable_code)]
-    #[allow(unused)]
     pub async fn fix_code_bugs(&mut self, tasks: &mut Task) -> Result<String> {
         let path = self.workspace.clone();
+
+        let bugs_description = self
+            .bugs
+            .clone()
+            .unwrap_or_else(|| "No bug description provided.".into());
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
             content: Cow::Owned(format!(
                 "Request to fix bugs in frontend code. Known bugs: {}",
-                self.bugs
-                    .clone()
-                    .unwrap_or_else(|| "No bug description provided.".into())
+                bugs_description
             )),
         });
 
@@ -933,18 +586,17 @@ impl FrontendGPT {
                     role: Cow::Borrowed("user"),
                     content: Cow::Owned(format!(
                         "Request to fix bugs in frontend code. Known bugs: {}",
-                        self.bugs
-                            .clone()
-                            .unwrap_or_else(|| "No bug description provided.".into())
+                        bugs_description
                     )),
                 })
                 .await;
         }
-        let request = format!(
+
+        let buggy_code = tasks.clone().frontend_code.unwrap_or_default();
+
+        let prompt = format!(
             "{}\n\nBuggy Code: {}\nBugs: {}\n\nFix all bugs.",
-            FIX_CODE_PROMPT,
-            tasks.clone().frontend_code.unwrap_or_default(),
-            self.bugs.clone().unwrap_or_default()
+            FIX_CODE_PROMPT, buggy_code, bugs_description
         );
 
         self.agent.add_communication(Communication {
@@ -966,223 +618,13 @@ impl FrontendGPT {
                 .await;
         }
 
-        let gemini_response: String = match &mut self.client {
-            #[cfg(feature = "gem")]
-            ClientType::Gemini(gem_client) => {
-                let parameters = ChatBuilder::default()
-                    .messages(vec![Message::User {
-                        content: Content::Text(request),
-                        name: None,
-                    }])
-                    .build()?;
+        let output = self.generate(&prompt, tasks, OutputKind::Text).await?;
 
-                let result = gem_client.chat().generate(parameters).await;
-
-                match result {
-                    Ok(response) => strip_code_blocks(&response),
-                    Err(_err) => {
-                        let error_msg =
-                            "Failed to generate bug-fixed frontend code via Gemini API."
-                                .to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-
-            #[cfg(feature = "oai")]
-            ClientType::OpenAI(oai_client) => {
-                let parameters = ChatCompletionParametersBuilder::default()
-                    .model(FlagshipModel::Gpt4O.to_string())
-                    .messages(vec![ChatMessage::User {
-                        content: ChatMessageContent::Text(request.clone()),
-                        name: None,
-                    }])
-                    .response_format(ChatCompletionResponseFormat::Text)
-                    .build()?;
-
-                let result = oai_client.chat().create(parameters).await;
-
-                match result {
-                    Ok(chat_response) => {
-                        let message = &chat_response.choices[0].message;
-
-                        let response_text = match message {
-                            ChatMessage::Assistant {
-                                content: Some(chat_content),
-                                ..
-                            } => chat_content.to_string(),
-                            ChatMessage::User { content, .. } => content.to_string(),
-                            ChatMessage::System { content, .. } => content.to_string(),
-                            ChatMessage::Developer { content, .. } => content.to_string(),
-                            ChatMessage::Tool { content, .. } => content.clone(),
-                            _ => String::from(""),
-                        };
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(_err) => {
-                        let error_msg =
-                            "Failed to generate bug-fixed frontend code via OpenAI API."
-                                .to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-
-            #[cfg(feature = "cld")]
-            ClientType::Anthropic(client) => {
-                let body = CreateMessageParams::new(RequiredMessageParams {
-                    model: "claude-3-7-sonnet-latest".to_string(),
-                    messages: vec![AnthMessage::new_text(Role::User, request.clone())],
-                    max_tokens: 1024,
-                });
-
-                match client.create_message(Some(&body)).await {
-                    Ok(chat_response) => {
-                        let response_text = chat_response
-                            .content
-                            .iter()
-                            .map(|block| match block {
-                                ContentBlock::Text { text, .. } => text.as_str(),
-                                _ => "",
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(_err) => {
-                        let error_msg =
-                            "Failed to generate bug-fixed frontend code via Claude API."
-                                .to_string();
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("system"),
-                                    content: Cow::Owned(error_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(error_msg));
-                    }
-                }
-            }
-            #[cfg(feature = "xai")]
-            ClientType::Xai(xai_client) => {
-                let messages = vec![XaiMessage {
-                    role: "user".into(),
-                    content: request.clone(),
-                }];
-
-                let rb = ChatCompletionsRequestBuilder::new(
-                    xai_client.clone(),
-                    "grok-beta".into(),
-                    messages,
-                )
-                .temperature(0.0)
-                .stream(false);
-
-                let req = rb.clone().build()?;
-                let resp = rb.create_chat_completion(req).await;
-
-                match resp {
-                    Ok(chat) => {
-                        let response_text = chat.choices[0].message.content.clone();
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(response_text.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(response_text.clone()),
-                                })
-                                .await;
-                        }
-
-                        #[cfg(debug_assertions)]
-                        debug!(
-                            "[*] {:?}: Got XAI Output: {:?}",
-                            self.agent.position(),
-                            response_text
-                        );
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(err) => {
-                        let err_msg = format!(
-                            "Failed to generate bug-fixed frontend code via XAI API: {}",
-                            err
-                        );
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(err_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(err_msg));
-                    }
-                }
-            }
-
-            #[allow(unreachable_patterns)]
+        let fixed_code = match output {
+            GenerationOutput::Text(code) => code,
             _ => {
                 return Err(anyhow::anyhow!(
-                    "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
+                    "Expected text output for bug-fixed code generation"
                 ));
             }
         };
@@ -1194,7 +636,7 @@ impl FrontendGPT {
             _ => panic!("Unsupported language, consider opening an Issue/PR"),
         };
 
-        fs::write(&frontend_path, gemini_response.clone()).await?;
+        fs::write(&frontend_path, &fixed_code).await?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -1217,44 +659,410 @@ impl FrontendGPT {
                 .await;
         }
 
-        tasks.frontend_code = Some(gemini_response.clone().into());
+        tasks.frontend_code = Some(fixed_code.clone().into());
 
         self.agent.update(Status::Completed);
         debug!("[*] {:?}: {:?}", self.agent.position(), self.agent);
 
-        Ok(gemini_response)
+        Ok(fixed_code)
+    }
+    pub fn think(&self) -> String {
+        let objective = self.agent.objective();
+        format!("How do I build and test the frontend for '{}'", objective)
     }
 
-    /// Retrieves the GPT agent associated with FrontendGPT.
-    ///
-    /// # Returns
-    ///
-    /// (`&AgentGPT`): A reference to the GPT agent.
-    ///
-    /// # Business Logic
-    ///
-    /// - Provides access to the GPT agent associated with the FrontendGPT instance.
-    ///
-    pub fn agent(&self) -> &AgentGPT {
-        &self.agent
+    pub fn plan(&mut self, context: String) -> Goal {
+        let mut goals = vec![
+            Goal {
+                description: "Generate initial frontend code".into(),
+                priority: 1,
+                completed: false,
+            },
+            Goal {
+                description: "Improve code quality".into(),
+                priority: 2,
+                completed: false,
+            },
+            Goal {
+                description: "Run unit tests".into(),
+                priority: 3,
+                completed: false,
+            },
+            Goal {
+                description: "Fix build/test bugs".into(),
+                priority: 4,
+                completed: false,
+            },
+        ];
+
+        goals.sort_by_key(|g| g.priority);
+
+        if let Some(planner) = self.agent.planner_mut() {
+            if planner.current_plan.is_empty() {
+                for g in goals.into_iter().rev() {
+                    planner.current_plan.push(g);
+                }
+            }
+
+            if let Some(next_goal) = planner.current_plan.iter().rev().find(|g| !g.completed) {
+                return next_goal.clone();
+            }
+        }
+
+        Goal {
+            description: format!("Fallback task from context: {}", context),
+            priority: 99,
+            completed: false,
+        }
+    }
+    pub async fn act(
+        &mut self,
+        goal: Goal,
+        tasks: &mut Task,
+        _execute: bool,
+        max_tries: u64,
+    ) -> Result<()> {
+        info!(
+            "{}",
+            format!(
+                "[*] {:?}: Executing goal: {}",
+                self.agent.position(),
+                goal.description
+            )
+            .cyan()
+            .bold()
+        );
+
+        match goal.description.to_lowercase() {
+            desc if desc.contains("generate") => {
+                let _ = self.generate_frontend_code(tasks).await;
+                self.agent.update(Status::Active);
+            }
+            desc if desc.contains("improve") => {
+                let _ = self.improve_frontend_code(tasks).await;
+                self.agent.update(Status::InUnitTesting);
+            }
+            desc if desc.contains("test") => {
+                let path = &self.workspace.to_string();
+                let _ = self.unit_test_and_build(path, tasks, max_tries).await;
+            }
+            desc if desc.contains("fix") => {
+                let _ = self.fix_code_bugs(tasks).await;
+                self.agent.update(Status::InUnitTesting);
+            }
+            _ => {
+                warn!(
+                    "{}",
+                    format!(
+                        "[*] {:?}: Unknown goal: {}",
+                        self.agent.position(),
+                        goal.description
+                    )
+                    .yellow()
+                );
+            }
+        }
+        Ok(())
+    }
+    pub async fn reflect(&mut self) {
+        let summary = format!(
+            "Reflection: Reviewing progress on '{}'",
+            self.agent.objective()
+        );
+
+        self.agent.memory_mut().push(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: summary.clone().into(),
+        });
+
+        self.agent
+            .context_mut()
+            .recent_messages
+            .push(Communication {
+                role: Cow::Borrowed("assistant"),
+                content: summary.into(),
+            });
+
+        if let Some(reflection) = self.agent.reflection() {
+            let feedback = (reflection.evaluation_fn)(&self.agent);
+            info!(
+                "{}",
+                format!(
+                    "[*] {:?}: Self Reflection: {}",
+                    self.agent.position(),
+                    feedback
+                )
+                .blue()
+            );
+        }
+    }
+    pub fn has_completed_objective(&self) -> bool {
+        self.planner()
+            .map(|p| p.current_plan.iter().all(|g| g.completed))
+            .unwrap_or(false)
     }
 
-    /// Updates the bugs found in the frontend code.
+    pub fn mark_goal_complete(&mut self, goal: Goal) {
+        if let Some(planner) = self.planner_mut() {
+            for g in &mut planner.current_plan {
+                if g.description == goal.description {
+                    g.completed = true;
+                }
+            }
+        }
+    }
+    fn display_task_info(&self, tasks: &Task) {
+        info!(
+            "{}",
+            format!("[*] {:?}: Executing task:", self.agent.position())
+                .bright_white()
+                .bold()
+        );
+        for task in tasks.clone().description.clone().split("- ") {
+            if !task.trim().is_empty() {
+                info!("{} {}", "•".bright_white().bold(), task.trim().cyan());
+            }
+        }
+    }
+    pub async fn unit_test_and_build(
+        &mut self,
+        path: &str,
+        tasks: &mut Task,
+        max_tries: u64,
+    ) -> Result<()> {
+        for attempt in 1..=max_tries {
+            info!(
+                "{}",
+                format!(
+                    "[*] {:?}: Attempting to build frontend...",
+                    self.agent.position()
+                )
+                .bright_white()
+                .bold()
+            );
+
+            let result = self.run_build_command(path).await;
+
+            match result {
+                Ok(mut child) => {
+                    let mut stderr = String::new();
+                    let _ = child
+                        .stderr
+                        .as_mut()
+                        .expect("stderr not captured")
+                        .read_to_string(&mut stderr)
+                        .await;
+
+                    if stderr.trim().is_empty() {
+                        info!(
+                            "{}",
+                            format!("[*] {:?}: Build succeeded!", self.agent.position())
+                                .bright_green()
+                                .bold()
+                        );
+                        self.agent.update(Status::Completed);
+                        break;
+                    } else {
+                        self.nb_bugs += 1;
+                        self.bugs = Some(stderr.clone().into());
+
+                        error!(
+                            "{}",
+                            format!("[*] {:?}: Build failed: {}", self.agent.position(), stderr)
+                                .bright_red()
+                        );
+
+                        if attempt == max_tries {
+                            error!(
+                                "{}",
+                                format!(
+                                    "[*] {:?}: Max build attempts reached. Aborting...",
+                                    self.agent.position()
+                                )
+                                .bright_red()
+                            );
+                        } else {
+                            info!(
+                                "{}",
+                                format!(
+                                    "[*] {:?}: Retrying build... ({}/{})",
+                                    self.agent.position(),
+                                    attempt,
+                                    max_tries
+                                )
+                                .yellow()
+                            );
+                            let _ = self.fix_code_bugs(tasks).await;
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "{}",
+                        format!(
+                            "[*] {:?}: Build command execution failed: {}",
+                            self.agent.position(),
+                            e
+                        )
+                        .bright_red()
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+    async fn run_build_command(&self, path: &str) -> Result<Child> {
+        match self.language {
+            "rust" => Ok(Command::new("timeout")
+                .arg("10s")
+                .arg("cargo")
+                .arg("build")
+                .arg("--release")
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()?),
+
+            "python" => {
+                let venv_path = format!("{}/.venv", path);
+                let pip_path = format!("{}/bin/pip", venv_path);
+                let venv_exists = Path::new(&venv_path).exists();
+
+                if !venv_exists {
+                    let create_venv = Command::new("python3")
+                        .arg("-m")
+                        .arg("venv")
+                        .arg(&venv_path)
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status();
+
+                    if let Ok(status) = create_venv.await {
+                        if status.success() {
+                            let main_py_path = format!("{}/main.py", path);
+                            let main_py_content = fs::read_to_string(&main_py_path)
+                                .await
+                                .expect("Failed to read main.py");
+
+                            let mut packages = vec![];
+
+                            for line in main_py_content.lines() {
+                                if line.starts_with("from ") || line.starts_with("import ") {
+                                    let parts: Vec<&str> = line.split_whitespace().collect();
+
+                                    if let Some(pkg) = parts.get(1) {
+                                        let root_pkg = pkg.split('.').next().unwrap_or(pkg);
+                                        if !packages.contains(&root_pkg) {
+                                            packages.push(root_pkg);
+                                        }
+                                    }
+                                }
+                            }
+                            if !packages.is_empty() {
+                                if !packages.contains(&"uvicorn") {
+                                    packages.push("uvicorn");
+                                }
+                                if !packages.contains(&"httpx") {
+                                    packages.push("httpx");
+                                }
+                                for pkg in &packages {
+                                    let install_status = Command::new(&pip_path)
+                                        .arg("install")
+                                        .arg(pkg)
+                                        .stdout(Stdio::null())
+                                        .stderr(Stdio::null())
+                                        .status();
+
+                                    match install_status.await {
+                                        Ok(status) if status.success() => {
+                                            info!(
+                                                "{}",
+                                                format!(
+                                                    "[*] {:?}: Successfully installed Python package '{}'",
+                                                    self.agent.position(),
+                                                    pkg
+                                                )
+                                                .bright_white()
+                                                .bold()
+                                            );
+                                        }
+                                        Err(e) => {
+                                            error!(
+                                                "{}",
+                                                format!(
+                                                    "[*] {:?}: Failed to install Python package '{}': {}",
+                                                    self.agent.position(),
+                                                    pkg,
+                                                    e
+                                                )
+                                                .bright_red()
+                                                .bold()
+                                            );
+                                        }
+                                        _ => {
+                                            error!(
+                                                "{}",
+                                                format!(
+                                                    "[*] {:?}: Installation of package '{}' exited with an error",
+                                                    self.agent.position(),
+                                                    pkg
+                                                )
+                                                .bright_red()
+                                                .bold()
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let run_output = Command::new("sh")
+                    .arg("-c")
+                    .arg(format!(
+                        "timeout {} '.venv/bin/python' -m uvicorn main:app --host 0.0.0.0 --port 8000",
+                        10
+                    ))
+                    .current_dir(path)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()
+                    .expect("Failed to run the backend application");
+
+                Ok(run_output)
+            }
+
+            "javascript" => Ok(Command::new("timeout")
+                .arg("10s")
+                .arg("npm")
+                .arg("run")
+                .arg("build")
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()?),
+
+            _ => panic!("Unsupported language: {}", self.language),
+        }
+    }
+    /// Updates the bugs found in the codebase.
     ///
     /// # Arguments
     ///
-    /// * `bugs` - Option containing the bugs found in the code.
+    /// * `bugs` - Optional description of bugs found in the codebase.
     ///
     /// # Business Logic
     ///
-    /// - Updates the bugs found in the frontend code.
+    /// - Updates the bugs field with the provided description.
     ///
     pub fn update_bugs(&mut self, bugs: Option<Cow<'static, str>>) {
         self.bugs = bugs;
     }
 }
 
-/// Implementation of the trait `AgentExecutor` for FrontendGPT.
+/// Implementation of the trait `Executor` for FrontendGPT.
 /// Contains additional methods related to frontend tasks.
 ///
 /// This trait provides methods for:
@@ -1269,7 +1077,7 @@ impl FrontendGPT {
 /// - Handles task execution including code generation, improvement, bug fixing, and testing.
 /// - Manages retries and error handling during task execution.
 #[async_trait]
-impl AgentExecutor for FrontendGPT {
+impl Executor for FrontendGPT {
     /// Asynchronously executes frontend tasks associated with FrontendGPT.
     ///
     /// # Arguments
@@ -1299,160 +1107,61 @@ impl AgentExecutor for FrontendGPT {
         _browse: bool,
         max_tries: u64,
     ) -> Result<()> {
+        self.agent.update(Status::Idle);
+
         info!(
             "{}",
-            format!("[*] {:?}: Executing task:", self.agent.position(),)
+            format!("[*] {:?}: Executing task:", self.agent.position())
                 .bright_white()
                 .bold()
         );
-        for task in tasks.clone().description.clone().split("- ") {
-            if !task.trim().is_empty() {
-                info!("{} {}", "•".bright_white().bold(), task.trim().cyan());
-            }
-        }
 
-        let path = &self.workspace.to_string();
+        self.display_task_info(tasks);
 
         while self.agent.status() != &Status::Completed {
-            match &self.agent.status() {
-                Status::Idle => {
-                    let _ = self.generate_frontend_code(tasks).await;
-                    self.agent.update(Status::Active);
-                    continue;
-                }
+            #[cfg(feature = "cli")]
+            let pb = spinner("Thinking...");
+            let context = self.think();
+            #[cfg(feature = "cli")]
+            pb.finish_with_message("Thinking complete!");
 
-                Status::Active => {
-                    if self.nb_bugs == 0 {
-                        let _ = self.improve_frontend_code(tasks).await;
-                    } else {
-                        let _ = self.fix_code_bugs(tasks).await;
-                    }
-                    self.agent.update(Status::InUnitTesting);
-                    continue;
-                }
+            #[cfg(feature = "cli")]
+            let pb = spinner("Planning...");
+            let goal = self.plan(context);
+            #[cfg(feature = "cli")]
+            pb.finish_with_message("Planning complete!");
 
-                Status::InUnitTesting => {
-                    info!(
-                        "{}",
-                        format!(
-                            "[*] {:?}: Frontend Code Unit Testing...",
-                            self.agent.position(),
-                        )
-                        .bright_white()
+            #[cfg(feature = "cli")]
+            let pb = spinner("Acting on goal...");
+            self.act(goal.clone(), tasks, execute, max_tries).await?;
+            #[cfg(feature = "cli")]
+            pb.finish_with_message("Action complete!");
+
+            #[cfg(feature = "cli")]
+            let pb = spinner("Marking goal complete...");
+            self.mark_goal_complete(goal);
+            #[cfg(feature = "cli")]
+            pb.finish_with_message("Goal marked complete!");
+
+            #[cfg(feature = "cli")]
+            let pb = spinner("Reflecting...");
+            self.reflect().await;
+            #[cfg(feature = "cli")]
+            pb.finish_with_message("Reflection complete!");
+
+            if self.has_completed_objective() {
+                info!(
+                    "{}",
+                    format!("[*] {:?}: Objective complete!", self.agent.position())
+                        .green()
                         .bold()
-                    );
-
-                    if !execute {
-                        warn!(
-                            "{}",
-                            format!(
-                                "[*] {:?}: It seems the code isn't safe to proceed...",
-                                self.agent.position(),
-                            )
-                            .bright_yellow()
-                            .bold()
-                        );
-                    }
-
-                    info!(
-                        "{}",
-                        format!(
-                            "[*] {:?}: Building and running the frontend project...",
-                            self.agent.position(),
-                        )
-                        .bright_white()
-                        .bold()
-                    );
-
-                    let result = match self.language {
-                        "rust" => {
-                            let mut build_command = Command::new("timeout");
-                            build_command
-                                .arg(format!("{}s", 10))
-                                .arg("cargo")
-                                .arg("build")
-                                .arg("--release")
-                                .current_dir(path)
-                                .stdout(Stdio::piped())
-                                .stderr(Stdio::piped())
-                                .spawn()
-                        }
-                        "python" => Command::new("timeout")
-                            .arg(format!("{}s", 10))
-                            .arg("uvicorn")
-                            .arg("main:app")
-                            .current_dir(path)
-                            .stdout(Stdio::piped())
-                            .stderr(Stdio::piped())
-                            .spawn(),
-                        "javascript" => Command::new("timeout")
-                            .arg(format!("{}s", 10))
-                            .arg("npm")
-                            .arg("run")
-                            .arg("build")
-                            .current_dir(path)
-                            .stdout(Stdio::piped())
-                            .stderr(Stdio::piped())
-                            .spawn(),
-                        _ => panic!("Unsupported language, consider opening an Issue/PR"),
-                    };
-
-                    match result {
-                        Ok(mut child) => {
-                            self.nb_bugs += 1;
-                            let mut stderr_output = String::new();
-                            let _ = child
-                                .stderr
-                                .as_mut()
-                                .expect("Failed to capture build stderr")
-                                .read_to_string(&mut stderr_output)
-                                .await;
-                            if self.nb_bugs > max_tries {
-                                error!(
-                                    "{}",
-                                    format!(
-                                        "[*] {:?}: Too many bugs found. Consider debugging...",
-                                        self.agent.position(),
-                                    )
-                                    .bright_red()
-                                    .bold()
-                                );
-                                break;
-                            } else {
-                                self.agent.update(Status::Active);
-                            }
-                            if !stderr_output.trim().is_empty() {
-                                self.bugs = Some(stderr_output.into());
-                            } else {
-                                info!(
-                                    "{}",
-                                    format!(
-                                        "[*] {:?}: Frontend build successful...",
-                                        self.agent.position(),
-                                    )
-                                    .bright_green()
-                                    .bold()
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            error!(
-                                "{}",
-                                format!(
-                                    "[*] {:?}: Failed to execute command: {}",
-                                    self.agent.position(),
-                                    err
-                                )
-                                .bright_red()
-                                .bold()
-                            );
-                            panic!();
-                        }
-                    }
-                }
-                _ => {}
+                );
+                self.agent.update(Status::Completed);
+                break;
             }
         }
+
+        self.agent.update(Status::Idle);
         Ok(())
     }
 }

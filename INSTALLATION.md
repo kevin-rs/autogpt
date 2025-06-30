@@ -293,7 +293,7 @@ pub struct CustomAgent {
 }
 
 #[async_trait]
-impl AgentExecutor for CustomAgent {
+impl Executor for CustomAgent {
     async fn execute<'a>(
         &'a mut self,
         tasks: &'a mut Task,
@@ -302,6 +302,25 @@ impl AgentExecutor for CustomAgent {
         max_tries: u64,
     ) -> Result<()> {
         // Custom agent logic to interact with `client` (e.g. OpenAI, Gemini, XAI, etc).
+
+        // Use the `send_request` method to send the agent's objective as a prompt
+        // to the configured AI client (e.g., OpenAI, Gemini, Claude). This abstracts
+        // over the client implementation and returns a model-generated response.
+        let response = self.send_request(&self.agent.objective()).await?;
+
+        // (Optional) Store the result in the task or agent state
+        self.agent.add_communication(Communication {
+            role: Cow::Borrowed("assistant"),
+            content: Cow::Owned(response),
+        });
+
+        // (Optional) Store the result in the vector DB (e.g. pinecone)
+        let _ = self
+            .save_ltm(Communication {
+                role: Cow::Borrowed("assistant"),
+                content: Cow::Owned(response),
+            })
+            .await;
         Ok(())
     }
 }

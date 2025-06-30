@@ -66,13 +66,13 @@
 use crate::agents::agent::AgentGPT;
 #[allow(unused_imports)]
 use crate::common::utils::{
-    Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
-    Route, Scope, Status, Task, TaskScheduler, Tool, strip_code_blocks,
+    Capability, ClientType, Communication, ContextManager, Goal, Knowledge, Persona, Planner,
+    Reflection, Route, Scope, Status, Task, TaskScheduler, Tool, strip_code_blocks,
 };
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
-use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
+use crate::traits::functions::{Executor, AsyncFunctions, Functions};
 use anyhow::Result;
 use auto_derive::Auto;
 use colored::*;
@@ -117,6 +117,7 @@ use async_trait::async_trait;
 
 /// Struct representing an `OptimizerGPT`, which manages code optimization and modularization tasks using the Gemini API.
 #[derive(Debug, Clone, Default, Auto)]
+#[allow(dead_code)]
 pub struct OptimizerGPT {
     /// Represents the path to the workspace directory for the backend code.
     /// This directory is where all generated or modified code is stored.
@@ -158,7 +159,6 @@ impl OptimizerGPT {
     ///
     /// - Ensures the working directory exists before continuing.
     /// - Establishes the foundational state for performing code modularization or refactoring.
-    #[allow(unreachable_code)]
     #[allow(unused)]
     pub async fn new(objective: &'static str, position: &'static str, language: &str) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or("workspace/".to_string());
@@ -246,292 +246,19 @@ impl OptimizerGPT {
     /// - Facilitates communication between the agent and the Gemini model.
     /// - Ensures that all model interactions are logged and optionally persisted for future context or audits.
     /// - Prepares the returned content for further downstream processing (e.g., file writing or parsing).
-    #[allow(unreachable_code)]
     #[allow(unused)]
     pub async fn generate_and_track(&mut self, request: &str) -> Result<String> {
-        let gemini_response = match &mut self.client {
-            #[cfg(feature = "gem")]
-            ClientType::Gemini(gem_client) => {
-                let parameters = ChatBuilder::default()
-                    .messages(vec![Message::User {
-                        content: Content::Text(request.to_string()),
-                        name: None,
-                    }])
-                    .build()?;
+        let mut response_text = String::new();
 
-                let result = gem_client.chat().generate(parameters).await;
-
-                match result {
-                    Ok(response) => {
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(response.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(response.clone()),
-                                })
-                                .await;
-                        }
-
-                        strip_code_blocks(&response)
-                    }
-                    Err(err) => {
-                        let err_msg = format!("Error retrieving Gemini response: {}", err);
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(err_msg),
-                                })
-                                .await;
-                        }
-
-                        Default::default()
-                    }
-                }
-            }
-
-            #[cfg(feature = "oai")]
-            ClientType::OpenAI(oai_client) => {
-                let parameters = ChatCompletionParametersBuilder::default()
-                    .model(FlagshipModel::Gpt4O.to_string())
-                    .messages(vec![ChatMessage::User {
-                        content: ChatMessageContent::Text(request.to_string()),
-                        name: None,
-                    }])
-                    .response_format(ChatCompletionResponseFormat::Text)
-                    .build()?;
-
-                let result = oai_client.chat().create(parameters).await;
-
-                match result {
-                    Ok(chat_response) => {
-                        let message = &chat_response.choices[0].message;
-
-                        let response_text = match message {
-                            ChatMessage::Assistant {
-                                content: Some(chat_content),
-                                ..
-                            } => chat_content.to_string(),
-                            ChatMessage::User { content, .. } => content.to_string(),
-                            ChatMessage::System { content, .. } => content.to_string(),
-                            ChatMessage::Developer { content, .. } => content.to_string(),
-                            ChatMessage::Tool { content, .. } => content.clone(),
-                            _ => String::from(""),
-                        };
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(response_text.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(response_text.clone()),
-                                })
-                                .await;
-                        }
-
-                        strip_code_blocks(&response_text)
-                    }
-                    Err(err) => {
-                        let err_msg = format!("Error retrieving OpenAI response: {}", err);
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(err_msg),
-                                })
-                                .await;
-                        }
-
-                        Default::default()
-                    }
-                }
-            }
-            #[cfg(feature = "cld")]
-            ClientType::Anthropic(client) => {
-                let body = CreateMessageParams::new(RequiredMessageParams {
-                    model: "claude-3-7-sonnet-latest".to_string(),
-                    messages: vec![AnthMessage::new_text(Role::User, request.to_string())],
-                    max_tokens: 1024,
-                });
-
-                match client.create_message(Some(&body)).await {
-                    Ok(chat_response) => {
-                        let response_text = chat_response
-                            .content
-                            .iter()
-                            .filter_map(|block| match block {
-                                ContentBlock::Text { text, .. } => Some(text),
-                                _ => None,
-                            })
-                            .cloned()
-                            .collect::<Vec<_>>()
-                            .join("\n");
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(response_text.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(response_text.clone()),
-                                })
-                                .await;
-                        }
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(err) => {
-                        let err_msg = format!("Error retrieving Claude response: {}", err);
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(err_msg),
-                                })
-                                .await;
-                        }
-
-                        Default::default()
-                    }
-                }
-            }
-            #[cfg(feature = "xai")]
-            ClientType::Xai(xai_client) => {
-                let messages = vec![XaiMessage {
-                    role: "user".into(),
-                    content: request.to_string(),
-                }];
-
-                let rb = ChatCompletionsRequestBuilder::new(
-                    xai_client.clone(),
-                    "grok-beta".into(),
-                    messages,
-                )
-                .temperature(0.0)
-                .stream(false);
-
-                let req = rb.clone().build()?;
-                let resp = rb.create_chat_completion(req).await;
-
-                match resp {
-                    Ok(chat) => {
-                        let response_text = chat.choices[0].message.content.clone();
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(response_text.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(response_text.clone()),
-                                })
-                                .await;
-                        }
-
-                        #[cfg(debug_assertions)]
-                        debug!(
-                            "[*] {:?}: Got XAI Output: {:?}",
-                            self.agent.position(),
-                            response_text
-                        );
-
-                        strip_code_blocks(&response_text)
-                    }
-
-                    Err(err) => {
-                        let err_msg = format!("Error retrieving XAI response: {}", err);
-
-                        self.agent.add_communication(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg.clone()),
-                        });
-
-                        #[cfg(feature = "mem")]
-                        {
-                            let _ = self
-                                .save_ltm(Communication {
-                                    role: Cow::Borrowed("assistant"),
-                                    content: Cow::Owned(err_msg.clone()),
-                                })
-                                .await;
-                        }
-
-                        return Err(anyhow::anyhow!(err_msg));
-                    }
-                }
-            }
-
-            #[allow(unreachable_patterns)]
-            _ => {
-                let err_msg =
-                    "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
-                        .to_string();
-
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(err_msg.clone()),
-                });
-
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
-                            role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(err_msg),
-                        })
-                        .await;
-                }
-
-                Default::default()
-            }
-        };
-
-        Ok(gemini_response)
+        #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+        {
+            response_text = self.send_request(&request).await?;
+        }
+        Ok(response_text)
     }
 }
 
-/// Implementation of the `AgentExecutor` trait for the `OptimizerGPT` struct.
+/// Implementation of the `Executor` trait for the `OptimizerGPT` struct.
 ///
 /// This implementation provides core functionality to interact with and operate
 /// the optimizer agent in a code refinement and enhancement pipeline. It defines
@@ -558,7 +285,7 @@ impl OptimizerGPT {
 /// This trait is designed to be shared among multiple AI roles (FrontendGPT, OptimizerGPT, etc.)
 /// to enforce a consistent interface for task execution across stages of the autonomous dev agent.
 #[async_trait]
-impl AgentExecutor for OptimizerGPT {
+impl Executor for OptimizerGPT {
     /// Asynchronously executes the modularization task for a given source code file.
     ///
     /// # Arguments

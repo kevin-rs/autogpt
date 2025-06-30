@@ -52,9 +52,9 @@ This is an example demonstrating how to use AutoGPT with Gemini with a persistan
    Executing this command will result in the following output:
 
    ```sh
-   Execution completed with tools: [Diagram]
-   Memory length: 4
-   First memory role: user
-   Second memory role: assistant
+   All agents executed successfully.
+   Memory length: 15
+   First memory role: assistant
+   Second memory role: user
    Agent status: Completed
    ```

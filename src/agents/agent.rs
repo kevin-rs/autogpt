@@ -3,12 +3,13 @@
 
 use crate::common::utils::{
     Capability, Communication, ContextManager, Knowledge, Persona, Planner, Reflection, Status,
-    Task, TaskScheduler, Tool,
+    Task, TaskScheduler, Tool, default_eval_fn,
 };
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
 use derivative::Derivative;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -61,7 +62,7 @@ pub struct AgentGPT {
     /// Manages context for conversation and topic focus.
     pub context: ContextManager,
 
-    /// List of tasks/goals assigned to this agent.
+    /// List of tasks assigned to this agent.
     pub tasks: Vec<Task>,
 }
 
@@ -116,9 +117,48 @@ impl AgentGPT {
     /// A new fully initialized instance of `AgentGPT`.
     pub fn new_owned(objective: String, position: String) -> Self {
         Self {
+            id: Cow::Owned(Uuid::new_v4().to_string()),
             objective: Cow::Owned(objective),
-            position: Cow::Owned(position),
-            ..Self::default()
+            position: Cow::Owned(position.clone()),
+            status: Status::Idle,
+
+            memory: vec![],
+
+            tools: vec![],
+
+            knowledge: Knowledge {
+                facts: HashMap::default(),
+            },
+
+            planner: Some(Planner {
+                current_plan: vec![],
+            }),
+
+            persona: Persona {
+                name: position.into(),
+                traits: vec![],
+                behavior_script: None,
+            },
+
+            collaborators: vec![],
+
+            reflection: Some(Reflection {
+                recent_logs: vec![],
+                evaluation_fn: default_eval_fn,
+            }),
+
+            scheduler: Some(TaskScheduler {
+                scheduled_tasks: vec![],
+            }),
+
+            capabilities: HashSet::default(),
+
+            context: ContextManager {
+                recent_messages: vec![],
+                focus_topics: vec![],
+            },
+
+            tasks: vec![],
         }
     }
 
@@ -134,9 +174,48 @@ impl AgentGPT {
     /// A new fully initialized instance of `AgentGPT`.
     pub fn new_borrowed(objective: &'static str, position: &'static str) -> Self {
         Self {
+            id: Cow::Owned(Uuid::new_v4().to_string()),
             objective: Cow::Borrowed(objective),
             position: Cow::Borrowed(position),
-            ..Self::default()
+            status: Status::Idle,
+
+            memory: vec![],
+
+            tools: vec![],
+
+            knowledge: Knowledge {
+                facts: HashMap::default(),
+            },
+
+            planner: Some(Planner {
+                current_plan: vec![],
+            }),
+
+            persona: Persona {
+                name: position.into(),
+                traits: vec![],
+                behavior_script: None,
+            },
+
+            collaborators: vec![],
+
+            reflection: Some(Reflection {
+                recent_logs: vec![],
+                evaluation_fn: default_eval_fn,
+            }),
+
+            scheduler: Some(TaskScheduler {
+                scheduled_tasks: vec![],
+            }),
+
+            capabilities: HashSet::default(),
+
+            context: ContextManager {
+                recent_messages: vec![],
+                focus_topics: vec![],
+            },
+
+            tasks: vec![],
         }
     }
 }
@@ -146,26 +225,47 @@ impl Agent for AgentGPT {
     fn new(objective: Cow<'static, str>, position: Cow<'static, str>) -> Self {
         Self {
             id: Cow::Owned(Uuid::new_v4().to_string()),
+
             objective,
-            position,
+            position: position.clone(),
             status: Status::Idle,
+
             memory: vec![],
+
             tools: vec![],
-            knowledge: Knowledge::default(),
-            planner: None,
+
+            knowledge: Knowledge {
+                facts: HashMap::default(),
+            },
+
+            planner: Some(Planner {
+                current_plan: vec![],
+            }),
+
             persona: Persona {
-                name: Cow::Borrowed("Default"),
+                name: position,
                 traits: vec![],
                 behavior_script: None,
             },
+
             collaborators: vec![],
-            reflection: None,
-            scheduler: None,
-            capabilities: HashSet::new(),
+
+            reflection: Some(Reflection {
+                recent_logs: vec![],
+                evaluation_fn: default_eval_fn,
+            }),
+
+            scheduler: Some(TaskScheduler {
+                scheduled_tasks: vec![],
+            }),
+
+            capabilities: HashSet::default(),
+
             context: ContextManager {
                 recent_messages: vec![],
                 focus_topics: vec![],
             },
+
             tasks: vec![],
         }
     }
@@ -243,5 +343,17 @@ impl Agent for AgentGPT {
     /// Returns the list of current tasks or tasks.
     fn tasks(&self) -> &Vec<Task> {
         &self.tasks
+    }
+
+    fn memory_mut(&mut self) -> &mut Vec<Communication> {
+        &mut self.memory
+    }
+
+    fn planner_mut(&mut self) -> Option<&mut Planner> {
+        self.planner.as_mut()
+    }
+
+    fn context_mut(&mut self) -> &mut ContextManager {
+        &mut self.context
     }
 }

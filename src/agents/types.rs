@@ -80,8 +80,6 @@ impl AgentType {
     /// # Business Logic
     ///
     /// - Retrieves the position of the agent based on its type.
-    #[allow(unreachable_code)]
-    #[allow(unused)]
     pub fn position(&self) -> String {
         match self {
             AgentType::Architect(agent) => agent.get_agent().position().to_string(),
@@ -92,7 +90,6 @@ impl AgentType {
             AgentType::Designer(agent) => agent.get_agent().position().to_string(),
             #[cfg(feature = "git")]
             AgentType::Git(agent) => agent.get_agent().position().to_string(),
-            _ => "Any".to_string(),
         }
     }
 
@@ -101,8 +98,6 @@ impl AgentType {
     /// # Returns
     ///
     /// (`AgentGPT`): The agent.
-    #[allow(unreachable_code)]
-    #[allow(unused)]
     pub fn get_agent(&self) -> &AgentGPT {
         match self {
             AgentType::Architect(agent) => agent.get_agent(),
