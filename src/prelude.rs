@@ -29,7 +29,7 @@ pub use {
     },
     crate::traits::agent::Agent,
     crate::traits::composite::AgentFunctions,
-    crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions},
+    crate::traits::functions::{AsyncFunctions, Executor, Functions},
     anyhow::{Result, anyhow},
     async_trait::async_trait,
     auto_derive::Auto,
@@ -43,6 +43,29 @@ pub use {
 pub use {
     crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
     crate::common::memory::save_long_term_memory,
+};
+
+
+#[cfg(feature = "oai")]
+pub use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
+
+#[cfg(feature = "cld")]
+pub use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
+};
+
+#[cfg(feature = "gem")]
+pub use gems::{
+    chat::ChatBuilder,
+    messages::{Content, Message},
+    traits::CTrait,
+};
+
+#[cfg(feature = "xai")]
+pub use x_ai::{
+    chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
+    traits::ChatCompletionsFetcher,
 };
 
 #[cfg(feature = "oai")]
@@ -124,7 +147,7 @@ impl AutoGPT {
                 let mut locked_tasks = tasks_clone.lock().await;
                 let mut agent = agent_clone.lock().await;
 
-                match agent.execute(&mut locked_tasks, true, false, 3).await {
+                match agent.execute(&mut locked_tasks, true, false, 1).await {
                     Ok(_) => {
                         debug!("Agent {} ({}) executed successfully", i, agent_objective);
                         Ok::<(), anyhow::Error>(())

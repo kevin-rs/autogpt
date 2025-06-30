@@ -13,7 +13,7 @@ use crate::common::utils::{
 };
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
-use crate::traits::functions::{AgentExecutor, AsyncFunctions, Functions};
+use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use async_trait::async_trait;
 use auto_derive::Auto;
 use std::fmt;
@@ -24,6 +24,28 @@ use tokio::sync::Mutex;
 use {
     crate::common::memory::load_long_term_memory, crate::common::memory::long_term_memory_context,
     crate::common::memory::save_long_term_memory,
+};
+
+#[cfg(feature = "oai")]
+use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*};
+
+#[cfg(feature = "gem")]
+use gems::{
+    chat::ChatBuilder,
+    messages::{Content, Message},
+    traits::CTrait,
+};
+
+#[cfg(feature = "xai")]
+use x_ai::{
+    chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
+    traits::ChatCompletionsFetcher,
+};
+
+#[cfg(feature = "cld")]
+use anthropic_ai_sdk::types::message::{
+    ContentBlock, CreateMessageParams, Message as AnthMessage, MessageClient,
+    RequiredMessageParams, Role,
 };
 
 /// Struct representing GitGPT, a thread-safe Git-aware task executor integrated with a GPT agent.
@@ -236,7 +258,7 @@ impl GitGPT {
 /// Provides access to the agent and defines asynchronous task execution,
 /// including staging and committing changes in a Git repository.
 #[async_trait]
-impl AgentExecutor for GitGPT {
+impl Executor for GitGPT {
     /// Executes a Git commit task asynchronously based on agent status.
     ///
     /// # Arguments

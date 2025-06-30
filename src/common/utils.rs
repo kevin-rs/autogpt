@@ -70,6 +70,8 @@ use crate::agents::agent::AgentGPT;
 use crate::traits::agent::Agent;
 #[cfg(feature = "cli")]
 use colored::Colorize;
+#[cfg(feature = "cli")]
+use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -80,11 +82,13 @@ use std::{io, io::Read, process::Command, process::Stdio};
 use webbrowser::{Browser, BrowserOptions, open_browser_with_options};
 #[cfg(feature = "cli")]
 use {
-    tracing::{error, info, warn},
+    tracing::{Event, Subscriber, error, info, warn},
     tracing_appender::rolling,
     tracing_subscriber::Layer,
     tracing_subscriber::Registry,
+    tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields},
     tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt,
+    tracing_subscriber::registry::LookupSpan,
     tracing_subscriber::{filter, fmt},
 };
 
@@ -115,6 +119,8 @@ use std::collections::HashMap;
 use x_ai::{chat_compl::Message as XaiMessage, client::XaiClient, traits::ClientConfig};
 
 use derivative::Derivative;
+#[cfg(feature = "cli")]
+use std::time::Duration;
 
 /// Enum representing supported AI clients.
 #[derive(Debug, Clone)]
@@ -473,6 +479,25 @@ pub async fn run_code(
         _ => Err(format!("Unsupported language: {}", language).into()),
     }
 }
+#[cfg(feature = "cli")]
+pub struct NoLevelFormatter;
+
+#[cfg(feature = "cli")]
+impl<S, N> FormatEvent<S, N> for NoLevelFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut writer: fmt::format::Writer<'_>,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
+        ctx.format_fields(writer.by_ref(), event)?;
+        writeln!(writer)
+    }
+}
 
 #[cfg(feature = "cli")]
 pub fn setup_logging() -> anyhow::Result<()> {
@@ -486,6 +511,7 @@ pub fn setup_logging() -> anyhow::Result<()> {
         .with_thread_ids(false)
         .with_target(false)
         .with_writer(std::io::stdout)
+        .event_format(NoLevelFormatter)
         .with_filter(filter::LevelFilter::INFO);
 
     let file_layer = fmt::Layer::new()
@@ -513,7 +539,7 @@ pub async fn ask_to_run_command(
     if !agent.memory().is_empty() {
         warn!(
             "{}",
-            "[*] \"AGI\": 🤔 Thinking... Maybe it's time to run the application? (yes/no)"
+            "[*] \"AGI\": Maybe it's time to run the application? (yes/no)"
                 .bright_yellow()
                 .bold()
         );
@@ -963,10 +989,61 @@ pub enum Position {
     Custom(Cow<'static, str>),
 }
 
-fn default_eval_fn(_: &dyn Agent) -> Cow<'static, str> {
-    Cow::Borrowed("default evaluation")
+pub fn default_eval_fn(agent: &dyn Agent) -> Cow<'static, str> {
+    if let Some(planner) = agent.planner() {
+        let total = planner.current_plan.len();
+        let completed = planner.current_plan.iter().filter(|g| g.completed).count();
+
+        let mut summary = format!(
+            "\n- Total Goals: {}\n- Completed: {}\n- In Progress: {}\n\nGoals Summary:\n",
+            total,
+            completed,
+            total - completed
+        );
+
+        for (i, goal) in planner.current_plan.iter().enumerate() {
+            let status = if goal.completed {
+                "✅ Completed"
+            } else {
+                "⏳ In Progress"
+            };
+            summary.push_str(&format!("{}. {} [{}]\n", i + 1, goal.description, status));
+        }
+
+        Cow::Owned(summary)
+    } else {
+        Cow::Borrowed("No planner available for self-evaluation.")
+    }
 }
 
-fn noop_tool(_: &str) -> String {
+pub fn noop_tool(_: &str) -> String {
     "default tool output".to_string()
+}
+
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+pub enum OutputKind {
+    #[default]
+    Text,
+    UrlList,
+    Scope,
+}
+
+#[derive(Eq, Debug, PartialEq, Clone, Hash)]
+pub enum GenerationOutput {
+    Text(String),
+    UrlList(Vec<Cow<'static, str>>),
+    Scope(Scope),
+}
+
+#[cfg(feature = "cli")]
+pub fn spinner(label: &str) -> ProgressBar {
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::with_template("{prefix:.bold.dim} {spinner:.cyan} {msg}")
+            .unwrap()
+            .tick_chars("◑◒◐◓"),
+    );
+    pb.set_message(label.to_string());
+    pb.enable_steady_tick(Duration::from_millis(120));
+    pb
 }

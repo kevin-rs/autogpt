@@ -76,6 +76,18 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             fn tasks(&self) -> &Vec<Task> {
                 &self.agent.tasks
             }
+
+            fn memory_mut(&mut self) -> &mut Vec<Communication> {
+                &mut self.agent.memory
+            }
+
+            fn planner_mut(&mut self) -> Option<&mut Planner> {
+                self.agent.planner.as_mut()
+            }
+
+            fn context_mut(&mut self) -> &mut ContextManager {
+                &mut self.agent.context
+            }
         }
 
         impl Functions for #name {
@@ -93,7 +105,7 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 browse: bool,
                 max_tries: u64,
             ) -> Result<()> {
-                <#name as AgentExecutor>::execute(self, tasks, execute, browse, max_tries).await
+                <#name as Executor>::execute(self, tasks, execute, browse, max_tries).await
             }
 
             /// Saves a communication to long-term memory for the agent.
@@ -147,6 +159,100 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             async fn ltm_context(&self) -> String {
                 long_term_memory_context(self.agent.id.clone()).await
             }
+
+            #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+            async fn send_request(&mut self, request: &str) -> Result<String> {
+                match &mut self.client {
+                    #[cfg(feature = "gem")]
+                    ClientType::Gemini(gem_client) => {
+                        let parameters = ChatBuilder::default()
+                            .messages(vec![Message::User {
+                                content: Content::Text(request.to_string()),
+                                name: None,
+                            }])
+                            .build()?;
+
+                        let result = gem_client.chat().generate(parameters).await;
+                        Ok(result.unwrap_or_default())
+                    }
+
+                    #[cfg(feature = "oai")]
+                    ClientType::OpenAI(oai_client) => {
+                        let parameters = ChatCompletionParametersBuilder::default()
+                            .model(FlagshipModel::Gpt4O.to_string())
+                            .messages(vec![ChatMessage::User {
+                                content: ChatMessageContent::Text(request.to_string()),
+                                name: None,
+                            }])
+                            .response_format(ChatCompletionResponseFormat::Text)
+                            .build()?;
+
+                        let result = oai_client.chat().create(parameters).await?;
+                        let message = &result.choices[0].message;
+
+                        Ok(match message {
+                            ChatMessage::Assistant {
+                                content: Some(chat_content),
+                                ..
+                            } => chat_content.to_string(),
+                            ChatMessage::User { content, .. } => content.to_string(),
+                            ChatMessage::System { content, .. } => content.to_string(),
+                            ChatMessage::Developer { content, .. } => content.to_string(),
+                            ChatMessage::Tool { content, .. } => content.clone(),
+                            _ => String::new(),
+                        })
+                    }
+
+                    #[cfg(feature = "cld")]
+                    ClientType::Anthropic(client) => {
+                        let body = CreateMessageParams::new(RequiredMessageParams {
+                            model: "claude-3-7-sonnet-latest".to_string(),
+                            messages: vec![AnthMessage::new_text(Role::User, request.to_string())],
+                            max_tokens: 1024,
+                        });
+
+                        let chat_response = client.create_message(Some(&body)).await?;
+                        Ok(chat_response
+                            .content
+                            .iter()
+                            .filter_map(|block| match block {
+                                ContentBlock::Text { text, .. } => Some(text.as_str()),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n"))
+                    }
+
+                    #[cfg(feature = "xai")]
+                    ClientType::Xai(xai_client) => {
+                        let messages = vec![XaiMessage {
+                            role: "user".into(),
+                            content: request.to_string(),
+                        }];
+
+                        let rb = ChatCompletionsRequestBuilder::new(
+                            xai_client.clone(),
+                            "grok-beta".into(),
+                            messages,
+                        )
+                        .temperature(0.0)
+                        .stream(false);
+
+                        let req = rb.clone().build()?;
+                        let chat = rb.create_chat_completion(req).await?;
+                        Ok(chat.choices[0].message.content.clone())
+                    }
+
+
+                    #[allow(unreachable_patterns)]
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
+                        ));
+                    }
+                }
+            }
+
         }
     };
 

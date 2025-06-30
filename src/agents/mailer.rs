@@ -542,6 +542,12 @@ impl AsyncFunctions for MailerGPT {
 
         Ok(())
     }
+
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+    async fn send_request(&mut self, _request: &str) -> Result<String> {
+        Ok("".to_string())
+    }
+
     /// Saves a communication to long-term memory for the agent.
     ///
     /// # Arguments

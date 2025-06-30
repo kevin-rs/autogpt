@@ -78,6 +78,10 @@ impl AsyncFunctions for MockFunctions {
             .collect::<Vec<_>>()
             .join("\n")
     }
+
+    async fn send_request(&mut self, _request: &str) -> Result<String> {
+        Ok("".to_string())
+    }
 }
 
 #[tokio::test]
