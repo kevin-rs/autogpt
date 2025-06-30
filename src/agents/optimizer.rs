@@ -72,7 +72,7 @@ use crate::common::utils::{
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
-use crate::traits::functions::{Executor, AsyncFunctions, Functions};
+use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::Result;
 use auto_derive::Auto;
 use colored::*;
@@ -252,7 +252,7 @@ impl OptimizerGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
         {
-            response_text = self.send_request(&request).await?;
+            response_text = self.send_request(request).await?;
         }
         Ok(response_text)
     }

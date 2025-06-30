@@ -53,7 +53,7 @@ use crate::prompts::frontend::{
 };
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
-use crate::traits::functions::{Executor, AsyncFunctions, Functions};
+use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::Result;
 use auto_derive::Auto;
 use colored::*;

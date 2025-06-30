@@ -48,7 +48,7 @@ use crate::prompts::architect::{
 };
 use crate::traits::agent::Agent;
 use crate::traits::composite::AgentFunctions;
-use crate::traits::functions::{Executor, AsyncFunctions, Functions};
+use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use colored::*;

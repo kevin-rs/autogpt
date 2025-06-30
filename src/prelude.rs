@@ -29,7 +29,7 @@ pub use {
     },
     crate::traits::agent::Agent,
     crate::traits::composite::AgentFunctions,
-    crate::traits::functions::{Executor, AsyncFunctions, Functions},
+    crate::traits::functions::{AsyncFunctions, Executor, Functions},
     anyhow::{Result, anyhow},
     async_trait::async_trait,
     auto_derive::Auto,
