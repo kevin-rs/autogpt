@@ -121,15 +121,15 @@
 //!     fn tasks(&self) -> &Vec<Task> {
 //!         &self.tasks
 //!     }
-//! 
+//!
 //!     fn memory_mut(&mut self) -> &mut Vec<Communication> {
 //!         &mut self.memory
 //!     }
-//! 
+//!
 //!     fn planner_mut(&mut self) -> Option<&mut Planner> {
 //!         self.planner.as_mut()
 //!     }
-//! 
+//!
 //!     fn context_mut(&mut self) -> &mut ContextManager {
 //!         &mut self.context
 //!     }
