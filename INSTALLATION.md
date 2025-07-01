@@ -42,10 +42,10 @@ Fork/Clone The Repo:
 git clone https://github.com/kevin-rs/autogpt.git
 ```
 
-Navigate to the autogpt directory:
+Navigate to the core autogpt directory:
 
 ```sh
-cd autogpt
+cd autogpt/autogpt
 ```
 
 ### ⚓ Using Cargo

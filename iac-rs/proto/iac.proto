@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package iac;
+
+enum MessageType {
+  UNKNOWN = 0;
+  PING = 1;
+  BROADCAST = 2;
+  FILE_TRANSFER = 3;
+  COMMAND = 4;
+  DELEGATE_TASK = 5;
+}
+
+message Message {
+  string from = 1;
+  string to = 2;
+  MessageType msg_type = 3;
+  string payload_json = 4;
+  uint64 timestamp = 5;
+  uint64 msg_id = 6;
+  uint64 session_id = 7;
+  bytes signature = 8;
+  bytes extra_data = 9;
+}

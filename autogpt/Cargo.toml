@@ -1,0 +1,89 @@
+[package]
+name = "autogpt"
+version = "0.1.7"
+edition = "2024"
+description = """
+🦀 A Pure Rust Framework For Building AGIs.
+"""
+authors = ["Mahmoud Harmouch <oss@wiseai.dev>"]
+license = "MIT"
+documentation = "https://docs.rs/autogpt"
+repository = "https://github.com/kevin-rs/autogpt"
+homepage = "https://kevin-rs.dev"
+readme = "README.md"
+categories = ["science"]
+keywords = ["agi", "ai", "machine-learning", "llm", "stable-diffusion"]
+exclude = ["/workspace", "/examples"]
+
+[[bin]]
+name = "autogpt"
+path = "src/bin/autogpt.rs"
+
+[[bin]]
+name = "orchgpt"
+path = "src/bin/orchgpt.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+webbrowser = { workspace = true }
+colored = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+auto-derive = { workspace = true }
+chrono = { workspace = true }
+derivative = { workspace = true }
+duckduckgo = { workspace = true }
+
+uuid = { version = "1.16.0", features = ["v4"] }
+tokio = { version = "1.37.0", default-features = false, features = ["full"] }
+reqwest = { version = "0.11.27", features = ["json"] }
+serde = { version = "1.0.197", features = ["derive"] }
+gems = { version = "0.1.3", optional = true }
+getimg = { version = "0.0.1", optional = true }
+nylas = { version = "0.0.8", optional = true }
+clap = { version = "4.5.4", features = ["derive"], optional = true }
+tracing-subscriber = { version = "0.3.18", features = ["std"], optional = true }
+tracing-appender = { version = "0.2.3", optional = true }
+git2 = { version = "0.20.1", optional = true }
+pinecone-sdk = { version = "0.1.2", optional = true }
+openai_dive = { version = "1.0.0", optional = true }
+prost = { version = "0.13.5", optional = true }
+prost-types = { version = "0.13.5", optional = true }
+tokio-rustls = { version = "0.26.2", optional = true }
+rustls = { version = "0.23.26", optional = true }
+rustls-pemfile = { version = "2.2.0", features = ["std"], optional = true }
+anthropic-ai-sdk = { version = "0.2.24", optional = true }
+x-ai = { version = "0.0.1", optional = true }
+indicatif = { version = "0.17.11", optional = true }
+
+[features]
+default = []
+img = ["getimg"]
+mail = ["nylas"]
+git = ["git2"]
+gem = ["gems"]
+oai = ["openai_dive"]
+xai = ["x-ai"]
+cld = ["anthropic-ai-sdk"]
+mem = ["pinecone-sdk"]
+cli = [
+    "clap",
+    "prost",
+    "rustls",
+    "indicatif",
+    "tokio-rustls",
+    "rustls-pemfile",
+    "tracing-appender",
+    "tracing-subscriber",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[badges]
+maintenance = { status = "actively-developed" }

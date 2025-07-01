@@ -169,7 +169,7 @@ async fn main() -> Result<()> {
                                 };
 
                                 let response = String::from_utf8_lossy(&buf[..n]);
-                                println!(
+                                info!(
                                     "{} {}",
                                     "[*] \"AGI\": 📬 Got Response →".bright_green().bold(),
                                     response.trim()
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
                         }
                     }
                     _ = &mut shutdown_signal => {
-                        println!("\n[*] \"AGI\": 👋 Graceful shutdown requested.");
+                        info!("\n[*] \"AGI\": 👋 Graceful shutdown requested.");
                         let _ = tls_stream.shutdown().await;
                         std::process::exit(0);
                     }
