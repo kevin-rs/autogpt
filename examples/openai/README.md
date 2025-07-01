@@ -27,7 +27,7 @@ This is an example demonstrating how to use AutoGPT with OpenAI API. It features
 1. Navigate to the application directory.
 
    ```sh
-   cd autogpt/examples/openai
+   cd autogpt/autogpt/examples/openai
    ```
 
 1. Set the following environment variables:

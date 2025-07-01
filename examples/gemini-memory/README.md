@@ -27,7 +27,7 @@ This is an example demonstrating how to use AutoGPT with Gemini with a persistan
 1. Navigate to the application directory.
 
    ```sh
-   cd autogpt/examples/gemini-memory
+   cd autogpt/autogpt/examples/gemini-memory
    ```
 
 1. Set the following environment variables:

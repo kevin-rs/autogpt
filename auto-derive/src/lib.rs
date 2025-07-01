@@ -160,7 +160,7 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 long_term_memory_context(self.agent.id.clone()).await
             }
 
-            #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+            #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
             async fn send_request(&mut self, request: &str) -> Result<String> {
                 match &mut self.client {
                     #[cfg(feature = "gem")]

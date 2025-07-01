@@ -27,7 +27,7 @@ This is an example demonstrating how to use AutoGPT with Gemini. It features a s
 1. Navigate to the application directory.
 
    ```sh
-   cd autogpt/examples/gemini
+   cd autogpt/autogpt/examples/gemini
    ```
 
 1. Set the following environment variables:

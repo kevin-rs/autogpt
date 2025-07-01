@@ -12,10 +12,17 @@ RUN apk add --no-cache \
 
 WORKDIR /kevin
 COPY Cargo.toml Cargo.lock INSTALLATION.md ./
-COPY src/ src/
-COPY auto-derive/ auto-derive/
+COPY auto-derive ./auto-derive
+COPY autogpt ./autogpt
+COPY iac-rs ./iac-rs
 COPY README.md ./
-RUN cargo build --release --all-features
+
+RUN cargo vendor vendor
+
+RUN mkdir -p .cargo && \
+    printf '[source.crates-io]\nreplace-with = "vendored-sources"\n[source.vendored-sources]\ndirectory = "vendor"\n' > .cargo/config.toml
+
+RUN cargo build --release --offline --all-features -p autogpt
 
 FROM alpine:3.21
 RUN addgroup -S kevin && \

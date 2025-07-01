@@ -9,6 +9,7 @@ async fn main() -> anyhow::Result<()> {
         use autogpt::orchestrator::Orchestrator;
         use clap::Parser;
         use tokio::sync::mpsc;
+        use tracing::error;
 
         let _args: Cli = Cli::parse();
 
@@ -29,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         // tx.send(msg).await?;
 
         if let Err(e) = orchestrator.run().await {
-            eprintln!("Orchestrator error: {:?}", e);
+            error!("Orchestrator error: {:?}", e);
         }
     }
 
