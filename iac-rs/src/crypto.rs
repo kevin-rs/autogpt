@@ -28,14 +28,14 @@ impl Signer {
 
 #[derive(Clone)]
 pub struct Verifier {
-    public_key: PublicKey,
+    pub_keys: Vec<PublicKey>,
 }
 
 impl Verifier {
     #[instrument(skip_all)]
-    pub fn new(public_key: PublicKey) -> Self {
+    pub fn new(pub_keys: Vec<PublicKey>) -> Self {
         debug!("🔍 Verifier initialized");
-        Self { public_key }
+        Self { pub_keys }
     }
 
     #[instrument(skip_all, fields(data_len = data.len(), sig_len = sig.len()))]
@@ -49,13 +49,15 @@ impl Verifier {
         sig_array.copy_from_slice(sig);
         let signature = Signature::new(sig_array);
 
-        self.public_key.verify(data, &signature).map_err(|_| {
-            error!("❌ Signature verification failed");
-            anyhow!("Signature verification failed")
-        })?;
+        for pk in &self.pub_keys {
+            if pk.verify(data, &signature).is_ok() {
+                debug!("✅ Signature verified successfully");
+                return Ok(());
+            }
+        }
 
-        debug!("✅ Signature verified successfully");
-        Ok(())
+        error!("❌ Signature verification failed");
+        Err(anyhow!("Signature verification failed"))
     }
 }
 

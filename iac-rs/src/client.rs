@@ -6,6 +6,7 @@ use quinn::Connection;
 use tracing::{debug, instrument};
 use zstd::stream::encode_all;
 
+#[derive(Clone)]
 pub struct Client {
     conn: Connection,
     signer: Signer,

@@ -158,7 +158,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "auto-derive"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "async-trait",
  "proc-macro2",
@@ -168,11 +168,31 @@ dependencies = [
 
 [[package]]
 name = "auto-derive"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5182ab0270e46e66b1249ad6f0f24f59fce866dd6342a9cc228e55631e3243a6"
+checksum = "5677c05b52e6b37871a9052d12afc162fb0ca9c59043f3869bbabcb21d297873"
 dependencies = [
  "async-trait",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "auto-net"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "auto-net"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97f643a56e3ee7ce015f8061fcb0ce6e0ee219df1bc614923129cc5988688919"
+dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.104",
@@ -191,7 +211,7 @@ dependencies = [
  "anthropic-ai-sdk",
  "anyhow",
  "async-trait",
- "auto-derive 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "auto-derive 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono",
  "clap",
  "colored",
@@ -1387,13 +1407,17 @@ dependencies = [
 
 [[package]]
 name = "iac-rs"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "auto-net 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ed25519-compact",
+ "futures",
  "prost 0.14.1",
  "prost-build 0.14.1",
  "quinn",
+ "rand 0.9.1",
  "rcgen",
  "rustls 0.23.28",
  "tokio",

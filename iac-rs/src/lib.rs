@@ -10,4 +10,5 @@ pub mod crypto;
 pub mod message;
 pub mod prelude;
 pub mod server;
+pub mod traits;
 pub mod transport;

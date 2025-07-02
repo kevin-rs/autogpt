@@ -1,5 +1,8 @@
 use anyhow::{Context, Result};
 use prost::Message as ProstMessage;
+use rand::TryRngCore;
+use rand::rngs::OsRng;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, instrument};
 
 include!(concat!(env!("OUT_DIR"), "/iac.rs"));
@@ -49,4 +52,70 @@ impl Message {
         debug!("🔐 Message signature verified");
         Ok(())
     }
+
+    #[instrument(skip_all, fields(from = from, to = to))]
+    pub fn ping(from: &str, to: &str, session_id: u64) -> Self {
+        let timestamp = curr_time();
+        let msg_id = gen_msg_id();
+
+        let msg = Message {
+            from: from.to_string(),
+            to: to.to_string(),
+            msg_type: MessageType::Ping.into(),
+            payload_json: "".to_string(),
+            timestamp,
+            msg_id,
+            session_id,
+            signature: vec![],
+            extra_data: vec![],
+        };
+
+        debug!(
+            msg_id = msg.msg_id,
+            msg_type = ?msg.msg_type(),
+            "📡 Created PING message"
+        );
+
+        msg
+    }
+
+    #[instrument(skip_all, fields(from = from))]
+    pub fn broadcast(from: &str, payload_json: &str, session_id: u64) -> Self {
+        let timestamp = curr_time();
+        let msg_id = gen_msg_id();
+
+        let msg = Message {
+            from: from.to_string(),
+            to: "".to_string(),
+            msg_type: MessageType::Broadcast.into(),
+            payload_json: payload_json.to_string(),
+            timestamp,
+            msg_id,
+            session_id,
+            signature: vec![],
+            extra_data: vec![],
+        };
+
+        debug!(
+            msg_id = msg.msg_id,
+            msg_type = ?msg.msg_type(),
+            payload_len = payload_json.len(),
+            "📢 Created BROADCAST message"
+        );
+
+        msg
+    }
+}
+
+fn curr_time() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn gen_msg_id() -> u64 {
+    OsRng
+        .try_next_u64()
+        .expect("Secure RNG failed to initialize")
 }

@@ -10,7 +10,7 @@ async fn test_server_bind_and_run() -> Result<()> {
 
     let addr = "127.0.0.1:4433";
     let mut server = Server::bind(addr).await?;
-    let verifier = Verifier::new(KeyPair::generate().pk);
+    let verifier = Verifier::new(vec![KeyPair::generate().pk]);
 
     let server_task = tokio::spawn(async move {
         server.run(verifier).await.unwrap();

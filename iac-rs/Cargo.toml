@@ -1,6 +1,6 @@
 [package]
 name = "iac-rs"
-version = "0.0.1"
+version = "0.0.2"
 description = "🛰️ IAC Protocol for Inter and Intra Agents Communications."
 edition = "2024"
 rust-version = "1.85"
@@ -22,6 +22,10 @@ rcgen = "0.13.2"
 rustls = "0.23.28"
 zstd = "0.13.3"
 tokio = { version = "1.45.1", default-features = false }
+rand = "0.9.1"
+auto-net = "0.0.1"
+async-trait = { workspace = true }
+futures.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
