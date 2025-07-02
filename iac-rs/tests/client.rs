@@ -12,7 +12,7 @@ async fn test_client_connect_and_send() -> Result<()> {
 
     tokio::spawn(async move {
         let mut server = Server::bind(addr).await.unwrap();
-        let verifier = Verifier::new(KeyPair::generate().pk);
+        let verifier = Verifier::new(vec![KeyPair::generate().pk]);
         server.run(verifier).await.unwrap();
     });
 

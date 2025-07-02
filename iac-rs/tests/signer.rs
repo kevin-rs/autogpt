@@ -10,7 +10,7 @@ fn test_sign_and_verify() -> Result<()> {
 
     let keypair = KeyPair::generate();
     let signer = Signer::new(keypair.clone());
-    let verifier = Verifier::new(signer.verifying_key());
+    let verifier = Verifier::new(vec![signer.verifying_key()]);
 
     let data = b"test data";
 

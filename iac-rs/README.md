@@ -35,13 +35,13 @@ To get started with IAC in your project, add the crate to start a server and con
 use iac_rs::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     let addr = "127.0.0.1:4433";
     let server_addr = "0.0.0.0:4433";
 
     tokio::spawn(async move {
         let mut server = Server::bind(server_addr).await?;
-        let verifier = Verifier::new(KeyPair::generate().pk);
+        let verifier = Verifier::new(vec![KeyPair::generate().pk]);
         server.run(verifier).await?;
         Ok::<(), anyhow::Error>(())
     });
@@ -70,6 +70,109 @@ This demonstrates:
 - Connecting a client with a generated signer key
 - Creating and signing a message
 - Sending the message over the IAC protocol
+
+### 🌐 Agentic Network
+
+```rust
+use iac_rs::prelude::*;
+use tokio::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::borrow::Cow;
+
+// Use the `AutoNet` macro to automatically implement the `Network` trait and enable IAC protocol support.
+// The struct must define at least these fields for `AutoNet` to function correctly:
+#[derive(AutoNet)]
+pub struct Agent {
+    pub id: Cow<'static, str>,
+    pub signer: Signer,
+    pub verifiers: HashMap<String, Verifier>,
+    pub addr: String,
+    pub clients: HashMap<String, Arc<Mutex<Client>>>,
+    pub server: Option<Arc<Mutex<Server>>>,
+    pub heartbeat_interval: Duration,
+    pub peer_addresses: HashMap<String, String>,
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let addr = "0.0.0.0:4555";
+    let client_addr = "127.0.0.1:4555";
+
+    // Generate keypairs for agents
+    let signer1 = Signer::new(KeyPair::generate());
+    let signer2 = Signer::new(KeyPair::generate());
+
+    // Server verifier (accepts both agents' keys)
+    let verifier = Verifier::new(vec![signer1.verifying_key(), signer2.verifying_key()]);
+
+    // Start server
+    tokio::spawn(async move {
+        let mut server = Server::bind(addr).await.unwrap();
+        server.run(verifier).await.unwrap();
+    });
+
+    // Agent 1 setup
+    let client1 = Client::connect(client_addr, signer1.clone()).await?;
+    let mut clients1 = HashMap::new();
+    clients1.insert("agent-2".into(), Arc::new(Mutex::new(client1)));
+
+    let agent1 = Arc::new(Agent {
+        id: "agent-1".into(),
+        signer: signer1,
+        verifiers: HashMap::new(),
+        addr: client_addr.into(),
+        clients: clients1,
+        server: None,
+        heartbeat_interval: Duration::from_millis(500),
+        peer_addresses: HashMap::new(),
+    });
+
+    // Agent 2 setup
+    let client2 = Client::connect(client_addr, signer2.clone()).await?;
+    let mut clients2 = HashMap::new();
+    clients2.insert("agent-1".into(), Arc::new(Mutex::new(client2)));
+
+    let agent2 = Arc::new(Agent {
+        id: "agent-2".into(),
+        signer: signer2,
+        verifiers: HashMap::new(),
+        addr: client_addr.into(),
+        clients: clients2,
+        server: None,
+        heartbeat_interval: Duration::from_millis(500),
+        peer_addresses: HashMap::new(),
+    });
+
+    // Start heartbeat tasks
+    let hb1 = {
+        let agent = Arc::clone(&agent1);
+        tokio::spawn(async move {
+            agent.heartbeat().await;
+        })
+    };
+
+    let hb2 = {
+        let agent = Arc::clone(&agent2);
+        tokio::spawn(async move {
+            agent.heartbeat().await;
+        })
+    };
+
+    // Agent 1 broadcasts a message
+    agent1.broadcast("hello from agent-1").await?;
+
+    hb1.abort();
+    hb2.abort();
+
+    Ok(())
+}
+```
+
+This shows:
+
+- How agents send **heartbeat** messages.
+- How agents send **broadcast** messages.
 
 ## 🤝 Contributing
 

@@ -1,12 +1,12 @@
 [package]
-name = "auto-derive"
-version = "0.0.4"
+name = "auto-net"
+version = "0.0.1"
 edition = "2024"
-description = "autogpt macro crate."
+description = "iac auto network macro crate."
 license = "MIT"
-keywords = ["autogpt", "autogpt-macro", "macro"]
+keywords = ["iac", "iac-macro", "autogpt"]
 repository = "https://github.com/kevin-rs/autogpt"
-documentation = "https://docs.rs/auto-derive"
+documentation = "https://docs.rs/auto-net"
 authors = ["Mahmoud Harmouch <oss@wiseai.dev>"]
 
 [lib]
@@ -16,4 +16,3 @@ proc-macro = true
 syn = { version = "2.0.104", features = ["full"] }
 quote = "1.0.40"
 proc-macro2 = "1.0.95"
-async-trait = { workspace = true }
