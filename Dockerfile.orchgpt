@@ -13,6 +13,7 @@ WORKDIR /kevin
 COPY Cargo.toml Cargo.lock INSTALLATION.md ./
 COPY auto-derive ./auto-derive
 COPY autogpt ./autogpt
+COPY auto-net ./auto-net
 COPY iac-rs ./iac-rs
 COPY README.md ./
 
