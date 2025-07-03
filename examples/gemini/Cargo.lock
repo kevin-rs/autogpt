@@ -66,9 +66,9 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "auto-derive"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5182ab0270e46e66b1249ad6f0f24f59fce866dd6342a9cc228e55631e3243a6"
+checksum = "5677c05b52e6b37871a9052d12afc162fb0ca9c59043f3869bbabcb21d297873"
 dependencies = [
  "async-trait",
  "proc-macro2",

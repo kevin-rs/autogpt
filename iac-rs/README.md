@@ -174,6 +174,12 @@ This shows:
 - How agents send **heartbeat** messages.
 - How agents send **broadcast** messages.
 
+## 🚀 Performance
+
+![benchmark](https://raw.githubusercontent.com/kevin-rs/autogpt/refs/heads/main/iac-rs/benches/bench.png)
+
+Through benchmarks (by running `cargo bench`), we found that **IAC achieves exceptional speed and efficiency**, with **sub-millisecond signed broadcasts** and tight tail latencies. Median message latency sits around **296 µs**, with the 99th percentile under **600 µs** across 1,000 async roundtrips. Built on QUIC, Ed25519, and Protobuf, IAC eliminates traditional overhead via **zero-RTT transport**, **concurrent streams**, and **fully async execution**. This makes IAC ideal for **high-frequency agent coordination**, **distributed task orchestration**, and **real-time multi-agent systems**, all with cryptographic guarantees and minimal delay.
+
 ## 🤝 Contributing
 
 We welcome all contributions: ideas, issues, improvements, documentation, or code!
