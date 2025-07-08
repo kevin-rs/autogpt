@@ -1,8 +1,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use iac_rs::prelude::*;
+use plotters::prelude::*;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::hint::black_box;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
@@ -72,19 +75,92 @@ async fn bench_iac_async(agent1: Arc<Agent>) {
     let mut latencies = Vec::with_capacity(1_000);
 
     for _ in 0..1_000 {
-        let now = tokio::time::Instant::now();
-        agent1.broadcast("test message").await.unwrap();
-        latencies.push(now.elapsed().as_micros());
+        let now = Instant::now();
+
+        agent1.broadcast(black_box("test message")).await.unwrap();
+
+        let elapsed = black_box(now.elapsed().as_micros() as u64);
+        latencies.push(elapsed);
     }
 
-    let csv = latencies
-        .into_iter()
-        .map(|v| v.to_string())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let mean = latencies.iter().copied().sum::<u64>() as f64 / latencies.len() as f64;
 
-    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("iac_benchmark.csv");
-    std::fs::write(&path, csv).unwrap();
+    let median = {
+        let mut sorted = latencies.clone();
+        sorted.sort_unstable();
+        let mid = sorted.len() / 2;
+        if sorted.len() % 2 == 0 {
+            (sorted[mid - 1] + sorted[mid]) as f64 / 2.0
+        } else {
+            sorted[mid] as f64
+        }
+    };
+
+    let root_area = BitMapBackend::new("iac_benchmark.png", (1200, 600)).into_drawing_area();
+    root_area.fill(&WHITE).unwrap();
+
+    let max_latency = *latencies.iter().max().unwrap_or(&0);
+    let min_latency = *latencies.iter().min().unwrap_or(&0);
+
+    let mut chart = ChartBuilder::on(&root_area)
+        .caption("Latency per Iteration (µs)", ("sans-serif", 30))
+        .margin(30)
+        .x_label_area_size(40)
+        .y_label_area_size(60)
+        .build_cartesian_2d(0..latencies.len(), min_latency..max_latency)
+        .unwrap();
+
+    chart
+        .configure_mesh()
+        .x_desc("Iteration")
+        .y_desc("Latency (µs)")
+        .axis_desc_style(("sans-serif", 20))
+        .light_line_style(&TRANSPARENT)
+        .draw()
+        .unwrap();
+
+    chart
+        .draw_series(LineSeries::new(
+            latencies.iter().enumerate().map(|(i, &v)| (i, v)),
+            &RED,
+        ))
+        .unwrap()
+        .label("Latency")
+        .legend(|(x, y)| PathElement::new([(x, y), (x + 20, y)], &RED));
+
+    chart
+        .draw_series(std::iter::once(PathElement::new(
+            [(0, mean as u64), (latencies.len(), mean as u64)],
+            ShapeStyle {
+                color: BLUE.mix(0.6).to_rgba(),
+                filled: false,
+                stroke_width: 2,
+            },
+        )))
+        .unwrap()
+        .label("Mean")
+        .legend(|(x, y)| PathElement::new([(x, y), (x + 20, y)], &BLUE));
+
+    chart
+        .draw_series(std::iter::once(PathElement::new(
+            [(0, median as u64), (latencies.len(), median as u64)],
+            ShapeStyle {
+                color: GREEN.mix(0.6).to_rgba(),
+                filled: false,
+                stroke_width: 2,
+            },
+        )))
+        .unwrap()
+        .label("Median")
+        .legend(|(x, y)| PathElement::new([(x, y), (x + 20, y)], &GREEN));
+
+    chart
+        .configure_series_labels()
+        .background_style(&WHITE.mix(0.8))
+        .border_style(&BLACK)
+        .label_font(("sans-serif", 18))
+        .draw()
+        .unwrap();
 }
 
 fn bench_iac(c: &mut Criterion) {
