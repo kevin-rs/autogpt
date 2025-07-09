@@ -1,6 +1,6 @@
 [package]
 name = "autogpt"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = """
 🦀 A Pure Rust Framework For Building AGIs.
@@ -10,7 +10,7 @@ license = "MIT"
 documentation = "https://docs.rs/autogpt"
 repository = "https://github.com/kevin-rs/autogpt"
 homepage = "https://kevin-rs.dev"
-readme = "README.md"
+readme = "../README.md"
 categories = ["science"]
 keywords = ["agi", "ai", "machine-learning", "llm", "stable-diffusion"]
 exclude = ["/workspace", "/examples"]
