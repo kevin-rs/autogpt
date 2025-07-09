@@ -37,13 +37,13 @@
 //!
 
 use crate::agents::agent::AgentGPT;
+use crate::collaboration::Collaborator;
 use crate::common::utils::{
     Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
     Status, Task, TaskScheduler, Tool, similarity,
 };
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
-use crate::traits::composite::AgentFunctions;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -53,9 +53,7 @@ use getimg::client::Client as ImgClient;
 use getimg::utils::save_image;
 use std::borrow::Cow;
 use std::env::var;
-use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -195,8 +193,7 @@ impl DesignerGPT {
     pub async fn generate_image_from_text(&mut self, tasks: &Task) -> Result<()> {
         let img_path = self.workspace.to_string() + "/img.jpg";
 
-        let text_prompt: String =
-            format!("{}\n\nUser Prompt: {}", IMGGET_PROMPT, tasks.description);
+        let text_prompt: String = format!("{IMGGET_PROMPT}\n\nUser Prompt: {}", tasks.description);
         let negative_prompt = Some("Disfigured, cartoon, blurry");
 
         self.agent.add_communication(Communication {
@@ -215,14 +212,14 @@ impl DesignerGPT {
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
-            content: Cow::Owned(format!("Generating image with prompt: '{}'", text_prompt)),
+            content: Cow::Owned(format!("Generating image with prompt: '{text_prompt}'")),
         });
         #[cfg(feature = "mem")]
         {
             let _ = self
                 .save_ltm(Communication {
                     role: Cow::Borrowed("assistant"),
-                    content: Cow::Owned(format!("Generating image with prompt: '{}'", text_prompt)),
+                    content: Cow::Owned(format!("Generating image with prompt: '{text_prompt}'")),
                 })
                 .await;
         }
@@ -244,14 +241,14 @@ impl DesignerGPT {
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("system"),
-            content: Cow::Owned(format!("Image saved at {}", img_path)),
+            content: Cow::Owned(format!("Image saved at {img_path}")),
         });
         #[cfg(feature = "mem")]
         {
             let _ = self
                 .save_ltm(Communication {
                     role: Cow::Borrowed("system"),
-                    content: Cow::Owned(format!("Image saved at {}", img_path)),
+                    content: Cow::Owned(format!("Image saved at {img_path}")),
                 })
                 .await;
         }
@@ -289,8 +286,7 @@ impl DesignerGPT {
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
             content: Cow::Owned(format!(
-                "Requesting text generation from image at path: {}",
-                image_path
+                "Requesting text generation from image at path: {image_path}"
             )),
         });
 
@@ -300,8 +296,7 @@ impl DesignerGPT {
                 .save_ltm(Communication {
                     role: Cow::Borrowed("user"),
                     content: Cow::Owned(format!(
-                        "Requesting text generation from image at path: {}",
-                        image_path
+                        "Requesting text generation from image at path: {image_path}"
                     )),
                 })
                 .await;
@@ -310,7 +305,7 @@ impl DesignerGPT {
         let base64_image_data = match load_and_encode_image(image_path) {
             Ok(data) => data,
             Err(_) => {
-                let error_msg = format!("Failed to load or encode image at path: {}", image_path);
+                let error_msg = format!("Failed to load or encode image at path: {image_path}");
 
                 self.agent.add_communication(Communication {
                     role: Cow::Borrowed("system"),
@@ -366,10 +361,7 @@ impl DesignerGPT {
                     Ok(response) => {
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
-                            content: Cow::Owned(format!(
-                                "Generated image description: {}",
-                                response
-                            )),
+                            content: Cow::Owned(format!("Generated image description: {response}")),
                         });
 
                         #[cfg(feature = "mem")]
@@ -378,8 +370,7 @@ impl DesignerGPT {
                                 .save_ltm(Communication {
                                     role: Cow::Borrowed("assistant"),
                                     content: Cow::Owned(format!(
-                                        "Generated image description: {}",
-                                        response
+                                        "Generated image description: {response}"
                                     )),
                                 })
                                 .await;
@@ -398,8 +389,7 @@ impl DesignerGPT {
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(format!(
-                                "Error generating image description: {}",
-                                err
+                                "Error generating image description: {err}"
                             )),
                         });
 
@@ -409,8 +399,7 @@ impl DesignerGPT {
                                 .save_ltm(Communication {
                                     role: Cow::Borrowed("assistant"),
                                     content: Cow::Owned(format!(
-                                        "Error generating image description: {}",
-                                        err
+                                        "Error generating image description: {err}"
                                     )),
                                 })
                                 .await;
@@ -466,8 +455,7 @@ impl DesignerGPT {
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(format!(
-                                "Generated image description: {}",
-                                response_text
+                                "Generated image description: {response_text}"
                             )),
                         });
 
@@ -477,8 +465,7 @@ impl DesignerGPT {
                                 .save_ltm(Communication {
                                     role: Cow::Borrowed("assistant"),
                                     content: Cow::Owned(format!(
-                                        "Generated image description: {}",
-                                        response_text
+                                        "Generated image description: {response_text}"
                                     )),
                                 })
                                 .await;
@@ -497,8 +484,7 @@ impl DesignerGPT {
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
                             content: Cow::Owned(format!(
-                                "Error generating image description: {}",
-                                err
+                                "Error generating image description: {err}"
                             )),
                         });
 
@@ -508,8 +494,7 @@ impl DesignerGPT {
                                 .save_ltm(Communication {
                                     role: Cow::Borrowed("assistant"),
                                     content: Cow::Owned(format!(
-                                        "Error generating image description: {}",
-                                        err
+                                        "Error generating image description: {err}"
                                     )),
                                 })
                                 .await;
@@ -573,7 +558,7 @@ impl DesignerGPT {
                     }
 
                     Err(err) => {
-                        let err_msg = format!("ERROR_MESSAGE: {}", err);
+                        let err_msg = format!("ERROR_MESSAGE: {err}");
 
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),

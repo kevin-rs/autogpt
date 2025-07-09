@@ -39,6 +39,7 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+use crate::collaboration::Collaborator;
 #[cfg(feature = "cli")]
 use crate::common::utils::spinner;
 #[allow(unused_imports)]
@@ -51,13 +52,10 @@ use crate::prompts::backend::{
     API_ENDPOINTS_PROMPT, FIX_CODE_PROMPT, IMPROVED_WEBSERVER_CODE_PROMPT, WEBSERVER_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::composite::AgentFunctions;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use auto_derive::Auto;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 // use std::thread::sleep;
 
 use anyhow::Result;
@@ -148,7 +146,7 @@ impl BackendGPT {
         language: &'static str,
     ) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or_else(|_| "workspace".to_string());
-        let workspace = format!("{}/backend", base_workspace);
+        let workspace = format!("{base_workspace}/backend");
 
         if !fs::try_exists(&workspace).await.unwrap_or(false) {
             match fs::create_dir_all(&workspace).await {
@@ -161,14 +159,14 @@ impl BackendGPT {
 
         info!(
             "{}",
-            format!("[*] {:?}: 🛠️  Getting ready!", position)
+            format!("[*] {position:?}: 🛠️  Getting ready!")
                 .bright_white()
                 .bold()
         );
 
         match language {
             "rust" => {
-                if !Path::new(&format!("{}/Cargo.toml", workspace)).exists() {
+                if !Path::new(&format!("{workspace}/Cargo.toml")).exists() {
                     let cargo_new = Command::new("cargo").arg("init").arg(&workspace).spawn();
 
                     match cargo_new {
@@ -177,7 +175,7 @@ impl BackendGPT {
                     }
                 }
 
-                let template_path = format!("{}/src/template.rs", workspace);
+                let template_path = format!("{workspace}/src/template.rs");
                 if !Path::new(&template_path).exists() {
                     if let Err(e) = fs::write(&template_path, "").await {
                         error!("Error creating file '{}': {}", template_path, e);
@@ -190,7 +188,7 @@ impl BackendGPT {
             "python" => {
                 let files = ["main.py", "template.py"];
                 for file in files.iter() {
-                    let full_path = format!("{}/{}", workspace, file);
+                    let full_path = format!("{workspace}/{file}");
                     if !Path::new(&full_path).exists() {
                         if let Err(e) = fs::write(&full_path, "").await {
                             error!("Error creating file '{}': {}", full_path, e);
@@ -202,7 +200,7 @@ impl BackendGPT {
             }
 
             "javascript" => {
-                if !Path::new(&format!("{}/package.json", workspace)).exists() {
+                if !Path::new(&format!("{workspace}/package.json")).exists() {
                     let npx_install = Command::new("npx")
                         .arg("create-react-app")
                         .arg(&workspace)
@@ -229,7 +227,7 @@ impl BackendGPT {
                     }
                 }
 
-                let template_path = format!("{}/src/template.js", workspace);
+                let template_path = format!("{workspace}/src/template.js");
                 if !Path::new(&template_path).exists() {
                     if let Err(e) = fs::write(&template_path, "").await {
                         error!("Error creating file '{}': {}", template_path, e);
@@ -239,10 +237,7 @@ impl BackendGPT {
                 }
             }
 
-            _ => panic!(
-                "Unsupported language '{}'. Consider opening an issue/PR.",
-                language
-            ),
+            _ => panic!("Unsupported language '{language}'. Consider opening an issue/PR.",),
         }
 
         let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
@@ -528,10 +523,8 @@ impl BackendGPT {
 
         let buggy_code = tasks.backend_code.clone().unwrap_or_default();
         let bugs = self.bugs.clone().unwrap_or_default();
-        let request = format!(
-            "{}\n\nBuggy Code: {}\nBugs: {}\n\nFix all bugs.",
-            FIX_CODE_PROMPT, buggy_code, bugs
-        );
+        let request =
+            format!("{FIX_CODE_PROMPT}\n\nBuggy Code: {buggy_code}\nBugs: {bugs}\n\nFix all bugs.");
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
@@ -575,9 +568,9 @@ impl BackendGPT {
 
         let workspace = &self.workspace;
         let backend_path = match self.language {
-            "rust" => format!("{}/src/main.rs", workspace),
-            "python" => format!("{}/main.py", workspace),
-            "javascript" => format!("{}/src/index.js", workspace),
+            "rust" => format!("{workspace}/src/main.rs"),
+            "python" => format!("{workspace}/main.py"),
+            "javascript" => format!("{workspace}/src/index.js"),
             _ => return Err(anyhow::anyhow!("Unsupported language")),
         };
 
@@ -624,9 +617,9 @@ impl BackendGPT {
 
         let path = self.workspace.clone();
         let full_path = match self.language {
-            "rust" => format!("{}/src/main.rs", path),
-            "python" => format!("{}/main.py", path),
-            "javascript" => format!("{}/src/index.js", path),
+            "rust" => format!("{path}/src/main.rs"),
+            "python" => format!("{path}/main.py"),
+            "javascript" => format!("{path}/src/index.js"),
             _ => return Err(anyhow::anyhow!("Unsupported language")),
         };
 
@@ -638,8 +631,7 @@ impl BackendGPT {
 
         let backend_code = fs::read_to_string(full_path).await?;
         let request = format!(
-            "{}\n\nHere is the backend code with all routes:{}",
-            API_ENDPOINTS_PROMPT, backend_code
+            "{API_ENDPOINTS_PROMPT}\n\nHere is the backend code with all routes:{backend_code}"
         );
 
         self.agent.add_communication(Communication {
@@ -687,7 +679,7 @@ impl BackendGPT {
 
     pub fn think(&self) -> String {
         let objective = self.agent.objective();
-        format!("How to build and test backend for '{}'", objective)
+        format!("How to build and test backend for '{objective}'")
     }
 
     pub fn plan(&mut self, _context: String) -> Goal {
@@ -983,7 +975,7 @@ impl BackendGPT {
 
             let _ = child.kill().await;
 
-            let backend_path = format!("{}/api.json", path);
+            let backend_path = format!("{path}/api.json");
             fs::write(&backend_path, endpoints).await?;
 
             info!(
@@ -1048,8 +1040,8 @@ impl BackendGPT {
     }
 
     async fn build_and_run_python_backend(&self, path: &str) -> Result<Option<Child>> {
-        let venv_path = format!("{}/.venv", path);
-        let pip_path = format!("{}/bin/pip", venv_path);
+        let venv_path = format!("{path}/.venv");
+        let pip_path = format!("{venv_path}/bin/pip");
         let venv_exists = Path::new(&venv_path).exists();
 
         if !venv_exists {
@@ -1063,7 +1055,7 @@ impl BackendGPT {
 
             if let Ok(status) = create_venv.await {
                 if status.success() {
-                    let main_py_path = format!("{}/main.py", path);
+                    let main_py_path = format!("{path}/main.py");
                     let main_py_content = fs::read_to_string(&main_py_path)
                         .await
                         .expect("Failed to read main.py");

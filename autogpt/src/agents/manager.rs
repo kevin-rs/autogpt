@@ -377,7 +377,7 @@ impl ManagerGPT {
                     }
 
                     Err(err) => {
-                        let err_msg = format!("Failed to generate content via XAI API: {}", err);
+                        let err_msg = format!("Failed to generate content via XAI API: {err}");
 
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),
@@ -500,8 +500,7 @@ impl ManagerGPT {
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
             content: Cow::Owned(format!(
-                "Identified Language: '{}', Framework: '{}'",
-                language, framework
+                "Identified Language: '{language}', Framework: '{framework}'"
             )),
         });
 
@@ -511,8 +510,7 @@ impl ManagerGPT {
                 .save_ltm(Communication {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!(
-                        "Identified Language: '{}', Framework: '{}'",
-                        language, framework
+                        "Identified Language: '{language}', Framework: '{framework}'"
                     )),
                 })
                 .await;

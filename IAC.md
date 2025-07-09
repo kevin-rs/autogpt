@@ -1,6 +1,6 @@
 # RFC: IAC Protocol for Inter and Intra Agents Communications
 
-![iac-seq-diag](https://github.com/user-attachments/assets/555534b1-84ca-4efc-ac9d-553e4a979d48)
+![iac-seq-diag](https://raw.githubusercontent.com/kevin-rs/autogpt/refs/heads/main/assets/iac.png)
 
 ## Introduction
 

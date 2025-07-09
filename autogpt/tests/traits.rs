@@ -13,7 +13,7 @@ pub struct MockAgent {
     knowledge: Knowledge,
     planner: Option<Planner>,
     persona: Persona,
-    collaborators: Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>,
+    collaborators: Vec<Collaborator>,
     reflection: Option<Reflection>,
     scheduler: Option<TaskScheduler>,
     capabilities: HashSet<Capability>,
@@ -72,7 +72,7 @@ impl Agent for MockAgent {
         &self.persona
     }
 
-    fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>> {
+    fn collaborators(&self) -> &Vec<Collaborator> {
         &self.collaborators
     }
 

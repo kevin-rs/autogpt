@@ -64,6 +64,7 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+use crate::collaboration::Collaborator;
 #[allow(unused_imports)]
 use crate::common::utils::{
     Capability, ClientType, Communication, ContextManager, Goal, Knowledge, Persona, Planner,
@@ -71,7 +72,6 @@ use crate::common::utils::{
 };
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
-use crate::traits::composite::AgentFunctions;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::Result;
 use auto_derive::Auto;
@@ -81,9 +81,7 @@ use std::env::var;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 #[cfg(feature = "mem")]
@@ -162,7 +160,7 @@ impl OptimizerGPT {
     #[allow(unused)]
     pub async fn new(objective: &'static str, position: &'static str, language: &str) -> Self {
         let base_workspace = var("AUTOGPT_WORKSPACE").unwrap_or("workspace/".to_string());
-        let workspace = format!("{}/backend", base_workspace);
+        let workspace = format!("{base_workspace}/backend");
 
         if !fs::try_exists(&workspace).await.unwrap_or(false) {
             match fs::create_dir_all(&workspace).await {
@@ -342,7 +340,7 @@ impl Executor for OptimizerGPT {
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
-            content: Cow::Owned(format!("Analyzing and modularizing: {}", file_path)),
+            content: Cow::Owned(format!("Analyzing and modularizing: {file_path}")),
         });
 
         #[cfg(feature = "mem")]
@@ -352,7 +350,7 @@ impl Executor for OptimizerGPT {
         })
         .await?;
 
-        let prompt = format!("{}\n\n{}", MODULARIZE_PROMPT, original_code);
+        let prompt = format!("{MODULARIZE_PROMPT}\n\n{original_code}");
         let file_list_raw = self.generate_and_track(&prompt).await?;
 
         let filenames: Vec<String> = file_list_raw
@@ -366,23 +364,21 @@ impl Executor for OptimizerGPT {
             .collect();
 
         for filename in &filenames {
-            let split_prompt = format!(
-                "{}\n\nFilename: {}\nContent:\n{}",
-                SPLIT_PROMPT, filename, original_code
-            );
+            let split_prompt =
+                format!("{SPLIT_PROMPT}\n\nFilename: {filename}\nContent:\n{original_code}");
             let response = self.generate_and_track(&split_prompt).await?;
 
             self.save_module(filename, &response).await?;
 
             self.agent.add_communication(Communication {
                 role: Cow::Borrowed("assistant"),
-                content: Cow::Owned(format!("Generated module: {}", filename)),
+                content: Cow::Owned(format!("Generated module: {filename}")),
             });
 
             #[cfg(feature = "mem")]
             self.save_ltm(Communication {
                 role: Cow::Borrowed("assistant"),
-                content: Cow::Owned(format!("Saved file: {}", filename)),
+                content: Cow::Owned(format!("Saved file: {filename}")),
             })
             .await?;
         }
@@ -392,7 +388,7 @@ impl Executor for OptimizerGPT {
             .map(|f| match self.language.as_str() {
                 "python" => format!("import {}", f.replace(".py", "").replace("/", ".")),
                 "rust" => format!("mod {};", f.replace(".rs", "").replace("/", "::")),
-                "javascript" => format!("import './{}';", f),
+                "javascript" => format!("import './{f}';"),
                 _ => String::new(),
             })
             .collect::<Vec<_>>()

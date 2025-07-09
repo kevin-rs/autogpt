@@ -27,7 +27,7 @@ async fn test_transport_configs() -> Result<()> {
                     break;
                 }
                 Err(e) => {
-                    eprintln!("Server connection error: {}", e);
+                    eprintln!("Server connection error: {e}");
                 }
             }
         }

@@ -189,16 +189,15 @@ impl ClientType {
         #[allow(unreachable_code)]
         {
             panic!(
-                "Invalid AI_PROVIDER `{}` or missing required feature flags. \
-                Make sure to enable at least one of: `oai`, `gem`, `cld`, `xai`.",
-                provider
+                "Invalid AI_PROVIDER `{provider}` or missing required feature flags. \
+                Make sure to enable at least one of: `oai`, `gem`, `cld`, `xai`."
             );
         }
     }
 }
 
 /// Represents a communication between agents.
-#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash, Serialize, Deserialize)]
 pub struct Communication {
     /// The role of the communication.
     pub role: Cow<'static, str>,
@@ -476,7 +475,7 @@ pub async fn run_code(
             Ok(Some(run_output))
         }
 
-        _ => Err(format!("Unsupported language: {}", language).into()),
+        _ => Err(format!("Unsupported language: {language}").into()),
     }
 }
 #[cfg(feature = "cli")]
@@ -584,10 +583,7 @@ pub async fn ask_to_run_command(
                     }
                 }
                 Err(e) => {
-                    error!(
-                        "{}",
-                        format!("[*] \"AGI\": Error: {}", e).bright_red().bold()
-                    );
+                    error!("{}", format!("[*] \"AGI\": Error: {e}").bright_red().bold());
                 }
                 _ => {}
             }
@@ -931,11 +927,13 @@ pub enum Sensor {
 }
 
 /// Enumerates possible capabilities the agent can possess.
-#[derive(Eq, Debug, PartialEq, Default, Clone, Hash)]
+#[derive(Eq, Debug, PartialEq, Default, Clone, Hash, Serialize, Deserialize)]
 pub enum Capability {
     /// Can generate code from prompts.
     #[default]
     CodeGen,
+    /// Can generate UI components.
+    UIDesign,
     /// Can perform live web searches.
     WebSearch,
     /// Can access SQL databases.
@@ -1046,4 +1044,21 @@ pub fn spinner(label: &str) -> ProgressBar {
     pb.set_message(label.to_string());
     pb.enable_steady_tick(Duration::from_millis(120));
     pb
+}
+
+#[derive(Eq, Debug, PartialEq, Clone, Hash, Serialize, Deserialize)]
+pub enum AgentMessage {
+    #[serde(rename = "task")]
+    Task(Task),
+    #[serde(rename = "status")]
+    Status(String),
+    #[serde(rename = "memory")]
+    Memory(Vec<Communication>),
+    #[serde(rename = "capability_advert")]
+    CapabilityAdvert {
+        sender_id: String,
+        capabilities: Vec<Capability>,
+    },
+    #[serde(rename = "custom")]
+    Custom(String),
 }

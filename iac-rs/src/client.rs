@@ -6,10 +6,18 @@ use quinn::Connection;
 use tracing::{debug, instrument};
 use zstd::stream::encode_all;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Client {
     conn: Connection,
     signer: Signer,
+}
+
+impl PartialEq for Client {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: File an issue to allow quinn Connection to implement PartialEq.
+        // For now, let's compare the signer
+        self.signer == other.signer
+    }
 }
 
 impl Client {

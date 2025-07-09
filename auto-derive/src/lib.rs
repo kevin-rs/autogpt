@@ -53,7 +53,7 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 &self.agent.persona
             }
 
-            fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>> {
+            fn collaborators(&self) -> &Vec<Collaborator> {
                 &self.agent.collaborators
             }
 

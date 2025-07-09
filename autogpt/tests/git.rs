@@ -26,7 +26,7 @@ async fn test_git_gpt_execute() {
 
     let mut git_agent = GitGPT::new("Commit all changes", "GitGPT").await;
 
-    let dummy_file_path = format!("{}/hello.txt", test_workspace);
+    let dummy_file_path = format!("{test_workspace}/hello.txt");
     fs::create_dir_all(test_workspace).unwrap();
     fs::write(&dummy_file_path, "Hello, GitGPT!").unwrap();
 

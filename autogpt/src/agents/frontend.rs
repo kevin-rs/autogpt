@@ -48,11 +48,11 @@ use crate::common::utils::{
     extract_array, strip_code_blocks,
 };
 
+use crate::collaboration::Collaborator;
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::composite::AgentFunctions;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::Result;
 use auto_derive::Auto;
@@ -62,13 +62,11 @@ use std::borrow::Cow;
 use std::env::var;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use tokio::process::Child;
 use tokio::process::Command;
-use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
 #[cfg(feature = "mem")]
@@ -399,8 +397,7 @@ impl FrontendGPT {
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
             content: Cow::Owned(format!(
-                "Frontend code generated and saved to '{}'",
-                frontend_main_path
+                "Frontend code generated and saved to '{frontend_main_path}'"
             )),
         });
 
@@ -410,8 +407,7 @@ impl FrontendGPT {
                 .save_ltm(Communication {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!(
-                        "Frontend code generated and saved to '{}'",
-                        frontend_main_path
+                        "Frontend code generated and saved to '{frontend_main_path}'"
                     )),
                 })
                 .await;
@@ -516,10 +512,7 @@ impl FrontendGPT {
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
-            content: Cow::Owned(format!(
-                "Improved frontend code saved to '{}'",
-                frontend_path
-            )),
+            content: Cow::Owned(format!("Improved frontend code saved to '{frontend_path}'",)),
         });
 
         #[cfg(feature = "mem")]
@@ -528,8 +521,7 @@ impl FrontendGPT {
                 .save_ltm(Communication {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!(
-                        "Improved frontend code saved to '{}'",
-                        frontend_path
+                        "Improved frontend code saved to '{frontend_path}'"
                     )),
                 })
                 .await;
@@ -574,8 +566,7 @@ impl FrontendGPT {
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
             content: Cow::Owned(format!(
-                "Request to fix bugs in frontend code. Known bugs: {}",
-                bugs_description
+                "Request to fix bugs in frontend code. Known bugs: {bugs_description}"
             )),
         });
 
@@ -585,8 +576,7 @@ impl FrontendGPT {
                 .save_ltm(Communication {
                     role: Cow::Borrowed("user"),
                     content: Cow::Owned(format!(
-                        "Request to fix bugs in frontend code. Known bugs: {}",
-                        bugs_description
+                        "Request to fix bugs in frontend code. Known bugs: {bugs_description}"
                     )),
                 })
                 .await;
@@ -595,8 +585,7 @@ impl FrontendGPT {
         let buggy_code = tasks.clone().frontend_code.unwrap_or_default();
 
         let prompt = format!(
-            "{}\n\nBuggy Code: {}\nBugs: {}\n\nFix all bugs.",
-            FIX_CODE_PROMPT, buggy_code, bugs_description
+            "{FIX_CODE_PROMPT}\n\nBuggy Code: {buggy_code}\nBugs: {bugs_description}\n\nFix all bugs."
         );
 
         self.agent.add_communication(Communication {
@@ -641,8 +630,7 @@ impl FrontendGPT {
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
             content: Cow::Owned(format!(
-                "Bugs fixed. Updated code saved to '{}'",
-                frontend_path
+                "Bugs fixed. Updated code saved to '{frontend_path}'"
             )),
         });
 
@@ -652,8 +640,7 @@ impl FrontendGPT {
                 .save_ltm(Communication {
                     role: Cow::Borrowed("assistant"),
                     content: Cow::Owned(format!(
-                        "Bugs fixed. Updated code saved to '{}'",
-                        frontend_path
+                        "Bugs fixed. Updated code saved to '{frontend_path}'"
                     )),
                 })
                 .await;
@@ -668,7 +655,7 @@ impl FrontendGPT {
     }
     pub fn think(&self) -> String {
         let objective = self.agent.objective();
-        format!("How do I build and test the frontend for '{}'", objective)
+        format!("How do I build and test the frontend for '{objective}'")
     }
 
     pub fn plan(&mut self, context: String) -> Goal {
@@ -710,7 +697,7 @@ impl FrontendGPT {
         }
 
         Goal {
-            description: format!("Fallback task from context: {}", context),
+            description: format!("Fallback task from context: {context}"),
             priority: 99,
             completed: false,
         }
@@ -925,8 +912,8 @@ impl FrontendGPT {
                 .spawn()?),
 
             "python" => {
-                let venv_path = format!("{}/.venv", path);
-                let pip_path = format!("{}/bin/pip", venv_path);
+                let venv_path = format!("{path}/.venv");
+                let pip_path = format!("{venv_path}/bin/pip");
                 let venv_exists = Path::new(&venv_path).exists();
 
                 if !venv_exists {
@@ -940,7 +927,7 @@ impl FrontendGPT {
 
                     if let Ok(status) = create_venv.await {
                         if status.success() {
-                            let main_py_path = format!("{}/main.py", path);
+                            let main_py_path = format!("{path}/main.py");
                             let main_py_content = fs::read_to_string(&main_py_path)
                                 .await
                                 .expect("Failed to read main.py");

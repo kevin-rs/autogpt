@@ -9,6 +9,7 @@
 //!     Capability, Communication, ContextManager, Knowledge, Persona, Planner,
 //!     Reflection, Status, TaskScheduler, Tool, Task
 //! };
+//! use autogpt::collaboration::Collaborator;
 //! use autogpt::traits::agent::Agent;
 //! use autogpt::traits::composite::AgentFunctions;
 //! use std::borrow::Cow;
@@ -27,7 +28,7 @@
 //!     knowledge: Knowledge,
 //!     planner: Option<Planner>,
 //!     persona: Persona,
-//!     collaborators: Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>,
+//!     collaborators: Vec<Collaborator>,
 //!     reflection: Option<Reflection>,
 //!     scheduler: Option<TaskScheduler>,
 //!     capabilities: HashSet<Capability>,
@@ -98,7 +99,7 @@
 //!         &self.persona
 //!     }
 //!
-//!     fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>> {
+//!     fn collaborators(&self) -> &Vec<Collaborator> {
 //!         &self.collaborators
 //!     }
 //!
@@ -137,16 +138,14 @@
 //! ```
 //!
 
+use crate::collaboration::Collaborator;
 use crate::common::utils::{
     Capability, Communication, ContextManager, Knowledge, Persona, Planner, Reflection, Status,
     Task, TaskScheduler, Tool,
 };
-use crate::prelude::Mutex;
-use crate::traits::composite::AgentFunctions;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::sync::Arc;
 
 /// A trait defining basic functionalities for agents.
 pub trait Agent: Debug {
@@ -192,7 +191,7 @@ pub trait Agent: Debug {
     fn persona(&self) -> &Persona;
 
     /// Returns a list of collaborators agents
-    fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>;
+    fn collaborators(&self) -> &Vec<Collaborator>;
 
     /// Returns optional self-reflection module
     fn reflection(&self) -> Option<&Reflection>;

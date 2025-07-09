@@ -129,7 +129,7 @@
 use crate::agents::agent::AgentGPT;
 #[cfg(feature = "mem")]
 use crate::common::utils::Communication;
-use crate::common::utils::Task;
+use crate::common::utils::{AgentMessage, Task};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -213,4 +213,11 @@ pub trait Executor {
         browse: bool,
         max_tries: u64,
     ) -> Result<()>;
+}
+
+#[async_trait]
+pub trait Collaborate: Send + Sync {
+    async fn handle_task(&self, task: Task) -> Result<()>;
+    async fn receive_message(&self, message: AgentMessage) -> Result<()>;
+    fn get_id(&self) -> &str;
 }

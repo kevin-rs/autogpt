@@ -37,6 +37,7 @@ auto-derive = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 duckduckgo = { workspace = true }
+iac-rs = { workspace = true }
 
 uuid = { version = "1.16.0", features = ["v4"] }
 tokio = { version = "1.37.0", default-features = false, features = ["full"] }
@@ -63,13 +64,13 @@ indicatif = { version = "0.17.11", optional = true }
 [features]
 default = []
 img = ["getimg"]
-mail = ["nylas"]
 git = ["git2"]
 gem = ["gems"]
-oai = ["openai_dive"]
 xai = ["x-ai"]
-cld = ["anthropic-ai-sdk"]
+mail = ["nylas"]
+oai = ["openai_dive"]
 mem = ["pinecone-sdk"]
+cld = ["anthropic-ai-sdk"]
 cli = [
     "clap",
     "prost",
