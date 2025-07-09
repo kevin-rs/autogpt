@@ -5,6 +5,6 @@ abstract: World's first, most capable, blazingly fast, and extremely flexible pu
 authors:
   - name: "Mahmoud Harmouch"
 version: v0.1.8
-date-released: "2025-07-2"
+date-released: "2025-07-9"
 license: MIT
 repository-code: "https://github.com/kevin-rs/autogpt"

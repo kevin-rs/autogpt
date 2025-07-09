@@ -23,13 +23,14 @@ pub use {
     crate::agents::frontend::FrontendGPT,
     crate::agents::manager::ManagerGPT,
     crate::agents::optimizer::OptimizerGPT,
+    crate::collaboration::{AgentNet, Collaborator, Swarm},
     crate::common::utils::{
-        Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner,
-        Reflection, Scope, Status, Task, TaskScheduler, Tool,
+        AgentMessage, Capability, ClientType, Communication, ContextManager, Knowledge, Persona,
+        Planner, Reflection, Scope, Status, Task, TaskScheduler, Tool,
     },
     crate::traits::agent::Agent,
     crate::traits::composite::AgentFunctions,
-    crate::traits::functions::{AsyncFunctions, Executor, Functions},
+    crate::traits::functions::{AsyncFunctions, Collaborate, Executor, Functions},
     anyhow::{Result, anyhow},
     async_trait::async_trait,
     auto_derive::Auto,
@@ -170,8 +171,8 @@ impl AutoGPT {
             .into_iter()
             .enumerate()
             .filter_map(|(i, res)| match res {
-                Ok(Err(e)) => Some(format!("Agent {}: {}", i, e)),
-                Err(join_err) => Some(format!("Agent {} panicked: {}", i, join_err)),
+                Ok(Err(e)) => Some(format!("Agent {i}: {e}")),
+                Err(join_err) => Some(format!("Agent {i} panicked: {join_err}")),
                 _ => None,
             })
             .collect();

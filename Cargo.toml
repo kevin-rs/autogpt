@@ -18,7 +18,8 @@ webbrowser = "1.0.1"
 colored = "2.1.0"
 futures = "0.3.31"
 async-trait = "0.1.88"
-auto-derive = "0.0.4"
+auto-derive = { version = "0.0.5", path = "./auto-derive" }
+iac-rs = { version = "0.0.4", path = "./iac-rs" }
 auto-net = "0.0.1"
 chrono = "0.4.41"
 derivative = "2.2.0"

@@ -6,6 +6,7 @@ use quinn::Endpoint;
 use tracing::{debug, error};
 use zstd::stream::decode_all;
 
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -13,9 +14,26 @@ use std::sync::Arc;
 type Handler =
     Arc<dyn Fn(Message) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> + Send + Sync>;
 
+#[derive(Clone)]
 pub struct Server {
     endpoint: Endpoint,
     handler: Option<Handler>,
+}
+
+impl PartialEq for Server {
+    fn eq(&self, _other: &Self) -> bool {
+        // We assume that 2 quinn servers are always different
+        false
+    }
+}
+
+impl fmt::Debug for Server {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Server")
+            .field("endpoint", &"<quinn::Endpoint>")
+            .field("handler", &"<Handler>")
+            .finish()
+    }
 }
 
 impl Server {

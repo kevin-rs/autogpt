@@ -141,7 +141,7 @@ async fn main() -> Result<()> {
                                     continue;
                                 };
 
-                                let payload = format!("input={};language={}", actual_input, lang);
+                                let payload = format!("input={actual_input};language={lang}");
 
                                 let msg = Message {
                                     from: "cli".to_string(),
@@ -314,7 +314,7 @@ async fn main() -> Result<()> {
                             {
                                 error!(
                                     "{}",
-                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                    format!("[*] AGI Runtime Error: {e}").bright_red().bold()
                                 );
                                 break;
                             }
@@ -332,7 +332,7 @@ async fn main() -> Result<()> {
                             {
                                 error!(
                                     "{}",
-                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                    format!("[*] AGI Runtime Error: {e}").bright_red().bold()
                                 );
                                 break;
                             }
@@ -399,7 +399,7 @@ async fn main() -> Result<()> {
                             {
                                 error!(
                                     "{}",
-                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                    format!("[*] AGI Runtime Error: {e}").bright_red().bold()
                                 );
                                 break;
                             }
@@ -416,7 +416,7 @@ async fn main() -> Result<()> {
                             {
                                 error!(
                                     "{}",
-                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                    format!("[*] AGI Runtime Error: {e}").bright_red().bold()
                                 );
                                 break;
                             }
@@ -484,7 +484,7 @@ async fn main() -> Result<()> {
                             {
                                 error!(
                                     "{}",
-                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                    format!("[*] AGI Runtime Error: {e}").bright_red().bold()
                                 );
                                 break;
                             }
@@ -501,7 +501,7 @@ async fn main() -> Result<()> {
                             {
                                 error!(
                                     "{}",
-                                    format!("[*] AGI Runtime Error: {}", e).bright_red().bold()
+                                    format!("[*] AGI Runtime Error: {e}").bright_red().bold()
                                 );
                                 break;
                             }

@@ -7,17 +7,16 @@ use tokio::fs;
 use tracing::{debug, error, info};
 
 use crate::agents::agent::AgentGPT;
+use crate::collaboration::Collaborator;
 use crate::common::utils::{
     Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
     Status, Task, TaskScheduler, Tool,
 };
 use crate::traits::agent::Agent;
-use crate::traits::composite::AgentFunctions;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use async_trait::async_trait;
 use auto_derive::Auto;
 use std::fmt;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[cfg(feature = "mem")]

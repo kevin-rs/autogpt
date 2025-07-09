@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use ed25519_compact::{KeyPair, PublicKey, Signature};
 use tracing::{debug, error, instrument};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Signer {
     keypair: KeyPair,
 }
@@ -26,7 +26,7 @@ impl Signer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Verifier {
     pub_keys: Vec<PublicKey>,
 }

@@ -151,8 +151,7 @@ impl MailerGPT {
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("user"),
             content: Cow::Owned(format!(
-                "Requested to generate text based on emails with prompt: '{}'",
-                prompt
+                "Requested to generate text based on emails with prompt: '{prompt}'"
             )),
         });
         #[cfg(feature = "mem")]
@@ -161,8 +160,7 @@ impl MailerGPT {
                 .save_ltm(Communication {
                     role: Cow::Borrowed("user"),
                     content: Cow::Owned(format!(
-                        "Requested to generate text based on emails with prompt: '{}'",
-                        prompt
+                        "Requested to generate text based on emails with prompt: '{prompt}'"
                     )),
                 })
                 .await;
@@ -170,7 +168,7 @@ impl MailerGPT {
         let emails = match self.get_latest_emails().await {
             Ok(e) => e,
             Err(err) => {
-                let error_msg = format!("Failed to fetch latest emails: {}", err);
+                let error_msg = format!("Failed to fetch latest emails: {err}");
                 self.agent.add_communication(Communication {
                     role: Cow::Borrowed("system"),
                     content: Cow::Owned(error_msg.clone()),
@@ -214,8 +212,7 @@ impl MailerGPT {
                 let parameters = ChatBuilder::default()
                     .messages(vec![GemMessage::User {
                         content: Content::Text(format!(
-                            "User Request:{}\n\nEmails:{:?}",
-                            prompt, emails
+                            "User Request:{prompt}\n\nEmails:{emails:?}"
                         )),
                         name: None,
                     }])
@@ -226,7 +223,7 @@ impl MailerGPT {
                 match result {
                     Ok(response) => response,
                     Err(err) => {
-                        let error_msg = format!("Failed to generate content from emails: {}", err);
+                        let error_msg = format!("Failed to generate content from emails: {err}");
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
@@ -253,8 +250,7 @@ impl MailerGPT {
                     .model(FlagshipModel::Gpt4O.to_string())
                     .messages(vec![ChatMessage::User {
                         content: ChatMessageContent::Text(format!(
-                            "User Request:{}\n\nEmails:{:?}",
-                            prompt, emails
+                            "User Request:{prompt}\n\nEmails:{emails:?}"
                         )),
                         name: None,
                     }])
@@ -281,7 +277,7 @@ impl MailerGPT {
                     }
 
                     Err(err) => {
-                        let error_msg = format!("Failed to generate content from emails: {}", err);
+                        let error_msg = format!("Failed to generate content from emails: {err}");
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
@@ -308,7 +304,7 @@ impl MailerGPT {
                     model: "claude-3-7-sonnet-latest".to_string(),
                     messages: vec![AnthMessage::new_text(
                         Role::User,
-                        format!("User Request:{}\n\nEmails:{:?}", prompt, emails),
+                        format!("User Request:{prompt}\n\nEmails:{emails:?}"),
                     )],
                     max_tokens: 1024,
                 });
@@ -327,7 +323,7 @@ impl MailerGPT {
 
                     Err(err) => {
                         let error_msg =
-                            format!("Failed to generate content from Claude API: {}", err);
+                            format!("Failed to generate content from Claude API: {err}");
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("system"),
                             content: Cow::Owned(error_msg.clone()),
@@ -351,7 +347,7 @@ impl MailerGPT {
             ClientType::Xai(xai_client) => {
                 let messages = vec![XaiMessage {
                     role: "user".into(),
-                    content: format!("User Request:{}\n\nEmails:{:?}", prompt, emails),
+                    content: format!("User Request:{prompt}\n\nEmails:{emails:?}"),
                 }];
 
                 let rb = ChatCompletionsRequestBuilder::new(
@@ -395,7 +391,7 @@ impl MailerGPT {
                     }
 
                     Err(err) => {
-                        let err_msg = format!("Failed to generate content from emails: {}", err);
+                        let err_msg = format!("Failed to generate content from emails: {err}");
 
                         self.agent.add_communication(Communication {
                             role: Cow::Borrowed("assistant"),

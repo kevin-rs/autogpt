@@ -119,7 +119,7 @@ pub async fn save_long_term_memory(
         }
     };
 
-    let namespace = format!("agent-{}", agent_id);
+    let namespace = format!("agent-{agent_id}");
     let values_f32: Vec<f32> = embed_text(client, communication.content.clone())
         .await
         .into_iter()
@@ -185,7 +185,7 @@ pub async fn load_long_term_memory(agent_id: Cow<'static, str>) -> Result<Vec<Co
         }
     };
 
-    let namespace = format!("agent-{}", agent_id);
+    let namespace = format!("agent-{agent_id}");
     let list = index
         .list(&namespace.clone().into(), None, None, None)
         .await

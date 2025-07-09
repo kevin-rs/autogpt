@@ -37,6 +37,7 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+use crate::collaboration::Collaborator;
 #[allow(unused_imports)]
 use crate::common::utils::{
     Capability, ClientType, Communication, ContextManager, GenerationOutput, Goal, Knowledge,
@@ -47,7 +48,6 @@ use crate::prompts::architect::{
     ARCHITECT_DIAGRAM_PROMPT, ARCHITECT_ENDPOINTS_PROMPT, ARCHITECT_SCOPE_PROMPT,
 };
 use crate::traits::agent::Agent;
-use crate::traits::composite::AgentFunctions;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
@@ -58,13 +58,11 @@ use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
 use std::process::Stdio;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
 #[cfg(feature = "mem")]
@@ -144,7 +142,7 @@ impl ArchitectGPT {
         } else {
             debug!("Directory '{}' already exists.", workspace);
         }
-        let file_path = format!("{}/diagram.py", workspace);
+        let file_path = format!("{workspace}/diagram.py");
         match OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -185,13 +183,13 @@ impl ArchitectGPT {
                 match pip_install {
                     Ok(_) => info!(
                         "{}",
-                        format!("[*] {:?}: Diagrams installed successfully!", position)
+                        format!("[*] {position:?}: Diagrams installed successfully!")
                             .bright_white()
                             .bold()
                     ),
                     Err(e) => error!(
                         "{}",
-                        format!("[*] {:?}: Error installing Diagrams: {}!", position, e)
+                        format!("[*] {position:?}: Error installing Diagrams: {e}!")
                             .bright_red()
                             .bold()
                     ),
@@ -410,7 +408,7 @@ impl ArchitectGPT {
 
     pub fn think(&self) -> String {
         let objective = self.agent.objective();
-        format!("What steps should I take to achieve '{}'", objective)
+        format!("What steps should I take to achieve '{objective}'")
     }
 
     pub fn plan(&mut self, context: String) -> Goal {
@@ -447,7 +445,7 @@ impl ArchitectGPT {
         }
 
         Goal {
-            description: format!("Default task from context: {}", context),
+            description: format!("Default task from context: {context}"),
             priority: 1,
             completed: false,
         }

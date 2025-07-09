@@ -8,7 +8,10 @@ RUN apk add --no-cache \
     pkgconfig \
     openssl-dev \
     openssl-libs-static \
-    git
+    git \
+    protobuf
+
+ENV PROTOC=/usr/bin/protoc
 
 WORKDIR /kevin
 COPY Cargo.toml Cargo.lock INSTALLATION.md ./

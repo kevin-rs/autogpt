@@ -1,13 +1,17 @@
 //! # `AgentGPT` agent.
 //!
 
+use crate::collaboration::{AgentNet, Collaborator, Swarm};
 use crate::common::utils::{
-    Capability, Communication, ContextManager, Knowledge, Persona, Planner, Reflection, Status,
-    Task, TaskScheduler, Tool, default_eval_fn,
+    AgentMessage, Capability, Communication, ContextManager, Knowledge, Persona, Planner,
+    Reflection, Status, Task, TaskScheduler, Tool, default_eval_fn,
 };
 use crate::traits::agent::Agent;
-use crate::traits::composite::AgentFunctions;
+use crate::traits::functions::Collaborate;
+use anyhow::Result;
+use async_trait::async_trait;
 use derivative::Derivative;
+use iac_rs::prelude::Network;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -46,9 +50,12 @@ pub struct AgentGPT {
     /// Persona defines behavior style and traits.
     pub persona: Persona,
 
-    /// Other agents this agent collaborates with.
+    /// Hybrid Swarm: Includes both local and remote agents.
+    /// Other agents this agent collaborates with, running in the same memory
+    /// space/thread or within the same runtime or IAC-based network module
+    /// for inter-agent communication.
     #[derivative(PartialEq = "ignore")]
-    pub collaborators: Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>,
+    pub collaborators: Vec<Collaborator>,
 
     /// Optional self-reflection module for introspection or evaluation.
     pub reflection: Option<Reflection>,
@@ -64,6 +71,9 @@ pub struct AgentGPT {
 
     /// List of tasks assigned to this agent.
     pub tasks: Vec<Task>,
+    pub network: Option<Arc<AgentNet>>,
+    #[derivative(PartialEq = "ignore")]
+    pub swarm: Arc<Mutex<Swarm>>,
 }
 
 impl Default for AgentGPT {
@@ -91,6 +101,8 @@ impl Default for AgentGPT {
                 focus_topics: vec![],
             },
             tasks: vec![],
+            network: None,
+            swarm: Arc::new(Mutex::new(Swarm::new())),
         }
     }
 }
@@ -159,6 +171,8 @@ impl AgentGPT {
             },
 
             tasks: vec![],
+            network: None,
+            swarm: Arc::new(Mutex::new(Swarm::new())),
         }
     }
 
@@ -216,6 +230,8 @@ impl AgentGPT {
             },
 
             tasks: vec![],
+            network: None,
+            swarm: Arc::new(Mutex::new(Swarm::new())),
         }
     }
 }
@@ -267,6 +283,8 @@ impl Agent for AgentGPT {
             },
 
             tasks: vec![],
+            network: None,
+            swarm: Arc::new(Mutex::new(Swarm::new())),
         }
     }
 
@@ -316,7 +334,7 @@ impl Agent for AgentGPT {
     }
 
     /// Returns a list of agents this agent collaborates with.
-    fn collaborators(&self) -> &Vec<Arc<Mutex<Box<dyn AgentFunctions>>>> {
+    fn collaborators(&self) -> &Vec<Collaborator> {
         &self.collaborators
     }
 
@@ -355,5 +373,52 @@ impl Agent for AgentGPT {
 
     fn context_mut(&mut self) -> &mut ContextManager {
         &mut self.context
+    }
+}
+
+impl AgentGPT {
+    pub async fn broadcast_capabilities(&self) -> Result<()> {
+        if let Some(net) = &self.network {
+            let msg = AgentMessage::CapabilityAdvert {
+                sender_id: self.id.to_string(),
+                capabilities: self.capabilities.iter().cloned().collect(),
+            };
+            net.broadcast(&serde_json::to_string(&msg)?).await?;
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Collaborate for AgentGPT {
+    async fn handle_task(&self, task: Task) -> Result<()> {
+        // TODO: implement this func
+        let mut this = self.clone();
+        this.tasks.push(task);
+        Ok(())
+    }
+
+    async fn receive_message(&self, msg: AgentMessage) -> Result<()> {
+        match msg {
+            AgentMessage::Task(task) => self.handle_task(task).await,
+            AgentMessage::CapabilityAdvert {
+                sender_id,
+                capabilities,
+            } => {
+                let net = match &self.network {
+                    Some(net) => net.clone(),
+                    None => return Ok(()),
+                };
+
+                let mut swarm = self.swarm.lock().await;
+                swarm.register_remote(sender_id.into(), capabilities, net);
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn get_id(&self) -> &str {
+        &self.id
     }
 }

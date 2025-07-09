@@ -1,6 +1,6 @@
 [package]
 name = "iac-rs"
-version = "0.0.3"
+version = "0.0.4"
 description = "🛰️ IAC Protocol for Inter and Intra Agents Communications."
 edition = "2024"
 rust-version = "1.85"
