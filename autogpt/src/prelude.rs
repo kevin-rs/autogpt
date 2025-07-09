@@ -1,4 +1,4 @@
-#![doc = include_str!("../../INSTALLATION.md")]
+#![doc = include_str!("../INSTALLATION.md")]
 
 #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
 use {

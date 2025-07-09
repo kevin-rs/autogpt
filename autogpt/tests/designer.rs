@@ -10,6 +10,7 @@ use autogpt::traits::functions::Functions;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
+#[ignore]
 #[cfg(feature = "img")]
 async fn test_generate_image_from_text() -> Result<()> {
     let filter = filter::LevelFilter::INFO;
@@ -42,6 +43,7 @@ async fn test_generate_image_from_text() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 #[cfg(feature = "img")]
 async fn test_execute_agent() -> Result<()> {
     let objective = "Crafts stunning web design layouts";

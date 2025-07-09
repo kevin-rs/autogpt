@@ -1,6 +1,6 @@
 [package]
 name = "autogpt"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = """
 🦀 A Pure Rust Framework For Building AGIs.
