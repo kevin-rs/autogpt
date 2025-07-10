@@ -100,10 +100,7 @@
 //!     }
 //!
 //!     fn collaborators(&self) -> Vec<Collaborator> {
-//!         let mut all = Vec::new();
-//!         all.extend(self.agent.local_collaborators.values().cloned());
-//!         all.extend(self.agent.remote_collaborators.values().cloned());
-//!         all
+//!         self.collaborators.clone()
 //!     }
 //!
 //!     fn reflection(&self) -> Option<&Reflection> {
