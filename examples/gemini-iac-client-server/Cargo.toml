@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = [
+    "server",
+    "designer",
+    "frontend",
+]
+
+[workspace.dependencies]
+anyhow = "1.0.81"
+tokio = { version = "1.45.1", features = ["full"] }
+autogpt = { path = "../../autogpt", features = ["gem", "net"] }
+iac-rs = { path = "../../iac-rs" }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["std"] }
+serde_json = { version = "1.0.140" }
+
+[profile.release]
+opt-level = "z"
+debug = false
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+incremental = false

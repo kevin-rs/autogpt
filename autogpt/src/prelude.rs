@@ -1,11 +1,7 @@
 #![doc = include_str!("../INSTALLATION.md")]
 
-#[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
-use {
-    futures::future::join_all,
-    tokio::task,
-    tracing::{debug, error},
-};
+#[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+use {futures::future::join_all, tokio::task, tracing::error};
 
 #[cfg(feature = "img")]
 pub use crate::agents::designer::DesignerGPT;
@@ -42,7 +38,13 @@ pub use {
 };
 
 #[cfg(feature = "net")]
-pub use crate::collaboration::Collaborator;
+pub use {
+    crate::collaboration::Collaborator, iac_rs::prelude::Message as IacMessage, iac_rs::prelude::*,
+};
+
+#[cfg(not(feature = "net"))]
+#[allow(unused_imports)]
+use tracing::debug;
 
 #[cfg(feature = "mem")]
 pub use {
@@ -103,7 +105,7 @@ impl AutoGPT {
         self
     }
 
-    #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
     pub fn with<A>(mut self, agents: A) -> Self
     where
         A: Into<Vec<Arc<Mutex<Box<dyn AgentFunctions>>>>>,
@@ -112,7 +114,7 @@ impl AutoGPT {
         self
     }
 
-    #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
     pub fn build(self) -> Result<Self> {
         Ok(Self {
             id: self.id,
@@ -120,7 +122,7 @@ impl AutoGPT {
         })
     }
 
-    #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
     pub async fn run(&self) -> Result<String> {
         if self.agents.is_empty() {
             return Err(anyhow!("No agents to run."));

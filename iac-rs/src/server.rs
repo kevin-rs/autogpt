@@ -1,7 +1,8 @@
 use crate::crypto::Verifier;
-use crate::message::Message;
+use crate::message::{Message, MessageType};
 use crate::transport::init_server;
 use anyhow::Result;
+use ed25519_compact::PublicKey;
 use quinn::Endpoint;
 use tracing::{debug, error};
 use zstd::stream::decode_all;
@@ -69,7 +70,7 @@ impl Server {
 
     pub async fn handle_conn(
         conn: quinn::Connection,
-        verifier: Verifier,
+        mut verifier: Verifier,
         handler: Option<Handler>,
     ) -> anyhow::Result<()> {
         debug!("🔁 Started handling incoming connection");
@@ -87,6 +88,21 @@ impl Server {
                     debug!(bytes = decompressed.len(), "📉 Data decompressed");
 
                     let msg = Message::deserialize(&decompressed)?;
+
+                    if msg.msg_type() == MessageType::RegisterKey {
+                        if let Ok(pk) = PublicKey::from_slice(&msg.extra_data) {
+                            verifier.register_key(pk);
+                            debug!("🔐 Registered new public key from agent {}", msg.from);
+                            continue;
+                        } else {
+                            error!(
+                                "❌ Invalid public key format in RegisterKey from {}",
+                                msg.from
+                            );
+                            continue;
+                        }
+                    }
+
                     msg.verify(&verifier)?;
 
                     debug!(

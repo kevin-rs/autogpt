@@ -567,14 +567,14 @@ impl AgentGPT {
             capabilities: self.capabilities.iter().cloned().collect(),
         };
 
-        let payload = serde_json::to_string(&msg)?;
+        let payload = serde_json::to_vec(&msg)?;
 
         for (peer_id, client) in &self.clients {
             let mut message = Message {
                 from: self.id.clone().into(),
                 to: peer_id.clone(),
                 msg_type: MessageType::Broadcast.into(),
-                payload_json: payload.clone(),
+                extra_data: payload.clone(),
                 ..Default::default()
             };
 

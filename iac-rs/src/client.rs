@@ -4,6 +4,7 @@ use crate::transport::connect;
 use anyhow::Result;
 use quinn::Connection;
 use tracing::{debug, instrument};
+use zstd::decode_all;
 use zstd::stream::encode_all;
 
 #[derive(Clone, Debug)]
@@ -51,5 +52,41 @@ impl Client {
 
         debug!("📤 Stream finished successfully");
         Ok(())
+    }
+
+    #[instrument(skip_all)]
+    pub async fn receive(&self) -> Result<Option<Message>> {
+        debug!("📥 Waiting for incoming unidirectional stream...");
+        match self.conn.accept_uni().await {
+            Ok(mut recv) => {
+                debug!("🔓 Stream accepted, reading message...");
+
+                let mut compressed = Vec::new();
+                recv.read_to_end(usize::MAX).await.inspect(|data| {
+                    compressed.extend_from_slice(data);
+                    debug!(
+                        compressed_len = compressed.len(),
+                        "📦 Compressed data received"
+                    );
+                })?;
+
+                debug!("📈 Decompressing message...");
+                let decompressed = decode_all(&compressed[..])?;
+                debug!(
+                    decompressed_len = decompressed.len(),
+                    "✅ Decompression complete"
+                );
+
+                debug!("🧠 Deserializing message...");
+                let msg = Message::deserialize(&decompressed)?;
+                debug!("📬 Message deserialized: {:?}", msg.msg_type);
+
+                Ok(Some(msg))
+            }
+            Err(e) => {
+                debug!("❌ Failed to receive stream: {:?}", e);
+                Ok(None)
+            }
+        }
     }
 }

@@ -18,6 +18,12 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
+      - name: 🛠️ Install Protobuf
+        run: |
+          sudo apt update
+          sudo apt install -y protobuf-compiler
+          echo "PROTOC=$(which protoc)" >> $GITHUB_ENV
+
       - name: 🏗️ Build Example Crates
         run: |
           set -euxo pipefail

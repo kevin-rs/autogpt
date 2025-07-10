@@ -249,7 +249,7 @@ impl OptimizerGPT {
     pub async fn generate_and_track(&mut self, request: &str) -> Result<String> {
         let mut response_text = String::new();
 
-        #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+        #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
             response_text = self.send_request(request).await?;
         }

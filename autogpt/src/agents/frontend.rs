@@ -276,7 +276,7 @@ impl FrontendGPT {
         #[allow(unused)]
         let mut response_text = String::new();
 
-        #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+        #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
             response_text = self.send_request(&request).await?;
         }
