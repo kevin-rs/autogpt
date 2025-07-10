@@ -9,6 +9,7 @@ enum MessageType {
   FILE_TRANSFER = 3;
   COMMAND = 4;
   DELEGATE_TASK = 5;
+  REGISTER_KEY = 6;
 }
 
 message Message {

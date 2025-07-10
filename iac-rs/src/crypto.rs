@@ -38,6 +38,12 @@ impl Verifier {
         Self { pub_keys }
     }
 
+    #[instrument(skip_all)]
+    pub fn register_key(&mut self, pk: PublicKey) {
+        debug!("🔏 Registering new public key");
+        self.pub_keys.push(pk);
+    }
+
     #[instrument(skip_all, fields(data_len = data.len(), sig_len = sig.len()))]
     pub fn verify(&self, data: &[u8], sig: &[u8]) -> Result<()> {
         if sig.len() != 64 {

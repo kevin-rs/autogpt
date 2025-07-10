@@ -1,0 +1,11 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { workspace = true }
+anyhow = { workspace = true }
+iac-rs = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
