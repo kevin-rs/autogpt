@@ -8,7 +8,7 @@ use crate::agents::agent::AgentGPT;
 use crate::common::utils::{ClientType, Communication, Status, Task};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Functions};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 use nylas::client::Nylas;
 use nylas::messages::Message;
@@ -182,7 +182,7 @@ impl MailerGPT {
                         })
                         .await;
                 }
-                return Err(anyhow::anyhow!(error_msg));
+                return Err(anyhow!(error_msg));
             }
         };
 
@@ -239,7 +239,7 @@ impl MailerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(error_msg));
+                        return Err(anyhow!(error_msg));
                     }
                 }
             }
@@ -293,7 +293,7 @@ impl MailerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(error_msg));
+                        return Err(anyhow!(error_msg));
                     }
                 }
             }
@@ -339,7 +339,7 @@ impl MailerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(error_msg));
+                        return Err(anyhow!(error_msg));
                     }
                 }
             }
@@ -408,14 +408,14 @@ impl MailerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(err_msg));
+                        return Err(anyhow!(err_msg));
                     }
                 }
             }
 
             #[allow(unreachable_patterns)]
             _ => {
-                return Err(anyhow::anyhow!(
+                return Err(anyhow!(
                     "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
                 ));
             }

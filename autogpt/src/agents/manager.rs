@@ -17,7 +17,7 @@ use crate::common::utils::{ClientType, Communication, Task};
 use crate::prompts::manager::{FRAMEWORK_MANAGER_PROMPT, LANGUAGE_MANAGER_PROMPT, MANAGER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Functions};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 #[cfg(feature = "gem")]
 use gems::Client;
@@ -222,7 +222,7 @@ impl ManagerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(error_msg));
+                        return Err(anyhow!(error_msg));
                     }
                 }
             }
@@ -279,7 +279,7 @@ impl ManagerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(error_msg));
+                        return Err(anyhow!(error_msg));
                     }
                 }
             }
@@ -325,7 +325,7 @@ impl ManagerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(error_msg));
+                        return Err(anyhow!(error_msg));
                     }
                 }
             }
@@ -394,14 +394,14 @@ impl ManagerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(err_msg));
+                        return Err(anyhow!(err_msg));
                     }
                 }
             }
 
             #[allow(unreachable_patterns)]
             _ => {
-                return Err(anyhow::anyhow!(
+                return Err(anyhow!(
                     "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
                 ));
             }

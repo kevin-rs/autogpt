@@ -39,6 +39,8 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "net")]
+use crate::collaboration::Collaborator;
 #[cfg(feature = "cli")]
 use crate::common::utils::spinner;
 #[allow(unused_imports)]
@@ -47,14 +49,12 @@ use crate::common::utils::{
     OutputKind, Persona, Planner, Reflection, Route, Scope, Status, Task, TaskScheduler, Tool,
     extract_array, strip_code_blocks,
 };
-
-use crate::collaboration::Collaborator;
 use crate::prompts::frontend::{
     FIX_CODE_PROMPT, FRONTEND_CODE_PROMPT, IMPROVED_FRONTEND_CODE_PROMPT,
 };
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use auto_derive::Auto;
 use colored::*;
 use reqwest::Client as ReqClient;
@@ -379,9 +379,7 @@ impl FrontendGPT {
         let code = match output {
             GenerationOutput::Text(code) => code,
             _ => {
-                return Err(anyhow::anyhow!(
-                    "Expected text output for frontend code generation"
-                ));
+                return Err(anyhow!("Expected text output for frontend code generation"));
             }
         };
 
@@ -495,7 +493,7 @@ impl FrontendGPT {
         let improved_code = match output {
             GenerationOutput::Text(code) => code,
             _ => {
-                return Err(anyhow::anyhow!(
+                return Err(anyhow!(
                     "Expected text output for improved frontend code generation"
                 ));
             }
@@ -612,7 +610,7 @@ impl FrontendGPT {
         let fixed_code = match output {
             GenerationOutput::Text(code) => code,
             _ => {
-                return Err(anyhow::anyhow!(
+                return Err(anyhow!(
                     "Expected text output for bug-fixed code generation"
                 ));
             }

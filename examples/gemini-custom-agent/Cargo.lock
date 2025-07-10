@@ -607,7 +607,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gemini"
+name = "gemini-custom-agent"
 version = "0.1.0"
 dependencies = [
  "autogpt",

@@ -199,7 +199,7 @@ pub trait AsyncFunctions: Send + Sync {
     async fn ltm_context<'a>(&'a self) -> String;
 
     #[allow(async_fn_in_trait)]
-    #[cfg(any(feature = "oai", feature = "gem", feature = "cld"))]
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
     async fn send_request(&mut self, request: &str) -> Result<String>;
 }
 
@@ -217,7 +217,7 @@ pub trait Executor {
 
 #[async_trait]
 pub trait Collaborate: Send + Sync {
-    async fn handle_task(&self, task: Task) -> Result<()>;
-    async fn receive_message(&self, message: AgentMessage) -> Result<()>;
+    async fn handle_task(&mut self, task: Task) -> Result<()>;
+    async fn receive_message(&mut self, message: AgentMessage) -> Result<()>;
     fn get_id(&self) -> &str;
 }

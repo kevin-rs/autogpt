@@ -37,6 +37,7 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "net")]
 use crate::collaboration::Collaborator;
 #[allow(unused_imports)]
 use crate::common::utils::{

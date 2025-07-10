@@ -64,6 +64,7 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "net")]
 use crate::collaboration::Collaborator;
 #[allow(unused_imports)]
 use crate::common::utils::{
@@ -73,7 +74,7 @@ use crate::common::utils::{
 use crate::prompts::optimizer::{MODULARIZE_PROMPT, SPLIT_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use auto_derive::Auto;
 use colored::*;
 use std::borrow::Cow;

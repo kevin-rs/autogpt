@@ -99,8 +99,11 @@
 //!         &self.persona
 //!     }
 //!
-//!     fn collaborators(&self) -> &Vec<Collaborator> {
-//!         &self.collaborators
+//!     fn collaborators(&self) -> Vec<Collaborator> {
+//!         let mut all = Vec::new();
+//!         all.extend(self.agent.local_collaborators.values().cloned());
+//!         all.extend(self.agent.remote_collaborators.values().cloned());
+//!         all
 //!     }
 //!
 //!     fn reflection(&self) -> Option<&Reflection> {
@@ -138,6 +141,7 @@
 //! ```
 //!
 
+#[cfg(feature = "net")]
 use crate::collaboration::Collaborator;
 use crate::common::utils::{
     Capability, Communication, ContextManager, Knowledge, Persona, Planner, Reflection, Status,
@@ -190,8 +194,9 @@ pub trait Agent: Debug {
     /// Returns the agent's persona
     fn persona(&self) -> &Persona;
 
-    /// Returns a list of collaborators agents
-    fn collaborators(&self) -> &Vec<Collaborator>;
+    /// Returns a list of local and remote collaborators agents
+    #[cfg(feature = "net")]
+    fn collaborators(&self) -> Vec<Collaborator>;
 
     /// Returns optional self-reflection module
     fn reflection(&self) -> Option<&Reflection>;

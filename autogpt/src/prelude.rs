@@ -14,16 +14,17 @@ pub use crate::agents::git::GitGPT;
 #[cfg(feature = "mail")]
 pub use crate::agents::mailer::MailerGPT;
 
+#[cfg(feature = "gpt")]
+pub use {
+    crate::agents::architect::ArchitectGPT, crate::agents::backend::BackendGPT,
+    crate::agents::frontend::FrontendGPT, crate::agents::manager::ManagerGPT,
+    crate::agents::optimizer::OptimizerGPT,
+};
+
 #[allow(unused)]
 pub use {
     crate::agents,
     crate::agents::agent::AgentGPT,
-    crate::agents::architect::ArchitectGPT,
-    crate::agents::backend::BackendGPT,
-    crate::agents::frontend::FrontendGPT,
-    crate::agents::manager::ManagerGPT,
-    crate::agents::optimizer::OptimizerGPT,
-    crate::collaboration::{AgentNet, Collaborator, Swarm},
     crate::common::utils::{
         AgentMessage, Capability, ClientType, Communication, ContextManager, Knowledge, Persona,
         Planner, Reflection, Scope, Status, Task, TaskScheduler, Tool,
@@ -39,6 +40,9 @@ pub use {
     tokio::sync::Mutex,
     uuid::Uuid,
 };
+
+#[cfg(feature = "net")]
+pub use crate::collaboration::Collaborator;
 
 #[cfg(feature = "mem")]
 pub use {

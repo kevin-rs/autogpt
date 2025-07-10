@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use colored::*;
 use git2::{IndexAddOption, Repository, Signature};
 use std::borrow::Cow;
@@ -7,6 +7,7 @@ use tokio::fs;
 use tracing::{debug, error, info};
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "net")]
 use crate::collaboration::Collaborator;
 use crate::common::utils::{
     Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
