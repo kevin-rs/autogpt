@@ -72,8 +72,8 @@ impl Agent for MockAgent {
         &self.persona
     }
 
-    fn collaborators(&self) -> &Vec<Collaborator> {
-        &self.collaborators
+    fn collaborators(&self) -> Vec<Collaborator> {
+        self.collaborators.clone()
     }
 
     fn reflection(&self) -> Option<&Reflection> {

@@ -53,8 +53,12 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 &self.agent.persona
             }
 
-            fn collaborators(&self) -> &Vec<Collaborator> {
-                &self.agent.collaborators
+            #[cfg(feature = "net")]
+            fn collaborators(&self) -> Vec<Collaborator> {
+                let mut all = Vec::new();
+                all.extend(self.agent.local_collaborators.values().cloned());
+                all.extend(self.agent.remote_collaborators.values().cloned());
+                all
             }
 
             fn reflection(&self) -> Option<&Reflection> {
@@ -96,7 +100,7 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
         }
 
-        #[async_trait::async_trait]
+        #[async_trait]
         impl AsyncFunctions for #name {
             async fn execute<'a>(
                 &'a mut self,
@@ -160,7 +164,6 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 long_term_memory_context(self.agent.id.clone()).await
             }
 
-            #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
             async fn send_request(&mut self, request: &str) -> Result<String> {
                 match &mut self.client {
                     #[cfg(feature = "gem")]
@@ -246,13 +249,12 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                     #[allow(unreachable_patterns)]
                     _ => {
-                        return Err(anyhow::anyhow!(
+                        return Err(anyhow!(
                             "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
                         ));
                     }
                 }
             }
-
         }
     };
 

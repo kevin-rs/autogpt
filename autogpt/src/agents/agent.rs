@@ -1,23 +1,28 @@
 //! # `AgentGPT` agent.
 //!
 
-use crate::collaboration::{AgentNet, Collaborator, Swarm};
 use crate::common::utils::{
-    AgentMessage, Capability, Communication, ContextManager, Knowledge, Persona, Planner,
-    Reflection, Status, Task, TaskScheduler, Tool, default_eval_fn,
+    Capability, Communication, ContextManager, Knowledge, Persona, Planner, Reflection, Status,
+    Task, TaskScheduler, Tool, default_eval_fn,
 };
 use crate::traits::agent::Agent;
-use crate::traits::functions::Collaborate;
-use anyhow::Result;
-use async_trait::async_trait;
 use derivative::Derivative;
-use iac_rs::prelude::Network;
 use std::borrow::Cow;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
+#[cfg(feature = "net")]
+use {
+    crate::collaboration::{AgentNet, Collaborator, RemoteAgent, delegate_task},
+    crate::common::utils::AgentMessage,
+    crate::traits::functions::Collaborate,
+    anyhow::{Result, anyhow},
+    async_trait::async_trait,
+    iac_rs::prelude::*,
+    std::collections::VecDeque,
+    std::sync::Arc,
+    std::time::Duration,
+    tokio::sync::Mutex,
+};
 
 /// Represents an agent with memory, tools, and other autonomous capabilities.
 #[derive(Derivative)]
@@ -50,13 +55,6 @@ pub struct AgentGPT {
     /// Persona defines behavior style and traits.
     pub persona: Persona,
 
-    /// Hybrid Swarm: Includes both local and remote agents.
-    /// Other agents this agent collaborates with, running in the same memory
-    /// space/thread or within the same runtime or IAC-based network module
-    /// for inter-agent communication.
-    #[derivative(PartialEq = "ignore")]
-    pub collaborators: Vec<Collaborator>,
-
     /// Optional self-reflection module for introspection or evaluation.
     pub reflection: Option<Reflection>,
 
@@ -71,9 +69,57 @@ pub struct AgentGPT {
 
     /// List of tasks assigned to this agent.
     pub tasks: Vec<Task>,
-    pub network: Option<Arc<AgentNet>>,
+
+    /// Cryptographic signer for agent authentication and message integrity.
+    #[cfg(feature = "net")]
+    pub signer: Signer,
+
+    /// Map of verifier instances used to verify signatures from peers.
+    #[cfg(feature = "net")]
+    pub verifiers: HashMap<String, Verifier>,
+
+    /// Network address this agent binds to for communication (e.g., "0.0.0.0:8080").
+    #[cfg(feature = "net")]
+    pub addr: String,
+
+    /// Connected client sessions to peer agents.
+    #[cfg(feature = "net")]
     #[derivative(PartialEq = "ignore")]
-    pub swarm: Arc<Mutex<Swarm>>,
+    pub clients: HashMap<String, Arc<Mutex<Client>>>,
+
+    /// Optional server instance handling incoming peer connections.
+    #[cfg(feature = "net")]
+    #[derivative(PartialEq = "ignore")]
+    pub server: Option<Arc<Mutex<Server>>>,
+
+    /// Interval for sending heartbeat signals to peers for liveness detection.
+    #[cfg(feature = "net")]
+    pub heartbeat_interval: Duration,
+
+    /// Map of peer agent identifiers to their network addresses.
+    #[cfg(feature = "net")]
+    pub peer_addresses: HashMap<String, String>,
+
+    /// Other agents this agent collaborates with, running in the same memory
+    /// space/thread or within the same runtime.
+    #[cfg(feature = "net")]
+    #[derivative(PartialEq = "ignore")]
+    pub local_collaborators: HashMap<String, Collaborator>,
+
+    /// Other agents this agent collaborates with via the network, using
+    /// inter/intra-agent communication (IAC) protocols.
+    #[cfg(feature = "net")]
+    #[derivative(PartialEq = "ignore")]
+    pub remote_collaborators: HashMap<String, Collaborator>,
+
+    /// Maps capabilities to a round-robin queue of peer agent IDs
+    /// for distributing tasks across collaborators.
+    #[cfg(feature = "net")]
+    pub cap_index: HashMap<Capability, VecDeque<String>>,
+
+    /// Round-robin index used to evenly distribute workload among peers.
+    #[cfg(feature = "net")]
+    pub rr_idx: usize,
 }
 
 impl Default for AgentGPT {
@@ -92,7 +138,6 @@ impl Default for AgentGPT {
                 traits: vec![],
                 behavior_script: None,
             },
-            collaborators: vec![],
             reflection: None,
             scheduler: None,
             capabilities: HashSet::new(),
@@ -101,8 +146,28 @@ impl Default for AgentGPT {
                 focus_topics: vec![],
             },
             tasks: vec![],
-            network: None,
-            swarm: Arc::new(Mutex::new(Swarm::new())),
+            #[cfg(feature = "net")]
+            signer: Signer::new(KeyPair::generate()),
+            #[cfg(feature = "net")]
+            verifiers: HashMap::new(),
+            #[cfg(feature = "net")]
+            addr: "0.0.0.0:0".to_string(),
+            #[cfg(feature = "net")]
+            clients: HashMap::new(),
+            #[cfg(feature = "net")]
+            server: None,
+            #[cfg(feature = "net")]
+            heartbeat_interval: Duration::from_secs(30),
+            #[cfg(feature = "net")]
+            peer_addresses: HashMap::new(),
+            #[cfg(feature = "net")]
+            local_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            remote_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            cap_index: HashMap::new(),
+            #[cfg(feature = "net")]
+            rr_idx: 0,
         }
     }
 }
@@ -152,8 +217,6 @@ impl AgentGPT {
                 behavior_script: None,
             },
 
-            collaborators: vec![],
-
             reflection: Some(Reflection {
                 recent_logs: vec![],
                 evaluation_fn: default_eval_fn,
@@ -171,8 +234,28 @@ impl AgentGPT {
             },
 
             tasks: vec![],
-            network: None,
-            swarm: Arc::new(Mutex::new(Swarm::new())),
+            #[cfg(feature = "net")]
+            signer: Signer::new(KeyPair::generate()),
+            #[cfg(feature = "net")]
+            verifiers: HashMap::new(),
+            #[cfg(feature = "net")]
+            addr: "0.0.0.0:0".to_string(),
+            #[cfg(feature = "net")]
+            clients: HashMap::new(),
+            #[cfg(feature = "net")]
+            server: None,
+            #[cfg(feature = "net")]
+            heartbeat_interval: Duration::from_secs(30),
+            #[cfg(feature = "net")]
+            peer_addresses: HashMap::new(),
+            #[cfg(feature = "net")]
+            local_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            remote_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            cap_index: HashMap::new(),
+            #[cfg(feature = "net")]
+            rr_idx: 0,
         }
     }
 
@@ -211,8 +294,6 @@ impl AgentGPT {
                 behavior_script: None,
             },
 
-            collaborators: vec![],
-
             reflection: Some(Reflection {
                 recent_logs: vec![],
                 evaluation_fn: default_eval_fn,
@@ -230,8 +311,88 @@ impl AgentGPT {
             },
 
             tasks: vec![],
-            network: None,
-            swarm: Arc::new(Mutex::new(Swarm::new())),
+            #[cfg(feature = "net")]
+            signer: Signer::new(KeyPair::generate()),
+            #[cfg(feature = "net")]
+            verifiers: HashMap::new(),
+            #[cfg(feature = "net")]
+            addr: "0.0.0.0:0".to_string(),
+            #[cfg(feature = "net")]
+            clients: HashMap::new(),
+            #[cfg(feature = "net")]
+            server: None,
+            #[cfg(feature = "net")]
+            heartbeat_interval: Duration::from_secs(30),
+            #[cfg(feature = "net")]
+            peer_addresses: HashMap::new(),
+            #[cfg(feature = "net")]
+            local_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            remote_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            cap_index: HashMap::new(),
+            #[cfg(feature = "net")]
+            rr_idx: 0,
+        }
+    }
+
+    #[cfg(feature = "net")]
+    pub async fn register_local(&mut self, collab: Collaborator, caps: Vec<Capability>) {
+        let id = collab.id().await;
+        self.local_collaborators.insert(id.clone(), collab);
+        for cap in caps {
+            self.cap_index.entry(cap).or_default().push_back(id.clone());
+        }
+    }
+
+    #[cfg(feature = "net")]
+    pub fn register_remote(&mut self, id: Cow<'static, str>, caps: Vec<Capability>) {
+        let remote = Collaborator::Remote(RemoteAgent {
+            id: id.clone(),
+            signer: self.signer.clone(),
+            clients: self.clients.clone(),
+        });
+
+        self.remote_collaborators
+            .insert(id.to_string(), remote.clone());
+
+        for cap in caps {
+            self.cap_index
+                .entry(cap)
+                .or_default()
+                .push_back(id.to_string());
+        }
+    }
+
+    #[cfg(feature = "net")]
+    pub async fn assign_task_lb(&mut self, cap: &Capability, task: Task) -> Result<()> {
+        let queue = self
+            .cap_index
+            .get_mut(cap)
+            .ok_or_else(|| anyhow!("No agent has capability: {:?}", cap))?;
+
+        let id = queue[self.rr_idx % queue.len()].clone();
+        self.rr_idx += 1;
+
+        let collab = self
+            .local_collaborators
+            .get(&id)
+            .or(self.remote_collaborators.get(&id))
+            .ok_or_else(|| anyhow!("Collaborator with id {} not found", id))?;
+
+        delegate_task(collab.clone(), task).await
+    }
+    #[cfg(feature = "net")]
+    pub fn as_agent_net(&self) -> AgentNet {
+        AgentNet {
+            id: self.id.clone(),
+            signer: self.signer.clone(),
+            verifiers: self.verifiers.clone(),
+            addr: self.addr.clone(),
+            clients: self.clients.clone(),
+            server: self.server.clone(),
+            heartbeat_interval: self.heartbeat_interval,
+            peer_addresses: self.peer_addresses.clone(),
         }
     }
 }
@@ -264,8 +425,6 @@ impl Agent for AgentGPT {
                 behavior_script: None,
             },
 
-            collaborators: vec![],
-
             reflection: Some(Reflection {
                 recent_logs: vec![],
                 evaluation_fn: default_eval_fn,
@@ -283,8 +442,28 @@ impl Agent for AgentGPT {
             },
 
             tasks: vec![],
-            network: None,
-            swarm: Arc::new(Mutex::new(Swarm::new())),
+            #[cfg(feature = "net")]
+            signer: Signer::new(KeyPair::generate()),
+            #[cfg(feature = "net")]
+            verifiers: HashMap::new(),
+            #[cfg(feature = "net")]
+            addr: "0.0.0.0:0".to_string(),
+            #[cfg(feature = "net")]
+            clients: HashMap::new(),
+            #[cfg(feature = "net")]
+            server: None,
+            #[cfg(feature = "net")]
+            heartbeat_interval: Duration::from_secs(30),
+            #[cfg(feature = "net")]
+            peer_addresses: HashMap::new(),
+            #[cfg(feature = "net")]
+            local_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            remote_collaborators: HashMap::new(),
+            #[cfg(feature = "net")]
+            cap_index: HashMap::new(),
+            #[cfg(feature = "net")]
+            rr_idx: 0,
         }
     }
 
@@ -334,8 +513,12 @@ impl Agent for AgentGPT {
     }
 
     /// Returns a list of agents this agent collaborates with.
-    fn collaborators(&self) -> &Vec<Collaborator> {
-        &self.collaborators
+    #[cfg(feature = "net")]
+    fn collaborators(&self) -> Vec<Collaborator> {
+        let mut all = Vec::new();
+        all.extend(self.local_collaborators.values().cloned());
+        all.extend(self.remote_collaborators.values().cloned());
+        all
     }
 
     /// Returns an optional reference to the self-reflection module.
@@ -376,49 +559,132 @@ impl Agent for AgentGPT {
     }
 }
 
+#[cfg(feature = "net")]
 impl AgentGPT {
     pub async fn broadcast_capabilities(&self) -> Result<()> {
-        if let Some(net) = &self.network {
-            let msg = AgentMessage::CapabilityAdvert {
-                sender_id: self.id.to_string(),
-                capabilities: self.capabilities.iter().cloned().collect(),
+        let msg = AgentMessage::CapabilityAdvert {
+            sender_id: self.id.to_string(),
+            capabilities: self.capabilities.iter().cloned().collect(),
+        };
+
+        let payload = serde_json::to_string(&msg)?;
+
+        for (peer_id, client) in &self.clients {
+            let mut message = Message {
+                from: self.id.clone().into(),
+                to: peer_id.clone(),
+                msg_type: MessageType::Broadcast.into(),
+                payload_json: payload.clone(),
+                ..Default::default()
             };
-            net.broadcast(&serde_json::to_string(&msg)?).await?;
+
+            message.sign(&self.signer)?;
+            client.lock().await.send(message).await?;
         }
+
         Ok(())
     }
 }
 
 #[async_trait]
+#[cfg(feature = "net")]
 impl Collaborate for AgentGPT {
-    async fn handle_task(&self, task: Task) -> Result<()> {
+    async fn handle_task(&mut self, task: Task) -> Result<()> {
         // TODO: implement this func
         let mut this = self.clone();
         this.tasks.push(task);
         Ok(())
     }
 
-    async fn receive_message(&self, msg: AgentMessage) -> Result<()> {
+    async fn receive_message(&mut self, msg: AgentMessage) -> Result<()> {
         match msg {
             AgentMessage::Task(task) => self.handle_task(task).await,
+
             AgentMessage::CapabilityAdvert {
                 sender_id,
                 capabilities,
             } => {
-                let net = match &self.network {
-                    Some(net) => net.clone(),
-                    None => return Ok(()),
-                };
-
-                let mut swarm = self.swarm.lock().await;
-                swarm.register_remote(sender_id.into(), capabilities, net);
+                self.register_remote(sender_id.into(), capabilities);
                 Ok(())
             }
+
             _ => Ok(()),
         }
     }
 
     fn get_id(&self) -> &str {
         &self.id
+    }
+}
+
+#[async_trait]
+#[cfg(feature = "net")]
+impl Network for AgentGPT {
+    async fn heartbeat(&self) {
+        let clients = self.clients.clone();
+        let peer_addresses = self.peer_addresses.clone();
+        let signer = self.signer.clone();
+        let id = self.id.to_string();
+        let interval = self.heartbeat_interval;
+
+        tokio::spawn(async move {
+            loop {
+                for (peer_id, client) in &clients {
+                    let msg = Message::ping(&id, peer_id, 0);
+                    let result = {
+                        let client = client.lock().await;
+                        client.send(msg).await
+                    };
+
+                    if let Err(e) = result {
+                        debug!("Heartbeat failed to {peer_id}: {e}");
+
+                        if let Some(addr) = peer_addresses.get(peer_id) {
+                            debug!("Attempting to reconnect to {peer_id} at {addr}...");
+
+                            match Client::connect(addr, signer.clone()).await {
+                                Ok(new_client) => {
+                                    debug!("Reconnected to {peer_id}");
+                                    let mut locked = client.lock().await;
+                                    *locked = new_client;
+                                }
+                                Err(err) => {
+                                    debug!("Failed to reconnect to {peer_id}: {err}");
+                                }
+                            }
+                        } else {
+                            debug!("No known address for {peer_id}, cannot reconnect.");
+                        }
+                    }
+                }
+
+                tokio::time::sleep(interval).await;
+            }
+        });
+    }
+
+    async fn broadcast(&self, payload: &str) -> anyhow::Result<()> {
+        let tasks = self.clients.iter().map(|(peer_id, client)| {
+            let mut msg = Message::broadcast(&self.id, payload, 0);
+            msg.to = peer_id.clone();
+            let client = client.clone();
+            async move {
+                let send_result = {
+                    let client_guard = client.lock().await;
+                    client_guard.clone()
+                }
+                .send(msg)
+                .await;
+
+                if let Err(e) = send_result {
+                    debug!("Broadcast to {peer_id} failed: {e}");
+                } else {
+                    debug!("Broadcast to {peer_id} succeeded");
+                }
+            }
+        });
+
+        futures::future::join_all(tasks).await;
+        Ok(())
     }
 }

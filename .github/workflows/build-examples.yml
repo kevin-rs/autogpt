@@ -1,0 +1,42 @@
+name: 🦀 Build All Examples
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: 🔧 Build Examples
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Build Example Crates
+        run: |
+          set -euxo pipefail
+          echo "🔍 Searching for example crates..."
+          failures=0
+          for dir in examples/*; do
+            if [ -d "$dir" ]; then
+              echo "🚧 Building crate in ➡️ $dir"
+              if ! (cd "$dir" && cargo build --release); then
+                echo "❌ Build failed in $dir"
+                failures=$((failures+1))
+              else
+                echo "✅ Success: $dir"
+              fi
+            fi
+          done
+          if [ $failures -ne 0 ]; then
+            echo "🚨 $failures crate(s) failed to build!"
+            exit 1
+          else
+            echo "🎉 All example crates built successfully!"
+          fi

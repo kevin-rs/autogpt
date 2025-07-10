@@ -37,6 +37,7 @@
 //!
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "net")]
 use crate::collaboration::Collaborator;
 use crate::common::utils::{
     Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
@@ -45,7 +46,7 @@ use crate::common::utils::{
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use auto_derive::Auto;
 use colored::*;
@@ -575,14 +576,14 @@ impl DesignerGPT {
                                 .await;
                         }
 
-                        return Err(anyhow::anyhow!(err_msg));
+                        return Err(anyhow!(err_msg));
                     }
                 }
             }
 
             #[allow(unreachable_patterns)]
             _ => {
-                return Err(anyhow::anyhow!(
+                return Err(anyhow!(
                     "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
                 ));
             }

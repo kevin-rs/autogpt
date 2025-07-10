@@ -37,7 +37,7 @@ auto-derive = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 duckduckgo = { workspace = true }
-iac-rs = { workspace = true }
+iac-rs = { workspace = true, optional = true }
 
 uuid = { version = "1.16.0", features = ["v4"] }
 tokio = { version = "1.37.0", default-features = false, features = ["full"] }
@@ -63,10 +63,12 @@ indicatif = { version = "0.17.11", optional = true }
 
 [features]
 default = []
+gpt = []
 img = ["getimg"]
 git = ["git2"]
 gem = ["gems"]
 xai = ["x-ai"]
+net = ["iac-rs"]
 mail = ["nylas"]
 oai = ["openai_dive"]
 mem = ["pinecone-sdk"]

@@ -60,7 +60,7 @@ dependencies = [
 
 [[package]]
 name = "auto-derive"
-version = "0.0.2"
+version = "0.0.6"
 dependencies = [
  "async-trait",
  "proc-macro2",
@@ -76,7 +76,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "autogpt"
-version = "0.1.6"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "async-trait",

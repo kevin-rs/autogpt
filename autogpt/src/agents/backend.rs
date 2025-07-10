@@ -39,6 +39,7 @@
 #![allow(unreachable_code)]
 
 use crate::agents::agent::AgentGPT;
+#[cfg(feature = "net")]
 use crate::collaboration::Collaborator;
 #[cfg(feature = "cli")]
 use crate::common::utils::spinner;
@@ -58,7 +59,7 @@ use std::path::Path;
 use std::process::Stdio;
 // use std::thread::sleep;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use colored::*;
 use reqwest::Client as ReqClient;
@@ -378,9 +379,7 @@ impl BackendGPT {
         let code = match output {
             GenerationOutput::Text(code) => code,
             _ => {
-                return Err(anyhow::anyhow!(
-                    "Expected text output for backend code generation"
-                ));
+                return Err(anyhow!("Expected text output for backend code generation"));
             }
         };
 
@@ -472,7 +471,7 @@ impl BackendGPT {
             "rust" => format!("{}/src/main.rs", self.workspace),
             "python" => format!("{}/main.py", self.workspace),
             "javascript" => format!("{}/src/index.js", self.workspace),
-            _ => return Err(anyhow::anyhow!("Unsupported language")),
+            _ => return Err(anyhow!("Unsupported language")),
         };
 
         debug!(
@@ -571,7 +570,7 @@ impl BackendGPT {
             "rust" => format!("{workspace}/src/main.rs"),
             "python" => format!("{workspace}/main.py"),
             "javascript" => format!("{workspace}/src/index.js"),
-            _ => return Err(anyhow::anyhow!("Unsupported language")),
+            _ => return Err(anyhow!("Unsupported language")),
         };
 
         debug!(
@@ -620,7 +619,7 @@ impl BackendGPT {
             "rust" => format!("{path}/src/main.rs"),
             "python" => format!("{path}/main.py"),
             "javascript" => format!("{path}/src/index.js"),
-            _ => return Err(anyhow::anyhow!("Unsupported language")),
+            _ => return Err(anyhow!("Unsupported language")),
         };
 
         debug!(

@@ -1,6 +1,6 @@
-# 💎 AutoGPT Gemini Memory Example
+# 💎 AutoGPT Gemini Custom Agent Example
 
-This is an example demonstrating how to use AutoGPT with Gemini with a persistant storage using Pinecone. It features a simple use case of an architect agent that generates `diagrams` code.
+This is an example demonstrating how to use AutoGPT with Gemini by building a custom agent. It features a simple use case of a custom agent that executes a task (e.g. sending a simple prompt to Gemini).
 
 ## 🛠️ Pre-requisites:
 
@@ -27,34 +27,24 @@ This is an example demonstrating how to use AutoGPT with Gemini with a persistan
 1. Navigate to the application directory.
 
    ```sh
-   cd autogpt/examples/gemini-memory
+   cd autogpt/examples/gemini-custom-agent
    ```
 
 1. Set the following environment variables:
 
    ```sh
    export GEMINI_API_KEY=<your_gemini_api_key>
+
    # Optional: Set the Model, flash 2.0 is the default
    export GEMINI_MODEL=<your_gemini_model>
-
-   export PINECONE_API_KEY=<Your_Pinecone_API_Key>
-   export PINECONE_INDEX_URL=<Your_Pinecone_Index_URL>
    ```
 
-   Generate an api key from [Google AI Studio](https://aistudio.google.com/app/apikey). Follow [our tutorial](../../PINECONE.md) for a guide on how to obtain Pinecone related keys.
+   Generate an api key from [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 1. Run the app:
 
    ```sh
-   cargo run
+   cargo run --features=gem
    ```
 
-   Executing this command will result in the following output:
-
-   ```sh
-   All agents executed successfully.
-   Memory length: 3
-   First memory role: user
-   Second memory role: assistant
-   Agent status: Completed
-   ```
+   Notice the response from Gemini in your terminal.
