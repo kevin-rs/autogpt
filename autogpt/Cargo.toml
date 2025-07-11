@@ -60,6 +60,10 @@ rustls-pemfile = { version = "2.2.0", features = ["std"], optional = true }
 anthropic-ai-sdk = { version = "0.2.24", optional = true }
 x-ai = { version = "0.0.1", optional = true }
 indicatif = { version = "0.17.11", optional = true }
+console = { version = "0.16.0", optional = true }
+convert_case = { version = "0.8.0", optional = true }
+serde_yaml = { version = "0.9.34", optional = true }
+toml_edit = { version = "0.23.0", optional = true }
 
 [features]
 default = []
@@ -77,7 +81,11 @@ cli = [
     "clap",
     "prost",
     "rustls",
+    "console",
     "indicatif",
+    "toml_edit",
+    "serde_yaml",
+    "convert_case",
     "tokio-rustls",
     "rustls-pemfile",
     "tracing-appender",

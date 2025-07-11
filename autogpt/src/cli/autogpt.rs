@@ -1,4 +1,15 @@
 #[cfg(feature = "cli")]
+pub mod ast;
+#[cfg(feature = "cli")]
+pub mod commands;
+#[cfg(feature = "cli")]
+pub mod generator;
+#[cfg(feature = "cli")]
+pub mod parser;
+#[cfg(feature = "cli")]
+pub mod utils;
+
+#[cfg(feature = "cli")]
 use clap::{Parser, Subcommand};
 
 #[cfg(feature = "cli")]
@@ -70,8 +81,52 @@ pub struct Cli {
 
 /// Represents available subcommands for the autogpt CLI.
 #[cfg(feature = "cli")]
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, PartialEq)]
 pub enum Commands {
+    /// Scaffold a new agent project from scratch
+    #[command(
+        name = "new",
+        about = "Create a new agent project",
+        long_about = "Scaffold a new AutoGPT-compatible agent project with YAML config and Cargo setup."
+    )]
+    New {
+        /// Name of the agent project (used as directory name)
+        #[arg()]
+        name: String,
+    },
+
+    /// Build the Rust code generated from agent.yaml
+    #[command(
+        name = "build",
+        about = "Compile generated agent source code",
+        long_about = "Parses `agent.yaml`, generates Rust code in `src/main.rs` (or a custom location), and compiles the project using Cargo."
+    )]
+    Build {
+        /// Optional output path for generated Rust file (default: src/main.rs)
+        #[arg(short, long, value_name = "FILE")]
+        out: Option<String>,
+    },
+
+    /// Run the compiled agent executable
+    #[command(
+        name = "run",
+        about = "Run the compiled agent",
+        long_about = "Executes the agent with the specified AI feature. This assumes the project is built successfully."
+    )]
+    Run {
+        /// AI provider feature to activate (e.g. gem, oai, cld, etc.)
+        #[arg(short, long, default_value = "gem", value_name = "FEATURE")]
+        feature: String,
+    },
+
+    /// Perform a dry-run to validate the YAML file
+    #[command(
+        name = "test",
+        about = "Validate agent.yaml file",
+        long_about = "Checks the structure and required fields in `agent.yaml` without generating or compiling code."
+    )]
+    Test,
+
     #[clap(
         name = "man",
         about = "ManagerGPT: Generate complete project requirements, specs, and task plans."

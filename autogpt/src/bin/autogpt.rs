@@ -30,7 +30,9 @@ async fn main() -> Result<()> {
         use autogpt::agents::mailer::MailerGPT;
         use autogpt::agents::manager::ManagerGPT;
         use autogpt::agents::optimizer::OptimizerGPT;
+        use autogpt::cli::autogpt::commands::{build, new, run, test};
         use autogpt::cli::autogpt::{Cli, Commands};
+
         use autogpt::common::input::read_user_input;
         use autogpt::common::utils::Scope;
         use autogpt::common::utils::Task;
@@ -208,19 +210,27 @@ async fn main() -> Result<()> {
             }
         } else if let Some(command) = args.command {
             // If a command is provided, operate in networkless (standalone agents) mode.
-
-            let mut git_agent = GitGPT::new("Commit all changes", "GitGPT").await;
+            let mut git_agent = GitGPT::default();
+            let mut _optimizer_gpt = OptimizerGPT::default();
+            let language = "python";
             let workspace = var("AUTOGPT_WORKSPACE")
                 .unwrap_or("workspace/".to_string())
                 .to_owned();
-            let language = "python";
+            if !matches!(
+                command,
+                Commands::Test
+                    | Commands::Run { feature: _ }
+                    | Commands::Build { out: _ }
+                    | Commands::New { name: _ }
+            ) {
+                git_agent = GitGPT::new("Commit all changes", "GitGPT").await;
 
-            let objective =
-                "Expertise lies in modularizing monolithic source code into clean components";
-            let position = "OptimizerGPT";
+                let objective =
+                    "Expertise lies in modularizing monolithic source code into clean components";
+                let position = "OptimizerGPT";
 
-            let mut _optimizer_gpt = OptimizerGPT::new(objective, position, language);
-
+                _optimizer_gpt = OptimizerGPT::new(objective, position, language).await;
+            }
             match command {
                 Commands::Man => {
                     let objective = "Expertise at managing projects at scale";
@@ -695,6 +705,10 @@ async fn main() -> Result<()> {
                         }
                     }
                 }
+                Commands::New { name } => new::handle_new(&name)?,
+                Commands::Build { out } => build::handle_build(out)?,
+                Commands::Run { feature } => run::handle_run(feature)?,
+                Commands::Test => test::handle_test()?,
             };
         }
     }
