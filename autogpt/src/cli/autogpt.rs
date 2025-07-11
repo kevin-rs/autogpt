@@ -115,8 +115,8 @@ pub enum Commands {
     )]
     Run {
         /// AI provider feature to activate (e.g. gem, oai, cld, etc.)
-        #[arg(short, long, default_value = "gem", value_name = "FEATURE")]
-        feature: String,
+        #[arg(short, long, value_name = "FEATURE")]
+        feature: Option<String>,
     },
 
     /// Perform a dry-run to validate the YAML file

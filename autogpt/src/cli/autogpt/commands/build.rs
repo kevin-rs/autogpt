@@ -16,7 +16,7 @@ pub fn handle_build(out: Option<String>) -> Result<()> {
 
     success("✅ Code generation complete");
 
-    spinner("Compiling project", || {
+    spinner("Compiling agent", || {
         std::process::Command::new("cargo")
             .arg("build")
             .stdout(Stdio::piped())

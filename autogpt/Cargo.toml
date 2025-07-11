@@ -64,6 +64,8 @@ console = { version = "0.16.0", optional = true }
 convert_case = { version = "0.8.0", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
 toml_edit = { version = "0.23.0", optional = true }
+crates_io_api = { version = "0.11.0", optional = true }
+semver = { version = "1.0.26", optional = true }
 
 [features]
 default = []
@@ -81,12 +83,14 @@ cli = [
     "clap",
     "prost",
     "rustls",
+    "semver",
     "console",
     "indicatif",
     "toml_edit",
     "serde_yaml",
     "convert_case",
     "tokio-rustls",
+    "crates_io_api",
     "rustls-pemfile",
     "tracing-appender",
     "tracing-subscriber",
