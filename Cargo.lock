@@ -211,6 +211,7 @@ dependencies = [
  "colored",
  "console",
  "convert_case",
+ "crates_io_api",
  "derivative",
  "duckduckgo",
  "futures",
@@ -227,6 +228,7 @@ dependencies = [
  "reqwest 0.11.27",
  "rustls 0.23.28",
  "rustls-pemfile 2.2.0",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -452,6 +454,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link",
 ]
@@ -685,6 +688,23 @@ dependencies = [
  "core-graphics",
  "foreign-types 0.5.0",
  "libc",
+]
+
+[[package]]
+name = "crates_io_api"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "200ad30d24892baf2168f2df366939264d02f2fa0be0914f8e2da4bd3407c58c"
+dependencies = [
+ "chrono",
+ "futures",
+ "reqwest 0.12.22",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_path_to_error",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -3597,6 +3617,16 @@ dependencies = [
  "itoa",
  "memchr",
  "ryu",
+ "serde",
+]
+
+[[package]]
+name = "serde_path_to_error"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59fab13f937fa393d08645bf3a84bdfe86e296747b506ada67bb15f10f218b2a"
+dependencies = [
+ "itoa",
  "serde",
 ]
 

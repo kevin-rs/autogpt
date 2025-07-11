@@ -37,6 +37,9 @@ async fn main() -> Result<()> {
         use autogpt::common::utils::Scope;
         use autogpt::common::utils::Task;
         use autogpt::common::utils::ask_to_run_command;
+        use autogpt::common::utils::fetch_latest_version;
+        use autogpt::common::utils::is_outdated;
+        use autogpt::common::utils::prompt_for_update;
         use autogpt::common::utils::setup_logging;
         use autogpt::traits::functions::AsyncFunctions;
         use autogpt::traits::functions::Functions;
@@ -65,6 +68,14 @@ async fn main() -> Result<()> {
         setup_logging()?;
 
         let args: Cli = Cli::parse();
+
+        let current_version = env!("CARGO_PKG_VERSION");
+
+        if let Some(latest_version) = fetch_latest_version().await {
+            if is_outdated(current_version, &latest_version) {
+                prompt_for_update();
+            }
+        }
 
         async fn run_client() -> Result<()> {
             let certs = load_certs("certs/cert.pem")?;
@@ -707,7 +718,7 @@ async fn main() -> Result<()> {
                 }
                 Commands::New { name } => new::handle_new(&name)?,
                 Commands::Build { out } => build::handle_build(out)?,
-                Commands::Run { feature } => run::handle_run(feature)?,
+                Commands::Run { feature } => run::handle_run(feature.unwrap_or_default())?,
                 Commands::Test => test::handle_test()?,
             };
         }

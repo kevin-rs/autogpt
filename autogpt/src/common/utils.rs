@@ -82,6 +82,9 @@ use std::{io, io::Read, process::Command, process::Stdio};
 use webbrowser::{Browser, BrowserOptions, open_browser_with_options};
 #[cfg(feature = "cli")]
 use {
+    crates_io_api::AsyncClient,
+    semver::Version,
+    std::io::Write,
     tracing::{Event, Subscriber, error, info, warn},
     tracing_appender::rolling,
     tracing_subscriber::Layer,
@@ -1061,4 +1064,59 @@ pub enum AgentMessage {
     },
     #[serde(rename = "custom")]
     Custom(String),
+}
+
+#[cfg(feature = "cli")]
+#[allow(unused)]
+pub async fn fetch_latest_version() -> Option<String> {
+    let client = AsyncClient::new(
+        "autogpt (github.com/kevin-rs/autogpt)",
+        Duration::from_millis(1000),
+    )
+    .ok()?;
+
+    let crate_data = client.get_crate("autogpt").await.ok()?;
+    Some(crate_data.crate_data.max_version)
+}
+
+#[cfg(feature = "cli")]
+#[allow(unused)]
+pub fn is_outdated(current: &str, latest: &str) -> bool {
+    let current = Version::parse(current).ok();
+    let latest = Version::parse(latest).ok();
+    current < latest
+}
+
+#[cfg(feature = "cli")]
+#[allow(unused)]
+pub fn prompt_for_update() {
+    info!(
+        "{}",
+        "🚀 A new version of autogpt is available! Do you want to update? (y/N):"
+            .bright_yellow()
+            .bold()
+    );
+
+    print!("> ");
+    io::stdout().flush().unwrap();
+
+    let mut input = String::new();
+    if io::stdin().read_line(&mut input).is_ok() {
+        if input.trim().to_lowercase() == "y" {
+            info!("{}", "🛠️  Updating autogpt...".bright_cyan().bold());
+
+            let status = Command::new("cargo")
+                .args(["install", "autogpt", "--force", "--all-features"])
+                .status()
+                .expect("❌ Failed to run cargo install");
+
+            if status.success() {
+                info!("{}", "✅ Successfully updated autogpt!".green().bold());
+            } else {
+                error!("{}", "❌ Failed to update autogpt.".red().bold());
+            }
+        } else {
+            info!("{}", "❎ Skipping update.".dimmed());
+        }
+    }
 }
