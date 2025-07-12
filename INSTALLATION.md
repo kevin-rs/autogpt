@@ -151,33 +151,6 @@ This will:
 
 ---
 
-## 🔐 TLS Certificate Setup (Required If Using CLI or Compose V2)
-
-Before running the AutoGPT CLI or using the SDK, you **must set up a local TLS certificate**. This certificate is required to establish secure communication between the CLI and the orchestrator.
-
-To generate a **self-signed TLS certificate**, run the following command in your terminal:
-
-```sh
-openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 \
-   -subj "/CN=localhost" \
-   -addext "subjectAltName=DNS:localhost" \
-   -addext "basicConstraints=critical,CA:FALSE"
-```
-
-- `-x509`: Generate a self-signed certificate.
-- `-newkey rsa:2048`: Create a new RSA private key (2048-bit).
-- `-nodes`: Skip the passphrase for the private key.
-- `-keyout key.pem`: Output file for the private key.
-- `-out cert.pem`: Output file for the certificate.
-- `-days 365`: Validity of the certificate (1 year).
-- `-subj "/CN=localhost"`: Set the Common Name to `localhost`.
-- `-addext "subjectAltName=DNS:localhost"`: Specify the Subject Alternative Name.
-- `-addext "basicConstraints=critical,CA:FALSE"`: Restrict the certificate from acting as a Certificate Authority.
-
-The generated `cert.pem` and `key.pem` file must be made available in a **certs** directory in the root project.
-
----
-
 ## 🧰 SDK Usage
 
 The SDK offers a simple and flexible API for building and running intelligent agents in your applications. Before getting started, **make sure to configure the required environment variables**. For detailed setup, refer to the [Environment Variables Setup](#environment-variables-setup) section.
@@ -357,7 +330,7 @@ The CLI provides a convenient means to interact with the code generation ecosyst
 - `orchgpt` - Launches the orchestrator that manages agents.
 - `autogpt` - Launches an agent.
 
-Before utilizing the CLI, you need to **set up TLS**. To do so, make sure you've created `cert.pem` and `key.pem` under the **certs** directory using the previous command. These are essential for establishing a secure connection with the orchestrator.
+Before utilizing the CLI, you need to **set up environment variables**. These are essential for establishing a secure connection with the orchestrator using the IAC protocol.
 
 ### Environment Variables Setup
 

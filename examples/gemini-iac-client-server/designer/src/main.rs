@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     let register_key_msg = IacMessage {
         from: agent.id.to_string(),
         to: "server".into(),
-        msg_type: MessageType::RegisterKey.into(),
+        msg_type: MessageType::RegisterKey,
         extra_data: public_key_bytes,
         ..Default::default()
     };

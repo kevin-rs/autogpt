@@ -189,8 +189,8 @@ impl Message {
             timestamp: curr_time(),
             msg_id: gen_msg_id(),
             session_id: 0,
-            signature: Vec::new(),
-            extra_data: Vec::new(),
+            signature: vec![],
+            extra_data: vec![],
         }
     }
     /// Serializes the message to a byte vector using Protobuf encoding.
@@ -220,7 +220,7 @@ impl Message {
     #[instrument(skip_all, fields(msg_id = self.msg_id))]
     pub fn sign(&mut self, signer: &crate::crypto::Signer) -> Result<()> {
         let mut copy = self.clone();
-        copy.signature = Vec::new();
+        copy.signature = vec![];
         let data = copy
             .serialize()
             .context("Failed to serialize message for signing")?;
@@ -233,7 +233,7 @@ impl Message {
     #[instrument(skip_all, fields(msg_id = self.msg_id))]
     pub fn verify(&self, verifier: &crate::crypto::Verifier) -> Result<()> {
         let mut copy = self.clone();
-        copy.signature = Vec::new();
+        copy.signature = vec![];
         let data = copy
             .serialize()
             .context("Failed to serialize message for verification")?;
@@ -258,8 +258,8 @@ impl Message {
             timestamp,
             msg_id,
             session_id,
-            signature: Vec::new(),
-            extra_data: Vec::new(),
+            signature: vec![],
+            extra_data: vec![],
         };
 
         debug!(
@@ -285,8 +285,8 @@ impl Message {
             timestamp,
             msg_id,
             session_id,
-            signature: Vec::new(),
-            extra_data: Vec::new(),
+            signature: vec![],
+            extra_data: vec![],
         };
 
         debug!(
@@ -311,8 +311,8 @@ impl Message {
             timestamp,
             msg_id,
             session_id,
-            signature: Vec::new(),
-            extra_data: Vec::new(),
+            signature: vec![],
+            extra_data: vec![],
         }
     }
 }

@@ -46,25 +46,18 @@ async fn main() -> Result<()> {
         use clap::Parser;
         use std::env::var;
 
-        use autogpt::common::tls::load_certs;
-        use autogpt::message::Message;
-        use autogpt::message::encode_message;
         use colored::*;
-        use rustls::pki_types::ServerName;
-        use rustls::{ClientConfig, RootCertStore};
+        use iac_rs::message::Message;
+        use iac_rs::prelude::*;
         use std::env;
         use std::io::Write;
         use std::sync::Arc;
         use tokio::io::AsyncBufReadExt;
-        use tokio::io::AsyncReadExt;
-        use tokio::io::AsyncWriteExt;
-        use tokio::net::TcpStream;
         use tokio::signal;
+        use tokio::sync::Mutex;
         use tokio::time::Duration;
         use tokio::time::timeout;
-        use tokio_rustls::TlsConnector;
         use tracing::{error, info, warn};
-
         setup_logging()?;
 
         let args: Cli = Cli::parse();
@@ -76,60 +69,51 @@ async fn main() -> Result<()> {
                 prompt_for_update();
             }
         }
-
         async fn run_client() -> Result<()> {
-            let certs = load_certs("certs/cert.pem")?;
-            let mut root = RootCertStore::empty();
-            root.add_parsable_certificates(certs);
+            let signer = Signer::new(KeyPair::generate());
 
-            let config = ClientConfig::builder()
-                .with_root_certificates(root)
-                .with_no_client_auth();
+            let address =
+                env::var("ORCHESTRATOR_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8443".to_string());
 
-            let connector = TlsConnector::from(Arc::new(config));
-            let bind_address =
-                env::var("ORCHESTRATOR_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8443".to_string());
-
-            let stream = TcpStream::connect(&bind_address).await?;
-            let domain = ServerName::try_from("localhost")?;
-            let mut tls_stream = connector.connect(domain, stream).await?;
+            let client = Arc::new(Mutex::new(Client::connect(&address, signer.clone()).await?));
 
             let mut stdin = tokio::io::BufReader::new(tokio::io::stdin());
             let mut input_line = String::new();
 
-            let shutdown_signal = signal::ctrl_c();
+            let public_key_bytes = signer.verifying_key().as_slice().to_vec();
 
+            let register_key_msg = Message {
+                from: "autogpt".into(),
+                to: "orchestrator".into(),
+                msg_type: MessageType::RegisterKey,
+                extra_data: public_key_bytes,
+                ..Default::default()
+            };
+
+            client.lock().await.send(register_key_msg).await?;
+
+            let shutdown_signal = signal::ctrl_c();
             tokio::pin!(shutdown_signal);
 
             loop {
                 print!("> ");
                 std::io::stdout().flush()?;
-
                 input_line.clear();
+
                 tokio::select! {
                     read = stdin.read_line(&mut input_line) => {
                         if read? == 0 {
                             break;
                         }
 
-                        let input = input_line.trim().to_string();
+                        let input = input_line.trim();
                         if input.is_empty() {
-                            warn!(
-                                "{}",
-                                "[*] \"AGI\": 🤔 You've entered an empty command? What exactly does that entail?"
-                                    .bright_yellow()
-                                    .bold()
-                            );
+                            warn!("{}", "[*] \"AGI\": 🤔 You've entered an empty command?".bright_yellow().bold());
                             continue;
                         }
 
                         if !input.starts_with('/') {
-                            error!(
-                                "{}",
-                                "[*] \"AGI\": ❌ Command must begin with a '/' followed by the agent name."
-                                    .bright_red()
-                                    .bold()
-                            );
+                            error!("{}", "[*] \"AGI\": ❌ Command must begin with a '/' followed by the agent name.".bright_red().bold());
                             continue;
                         }
 
@@ -145,55 +129,49 @@ async fn main() -> Result<()> {
                                         (remaining.trim(), "python")
                                     }
                                 } else {
-                                    error!(
-                                        "{}",
-                                        "[*] \"AGI\": ❌ Invalid command format. Use: /<agent> <action>"
-                                            .bright_red()
-                                            .bold()
-                                    );
+                                    error!("{}", "[*] \"AGI\": ❌ Invalid command format. Use: /<agent> <action>".bright_red().bold());
                                     continue;
                                 };
 
                                 let payload = format!("input={actual_input};language={lang}");
 
                                 let msg = Message {
-                                    from: "cli".to_string(),
-                                    to: to.trim_start_matches('/').to_string(),
+                                    from: "cli".into(),
+                                    to: to.trim_start_matches('/').into(),
                                     msg_type: action.into(),
                                     payload_json: payload,
-                                    auth_token: "secret".into(),
+                                    ..Default::default()
                                 };
 
-                                let data = encode_message(&msg)?;
-                                tls_stream.write_all(&data).await?;
+                                let client = client.lock().await;
+                                client.send(msg).await?;
                                 info!("{}", "[*] \"AGI\": ✅ Sent!".green().bold());
 
-                                let mut buf = vec![0u8; 4096];
-                                let n = match timeout(Duration::from_secs(30), tls_stream.read(&mut buf)).await {
-                                    Ok(Ok(n)) if n > 0 => n,
-                                    Ok(_) => {
-                                        warn!("{}", "[*] \"AGI\": ❌ Connection closed.".bright_red().bold());
+                                let response = timeout(Duration::from_secs(30), client.receive()).await?;
+
+                                match response {
+                                    Ok(Some(resp)) => {
+                                        info!(
+                                            "{} {}",
+                                            "[*] \"AGI\": 📬 Got Response →".bright_green().bold(),
+                                            resp.payload_json.trim()
+                                        );
+                                    }
+                                    Ok(None) => {
+                                        warn!("{}", "[*] \"AGI\": ❌ No response from server.".bright_red().bold());
                                         break;
-                                    },
+                                    }
                                     Err(_) => {
                                         warn!("{}", "[*] \"AGI\": ⏱️ Timeout waiting for response.".bright_red().bold());
                                         break;
                                     }
-                                };
-
-                                let response = String::from_utf8_lossy(&buf[..n]);
-                                info!(
-                                    "{} {}",
-                                    "[*] \"AGI\": 📬 Got Response →".bright_green().bold(),
-                                    response.trim()
-                                );
+                                }
                             }
                         }
                     }
                     _ = &mut shutdown_signal => {
                         info!("\n[*] \"AGI\": 👋 Graceful shutdown requested.");
-                        let _ = tls_stream.shutdown().await;
-                        std::process::exit(0);
+                        break;
                     }
                 }
             }

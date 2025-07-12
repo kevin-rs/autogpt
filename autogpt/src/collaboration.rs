@@ -65,7 +65,7 @@ impl Collaborate for RemoteAgent {
         let mut message = Message {
             from: "AgentGPT".into(),
             to: self.id.clone().into(),
-            msg_type: MessageType::DelegateTask.into(),
+            msg_type: MessageType::DelegateTask,
             payload_json: serde_json::to_string(&msg)?,
             ..Default::default()
         };

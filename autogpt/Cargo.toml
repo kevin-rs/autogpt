@@ -52,11 +52,6 @@ tracing-appender = { version = "0.2.3", optional = true }
 git2 = { version = "0.20.1", optional = true }
 pinecone-sdk = { version = "0.1.2", optional = true }
 openai_dive = { version = "1.0.0", optional = true }
-prost = { version = "0.13.5", optional = true }
-prost-types = { version = "0.13.5", optional = true }
-tokio-rustls = { version = "0.26.2", optional = true }
-rustls = { version = "0.23.26", optional = true }
-rustls-pemfile = { version = "2.2.0", features = ["std"], optional = true }
 anthropic-ai-sdk = { version = "0.2.24", optional = true }
 x-ai = { version = "0.0.1", optional = true }
 indicatif = { version = "0.17.11", optional = true }
@@ -81,17 +76,13 @@ mem = ["pinecone-sdk"]
 cld = ["anthropic-ai-sdk"]
 cli = [
     "clap",
-    "prost",
-    "rustls",
     "semver",
     "console",
     "indicatif",
     "toml_edit",
     "serde_yaml",
     "convert_case",
-    "tokio-rustls",
     "crates_io_api",
-    "rustls-pemfile",
     "tracing-appender",
     "tracing-subscriber",
 ]

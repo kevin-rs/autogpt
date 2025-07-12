@@ -1,6 +1,5 @@
-use autogpt::message::Message;
 use autogpt::orchestrator::Orchestrator;
-use tokio::sync::mpsc;
+use iac_rs::prelude::*;
 use tracing_subscriber::{filter, fmt, prelude::*, reload};
 
 #[tokio::test]
@@ -15,9 +14,12 @@ async fn test_orchestrator_create_and_terminate_agent() {
         .with(fmt::Layer::default())
         .init();
 
-    let (tx, rx) = mpsc::channel(8);
+    let signer = Signer::new(KeyPair::generate());
+    let verifier = Verifier::new(vec![]);
 
-    let orchestrator = Orchestrator::new(rx).await.unwrap();
+    let mut orchestrator = Orchestrator::new("orchestrator".to_string(), signer.clone(), verifier)
+        .await
+        .unwrap();
     let agents = orchestrator.agents.clone();
 
     tokio::spawn(async move {
@@ -27,11 +29,14 @@ async fn test_orchestrator_create_and_terminate_agent() {
     let create_msg = Message {
         from: "tester".into(),
         to: "ArchitectGPT".into(),
-        msg_type: "create".into(),
-        payload_json: "".into(),
-        auth_token: "securetoken".into(),
+        msg_type: MessageType::Create,
+        ..Default::default()
     };
-    tx.send(create_msg).await.unwrap();
+    let client = Client::connect("127.0.0.1:8443", signer.clone())
+        .await
+        .unwrap();
+
+    client.send(create_msg).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -43,11 +48,10 @@ async fn test_orchestrator_create_and_terminate_agent() {
     let terminate_msg = Message {
         from: "tester".into(),
         to: "ArchitectGPT".into(),
-        msg_type: "terminate".into(),
-        payload_json: "".into(),
-        auth_token: "securetoken".into(),
+        msg_type: MessageType::Terminate,
+        ..Default::default()
     };
-    tx.send(terminate_msg).await.unwrap();
+    client.send(terminate_msg).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 

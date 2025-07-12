@@ -1,11 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tokio::{
-    io::AsyncReadExt,
-    net::TcpListener,
-    sync::{Mutex, mpsc},
-};
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use crate::agents::architect::ArchitectGPT;
@@ -17,13 +13,8 @@ use crate::agents::git::GitGPT;
 use crate::agents::types::AgentType;
 use crate::common::utils::Task;
 use crate::message::parse_kv;
-use crate::{
-    common::tls::load_tls_config,
-    message::{Message, parse_message},
-};
+use iac_rs::prelude::*;
 use std::env;
-use tokio::io::AsyncWriteExt;
-use tokio::time::{Duration, timeout};
 
 /// Struct representing the orchestrator responsible for managing and coordinating multiple agents.
 ///
@@ -32,30 +23,38 @@ use tokio::time::{Duration, timeout};
 /// messages it receives. The orchestrator interacts with agents via an asynchronous model using
 /// the Tokio runtime.
 pub struct Orchestrator {
+    /// A unique identifier for the orchestrator instance.
+    pub id: String,
+
+    /// The digital signer used to sign outgoing messages.
+    pub signer: Signer,
+
+    /// The verifier used to validate incoming messages.
+    pub verifier: Verifier,
+
     /// A shared, thread-safe map of agent names to their respective agent types.
     pub agents: Arc<Mutex<HashMap<String, AgentType>>>,
-
-    /// A receiver channel that receives messages instructing the orchestrator on agent actions.
-    receiver: mpsc::Receiver<Message>,
 }
 
 impl Orchestrator {
-    /// Creates a new `Orchestrator` instance with a given message receiver.
+    /// Creates a new `Orchestrator` instance.
     ///
     /// # Arguments
     ///
-    /// * `receiver` - A receiver channel (`mpsc::Receiver<Message>`) that the orchestrator will use
-    ///   to receive messages about agent actions.
+    /// * `id` - A unique string identifier for the orchestrator (used in message routing).
+    /// * `signer` - A cryptographic signer for signing outgoing messages.
+    /// * `verifier` - A cryptographic verifier for verifying incoming messages.
     ///
     /// # Returns
     ///
-    /// `Ok(Orchestrator)` - A new `Orchestrator` instance wrapped in a `Result`. If the receiver is successfully
-    /// created, it returns an `Orchestrator` instance. If an error occurs during initialization,
-    /// it returns an `Err` with details about the error.
-    pub async fn new(receiver: mpsc::Receiver<Message>) -> anyhow::Result<Self> {
+    /// Returns a fully initialized `Orchestrator` with an empty agent registry and
+    /// no server bound yet.
+    pub async fn new(id: String, signer: Signer, verifier: Verifier) -> anyhow::Result<Self> {
         Ok(Self {
+            id,
+            signer,
+            verifier,
             agents: Arc::new(Mutex::new(HashMap::new())),
-            receiver,
         })
     }
 
@@ -70,156 +69,125 @@ impl Orchestrator {
     /// `Ok(())` - Returns `Ok` if the orchestrator starts and runs successfully.
     ///
     /// `Err(anyhow::Error)` - Returns an error if something goes wrong while running the orchestrator.
-    pub async fn run(mut self) -> anyhow::Result<()> {
-        let tls_config = load_tls_config()?;
-        let bind_address =
-            env::var("ORCHESTRATOR_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8443".to_string());
-        let listener = TcpListener::bind(bind_address.to_string()).await?;
-        info!("[*] \"Orchestrator\": Listening on {}", bind_address);
+    pub async fn run(&mut self) -> Result<()> {
+        let addr = env::var("ORCHESTRATOR_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8443".to_string());
 
-        loop {
-            tokio::select! {
-                Ok((stream, _)) = listener.accept() => {
-                    let agents = self.agents.clone();
-                    let tls = tls_config.clone();
-                    tokio::spawn(async move {
-                        let mut tls_stream = match tls.accept(stream).await {
-                            Ok(s) => s,
-                            Err(e) => {
-                                error!("TLS accept error: {}", e);
-                                return;
+        let agents = Arc::clone(&self.agents);
+        let verifier = self.verifier.clone();
+        let id = self.id.clone();
+        let signer = self.signer.clone();
+
+        let mut server = Server::bind(&addr).await?;
+        info!("[*] \"Orchestrator\": Listening on {}", addr);
+
+        let server_handle = server.clone();
+
+        server.set_handler(move |(msg, conn)| {
+            let agents = Arc::clone(&agents);
+            let signer = signer.clone();
+            let value = id.clone();
+            let server_handle = server_handle.clone();
+
+            async move {
+                let mut agents = agents.lock().await;
+
+                let reply = match msg.msg_type {
+                    MessageType::Create => {
+                        let (_input, lang) = parse_kv(&msg.payload_json);
+                        let lang_str = if lang.trim().is_empty() {
+                            info!("[*] \"Orchestrator\": Language not specified, defaulting to 'python'");
+                            "python".to_string()
+                        } else {
+                            lang
+                        };
+                        let language = Box::leak(lang_str.into_boxed_str());
+
+                        let new_agent = match msg.to.as_str() {
+                            "arch" => {
+                                info!("[*] \"Orchestrator\": Creating Architect agent '{}'", msg.to);
+                                Some(AgentType::Architect(ArchitectGPT::new("Architect agent", "ArchitectGPT").await))
+                            }
+                            "back" => {
+                                info!("[*] \"Orchestrator\": Creating Backend agent '{}', language: {}", msg.to, language);
+                                Some(AgentType::Backend(BackendGPT::new("Backend agent", "BackendGPT", language).await))
+                            }
+                            "front" => {
+                                info!("[*] \"Orchestrator\": Creating Frontend agent '{}', language: {}", msg.to, language);
+                                Some(AgentType::Frontend(FrontendGPT::new("Frontend agent", "FrontendGPT", language).await))
+                            }
+                            #[cfg(feature = "img")]
+                            "design" => {
+                                info!("[*] \"Orchestrator\": Creating Designer agent '{}'", msg.to);
+                                Some(AgentType::Designer(DesignerGPT::new("Designer agent", "DesignerGPT").await))
+                            }
+                            #[cfg(feature = "git")]
+                            "git" => {
+                                info!("[*] \"Orchestrator\": Creating Git agent '{}'", msg.to);
+                                Some(AgentType::Git(GitGPT::new("Git agent", "GitGPT").await))
+                            }
+                            _ => {
+                                warn!("[*] \"Orchestrator\": Unknown agent type requested '{}'", msg.to);
+                                None
                             }
                         };
 
-                        let mut buf = [0u8; 4096];
-
-                        loop {
-                            let read_result = timeout(Duration::from_secs(60), tls_stream.read(&mut buf)).await;
-
-                            let n = match read_result {
-                                Ok(Ok(0)) => {
-                                    info!("[*] \"Orchestrator\": Client disconnected gracefully.");
-                                    break;
-                                },
-                                Ok(Ok(n)) => n,
-                                Ok(Err(e)) => {
-                                    let _ = tls_stream.write_all(b"[*] \"Orchestrator\": TLS read error\n").await;
-                                    error!("[*] \"Orchestrator\": TLS read error: {}", e);
-                                    break;
-                                },
-                                Err(_) => {
-                                    let _ = tls_stream.write_all(b"[*] \"Orchestrator\": Read timed out\n").await;
-                                    warn!("[*] \"Orchestrator\": Read timeout - closing connection.");
-                                    break;
-                                },
-                            };
-
-                            if let Ok(msg) = parse_message(&buf[..n]) {
-                                let mut agents = agents.lock().await;
-
-                                match msg.msg_type.as_str() {
-                                    "create" => {
-                                        let payload = parse_kv(&msg.payload_json);
-                                        let lang_str = if payload.1.trim().is_empty() {
-                                            "python".to_string()
-                                        } else {
-                                            payload.1
-                                        };
-                                        let lang: &'static str = Box::leak(lang_str.into_boxed_str());
-
-                                        let agent_type = match msg.to.as_str() {
-                                            "arch" => Some(AgentType::Architect(ArchitectGPT::new("Architect agent", "ArchitectGPT").await)),
-                                            "back" => Some(AgentType::Backend(BackendGPT::new("Backend agent", "BackendGPT", lang).await)),
-                                            "front" => Some(AgentType::Frontend(FrontendGPT::new("Frontend agent", "FrontendGPT", lang).await)),
-                                            #[cfg(feature = "img")]
-                                            "design" => Some(AgentType::Designer(DesignerGPT::new("Designer agent", "DesignerGPT").await)),
-                                            #[cfg(feature = "git")]
-                                            "git" => Some(AgentType::Git(GitGPT::new("Git agent", "GitGPT").await)),
-                                            _ => None,
-                                        };
-
-                                        let reply = if let Some(agent) = agent_type {
-                                            agents.insert(msg.to.clone(), agent);
-                                            format!("[*] \"Orchestrator\": ✅ Agent '{}' created\n", msg.to)
-                                        } else {
-                                            format!("[*] \"Orchestrator\": Unknown agent type '{}'\n", msg.to)
-                                        };
-                                        let _ = tls_stream.write_all(reply.as_bytes()).await;
-                                        info!("{}", reply.trim_end());
-                                    },
-                                    "terminate" => {
-                                        agents.remove(&msg.to);
-                                        let reply = format!("[*] \"Orchestrator\": 🧹 Agent '{}' terminated\n", msg.to);
-                                        let _ = tls_stream.write_all(reply.as_bytes()).await;
-                                        info!("{}", reply.trim_end());
-                                    },
-                                    "run" => {
-                                        if let Some(agent) = agents.get_mut(&msg.to) {
-                                            let mut tasks = Task::from_payload(&msg.payload_json);
-                                            let _ = agent.execute(&mut tasks, true, false, 3).await;
-                                            let reply = format!("[*] \"Orchestrator\": ✅ Executed tasks for agent '{}'\n", msg.to);
-                                            let _ = tls_stream.write_all(reply.as_bytes()).await;
-                                            info!("{}", reply.trim_end());
-                                        } else {
-                                            let reply = format!("[*] \"Orchestrator\": Agent '{}' not found\n", msg.to);
-                                            let _ = tls_stream.write_all(reply.as_bytes()).await;
-                                            warn!("{}", reply.trim_end());
-                                        }
-                                    },
-                                    _ => {
-                                        let reply = "[*] \"Orchestrator\": ⚠️ Unknown message type\n".to_string();
-                                        let _ = tls_stream.write_all(reply.as_bytes()).await;
-                                        warn!("{}", reply.trim_end());
-                                    }
-                                }
-                            } else {
-                                let _ = tls_stream.write_all(b"[*] \"Orchestrator\": Failed to parse message\n").await;
-                                warn!("[*] \"Orchestrator\": Failed to parse message");
-                            }
+                        if let Some(agent) = new_agent {
+                            agents.insert(msg.to.clone(), agent);
+                            format!("✅ Agent '{}' created", msg.to)
+                        } else {
+                            format!("❌ Unknown agent type '{}'", msg.to)
                         }
-                    });
-                },
-                Some(msg) = self.receiver.recv() => {
-                    let mut agents = self.agents.lock().await;
-                    match msg.msg_type.as_str() {
-                        "create" => {
-                            let payload = parse_kv(&msg.payload_json);
-                            let lang: &'static str = Box::leak(payload.1.into_boxed_str());
-                            let agent_type = match msg.to.as_str() {
-                                "arch" => Some(AgentType::Architect(ArchitectGPT::new("Architect agent", "ArchitectGPT").await)),
-                                "back" => Some(AgentType::Backend(BackendGPT::new("Backend agent", "BackendGPT", lang).await)),
-                                "front" => Some(AgentType::Frontend(FrontendGPT::new("Frontend agent", "FrontendGPT", lang).await)),
-                                #[cfg(feature = "img")]
-                                "design" => Some(AgentType::Designer(DesignerGPT::new("Designer agent", "DesignerGPT").await)),
-                                #[cfg(feature = "git")]
-                                "git" => Some(AgentType::Git(GitGPT::new("Git agent", "GitGPT").await)),
-                                _ => None,
-                            };
-
-                            if let Some(agent) = agent_type {
-                                agents.insert(msg.to.clone(), agent);
-                                info!("[*] \"Orchestrator\": Agent {} created", msg.to);
-                            } else {
-                                warn!("[*] \"Orchestrator\": Unknown agent type: {}", msg.to);
-                            }
-                        },
-                        "terminate" => {
-                            agents.remove(&msg.to);
-                            info!("[*] \"Orchestrator\": Agent {} terminated", msg.to);
-                        },
-                        "run" => {
-                            if let Some(agent) = agents.get_mut(&msg.to) {
-                                let mut tasks = Task::from_payload(&msg.payload_json);
-                                let _ = agent.execute(&mut tasks, true, false, 3).await;
-                                info!("[*] \"Orchestrator\": Executed tasks for agent {}", msg.to);
-                            } else {
-                                warn!("[*] \"Orchestrator\": Agent {} not found", msg.to);
-                            }
-                        },
-                        _ => {}
                     }
+
+                    MessageType::Terminate => {
+                        if agents.remove(&msg.to).is_some() {
+                            info!("[*] \"Orchestrator\": Agent '{}' terminated", msg.to);
+                            format!("🧹 Agent '{}' terminated", msg.to)
+                        } else {
+                            warn!("[*] \"Orchestrator\": Attempted to terminate unknown agent '{}'", msg.to);
+                            format!("❌ Agent '{}' not found for termination", msg.to)
+                        }
+                    }
+
+                    MessageType::Run => {
+                        if let Some(agent) = agents.get_mut(&msg.to) {
+                            info!("[*] \"Orchestrator\": Executing tasks for agent '{}'", msg.to);
+                            let mut tasks = Task::from_payload(&msg.payload_json);
+                            if let Err(e) = agent.execute(&mut tasks, true, false, 3).await {
+                                error!("[*] \"Orchestrator\": Error executing tasks for agent '{}': {:?}", msg.to, e);
+                                format!("❌ Failed to execute tasks for agent '{}'", msg.to)
+                            } else {
+                                format!("✅ Executed tasks for agent '{}'", msg.to)
+                            }
+                        } else {
+                            warn!("[*] \"Orchestrator\": Agent '{}' not found for running tasks", msg.to);
+                            format!("❌ Agent '{}' not found", msg.to)
+                        }
+                    }
+
+                    _ => {
+                        warn!("[*] \"Orchestrator\": Unsupported message type: {:?}", msg.msg_type);
+                        format!("❌ Unsupported message type: {:?}", msg.msg_type)
+                    }
+                };
+
+                let response = Message::new(&value, &conn, MessageType::Reply, &reply);
+
+                if let Err(e) = server_handle.send(&conn, response, &signer).await {
+                    error!("Failed to send reply: {:?}", e);
+                } else {
+                    info!("[*] \"Orchestrator\": Reply sent to '{}'", conn);
                 }
+
+                Ok(())
             }
+        });
+
+        if let Err(e) = server.run(verifier).await {
+            error!("[*] \"Orchestrator\": Server run error: {:?}", e);
+            return Err(e);
         }
+
+        Ok(())
     }
 }
