@@ -255,6 +255,97 @@ pub fn derive_agent(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     }
                 }
             }
+
+            async fn imagen(&mut self, request: &str) -> Result<Vec<u8>> {
+                match &mut self.client {
+                    #[cfg(feature = "gem")]
+                    ClientType::Gemini(gem_client) => {
+                        gem_client.set_model(Model::FlashExpImage);
+
+                        let input = Message::User {
+                            content: Content::Text(request.into()),
+                            name: None,
+                        };
+
+                        let params = ImageGenBuilder::default()
+                            .model(Model::FlashExpImage)
+                            .input(input)
+                            .build()?;
+
+                        let image_bytes = gem_client.images().generate(params).await;
+                        Ok(image_bytes.unwrap_or_default())
+                    }
+
+                    #[cfg(feature = "oai")]
+                    ClientType::OpenAI(oai_client) => {
+                        // TODO: Implement this
+                        Ok(Default::default())
+                    }
+
+                    #[cfg(feature = "cld")]
+                    ClientType::Anthropic(client) => {
+                        // TODO: Implement this
+                        Ok(Default::default())
+                    }
+
+                    #[cfg(feature = "xai")]
+                    ClientType::Xai(xai_client) => {
+                        // TODO: Implement this
+                        Ok(Default::default())
+                    }
+
+
+                    #[allow(unreachable_patterns)]
+                    _ => {
+                        return Err(anyhow!(
+                            "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
+                        ));
+                    }
+                }
+            }
+
+            async fn stream(&mut self, request: &str) -> Result<ReqResponse> {
+                match &mut self.client {
+                    #[cfg(feature = "gem")]
+                    ClientType::Gemini(gem_client) => {
+                        let parameters = StreamBuilder::default()
+                            .model(Model::Flash20)
+                            .input(Message::User {
+                                content: Content::Text(request.into()),
+                                name: None,
+                            })
+                            .build()?;
+
+                        Ok(ReqResponse(Some(gem_client.stream().generate(parameters).await?)))
+                    }
+
+                    #[cfg(feature = "oai")]
+                    ClientType::OpenAI(oai_client) => {
+                        // TODO: Implement this
+                        Ok(Default::default())
+                    }
+
+                    #[cfg(feature = "cld")]
+                    ClientType::Anthropic(client) => {
+                        // TODO: Implement this
+                        Ok(Default::default())
+                    }
+
+                    #[cfg(feature = "xai")]
+                    ClientType::Xai(xai_client) => {
+                        // TODO: Implement this
+                        Ok(Default::default())
+                    }
+
+
+                    #[allow(unreachable_patterns)]
+                    _ => {
+                        return Err(anyhow!(
+                            "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
+                        ));
+                    }
+                }
+            }
         }
     };
 

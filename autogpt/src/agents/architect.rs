@@ -53,8 +53,8 @@ use crate::traits::functions::{AsyncFunctions, Executor, Functions};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use colored::*;
-use duckduckgo::browser::Browser;
-use duckduckgo::user_agents::get;
+// use duckduckgo::browser::Browser;
+// use duckduckgo::user_agents::get;
 use reqwest::Client as ReqClient;
 use std::borrow::Cow;
 use std::env::var;
@@ -84,9 +84,15 @@ use anthropic_ai_sdk::types::message::{
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
+    imagen::ImageGenBuilder,
     messages::{Content, Message},
+    models::Model,
+    stream::StreamBuilder,
     traits::CTrait,
 };
+
+#[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+use crate::traits::functions::ReqResponse;
 
 #[cfg(feature = "xai")]
 use x_ai::{
@@ -198,7 +204,8 @@ impl ArchitectGPT {
             }
         }
 
-        let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        let mut agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        agent.id = agent.position().to_string().into();
 
         let client = ClientType::from_env();
 
@@ -753,8 +760,9 @@ impl ArchitectGPT {
     }
 
     async fn search_solution_and_regenerate(&mut self, tasks: &mut Task) -> Result<String> {
-        let browser = Browser::new(self.req_client.clone());
-        let user_agent = get("firefox").unwrap();
+        // TODO: remove `req_client` arg in duckduckgo
+        // let browser = Browser::new(self.req_client.clone());
+        // let user_agent = get("firefox").unwrap();
 
         let query = format!("Python error handling for: {}", tasks.description);
         info!(
@@ -764,9 +772,10 @@ impl ArchitectGPT {
                 .bold()
         );
 
-        let results = browser
-            .lite_search(&query, "wt-wt", Some(3), user_agent)
-            .await?;
+        // let results = browser
+        //     .lite_search(&query, "wt-wt", Some(3), user_agent)
+        //     .await?;
+        let results = vec!["".to_string()];
 
         for result in &results {
             info!(
@@ -774,7 +783,8 @@ impl ArchitectGPT {
                 format!(
                     "[*] {:?}: DuckDuckGo result: {}",
                     self.agent.position(),
-                    result.title
+                    // result.title
+                    result
                 )
                 .bright_cyan()
             );

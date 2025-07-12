@@ -86,9 +86,15 @@ use anthropic_ai_sdk::types::message::{
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
+    imagen::ImageGenBuilder,
     messages::{Content, Message},
+    models::Model,
+    stream::StreamBuilder,
     traits::CTrait,
 };
+
+#[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+use crate::traits::functions::ReqResponse;
 
 use async_trait::async_trait;
 #[cfg(feature = "xai")]
@@ -213,7 +219,8 @@ impl FrontendGPT {
             _ => panic!("Unsupported language, consider open an Issue/PR"),
         };
         #[allow(unused)]
-        let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        let mut agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        agent.id = agent.position().to_string().into();
 
         #[allow(unused)]
         let client = ClientType::from_env();

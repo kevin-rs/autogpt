@@ -43,6 +43,7 @@ use crate::common::utils::{
     Capability, ClientType, Communication, ContextManager, Knowledge, Persona, Planner, Reflection,
     Status, Task, TaskScheduler, Tool, similarity,
 };
+#[allow(unused)]
 use crate::prompts::designer::{IMGGET_PROMPT, WEB_DESIGNER_PROMPT};
 use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Executor, Functions};
@@ -50,7 +51,9 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use auto_derive::Auto;
 use colored::*;
+#[cfg(feature = "img")]
 use getimg::client::Client as ImgClient;
+#[cfg(feature = "img")]
 use getimg::utils::save_image;
 use std::borrow::Cow;
 use std::env::var;
@@ -69,11 +72,17 @@ use {openai_dive::v1::models::FlagshipModel, openai_dive::v1::resources::chat::*
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
+    imagen::ImageGenBuilder,
     messages::{Content, Message},
+    models::Model,
+    stream::StreamBuilder,
     traits::CTrait,
     utils::load_and_encode_image,
     vision::VisionBuilder,
 };
+
+#[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+use crate::traits::functions::ReqResponse;
 
 #[cfg(feature = "xai")]
 use x_ai::{
@@ -98,6 +107,7 @@ pub struct DesignerGPT {
     /// Represents the GPT agent responsible for handling design tasks.
     agent: AgentGPT,
     /// Represents a GetIMG client for generating images from text prompts.
+    #[cfg(feature = "img")]
     img_client: ImgClient,
     /// Represents an OpenAI or Gemini client for interacting with their API.
     client: ClientType,
@@ -108,6 +118,7 @@ impl Default for DesignerGPT {
         Self {
             workspace: Cow::Borrowed("default_workspace"),
             agent: AgentGPT::default(),
+            #[cfg(feature = "img")]
             img_client: ImgClient::new("default", "default"),
             client: ClientType::default(),
         }
@@ -147,12 +158,16 @@ impl DesignerGPT {
             debug!("Workspace directory '{}' already exists.", workspace);
         }
 
-        let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        let mut agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        agent.id = agent.position().to_string().into();
+        #[cfg(feature = "img")]
         let getimg_api_key = var("GETIMG_API_KEY").unwrap_or_default().to_owned();
+        #[cfg(feature = "img")]
         let getimg_model = var("GETIMG__MODEL")
             .unwrap_or("lcm-realistic-vision-v5-1".to_string())
             .to_owned();
 
+        #[cfg(feature = "img")]
         let img_client = ImgClient::new(&getimg_api_key, &getimg_model);
 
         let client = ClientType::from_env();
@@ -167,6 +182,7 @@ impl DesignerGPT {
         Self {
             workspace: workspace.into(),
             agent,
+            #[cfg(feature = "img")]
             img_client,
             client,
         }
@@ -195,6 +211,7 @@ impl DesignerGPT {
         let img_path = self.workspace.to_string() + "/img.jpg";
 
         let text_prompt: String = format!("{IMGGET_PROMPT}\n\nUser Prompt: {}", tasks.description);
+        #[allow(unused)]
         let negative_prompt = Some("Disfigured, cartoon, blurry");
 
         self.agent.add_communication(Communication {
@@ -225,20 +242,38 @@ impl DesignerGPT {
                 .await;
         }
 
-        let text_response = self
-            .img_client
-            .generate_image_from_text(
-                &text_prompt,
-                1024,
-                1024,
-                5,
-                "jpeg",
-                negative_prompt,
-                Some(512),
-            )
-            .await?;
+        #[allow(unused)]
+        #[cfg(feature = "img")]
+        let mut text_response = String::new();
 
-        save_image(&text_response.image, &img_path).unwrap();
+        // #[cfg(feature = "img")]
+        // {
+        //     text_response = self
+        //         .img_client
+        //         .generate_image_from_text(
+        //             &text_prompt,
+        //             1024,
+        //             1024,
+        //             5,
+        //             "jpeg",
+        //             negative_prompt,
+        //             Some(512),
+        //         )
+        //         .await?.image;
+        // }
+
+        #[cfg(feature = "img")]
+        save_image(&text_response, &img_path).unwrap();
+
+        #[allow(unused)]
+        let mut image_data = vec![0];
+
+        #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+        {
+            image_data = self.imagen(&text_prompt).await?;
+        }
+
+        std::fs::write(&img_path, &image_data)?;
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("system"),
@@ -303,29 +338,35 @@ impl DesignerGPT {
                 .await;
         }
 
-        let base64_image_data = match load_and_encode_image(image_path) {
-            Ok(data) => data,
-            Err(_) => {
-                let error_msg = format!("Failed to load or encode image at path: {image_path}");
+        #[allow(unused)]
+        let mut base64_image_data = String::new();
 
-                self.agent.add_communication(Communication {
-                    role: Cow::Borrowed("system"),
-                    content: Cow::Owned(error_msg.clone()),
-                });
+        #[cfg(feature = "gem")]
+        {
+            base64_image_data = match load_and_encode_image(image_path) {
+                Ok(data) => data,
+                Err(_) => {
+                    let error_msg = format!("Failed to load or encode image at path: {image_path}");
 
-                #[cfg(feature = "mem")]
-                {
-                    let _ = self
-                        .save_ltm(Communication {
-                            role: Cow::Borrowed("system"),
-                            content: Cow::Owned(error_msg.clone()),
-                        })
-                        .await;
+                    self.agent.add_communication(Communication {
+                        role: Cow::Borrowed("system"),
+                        content: Cow::Owned(error_msg.clone()),
+                    });
+
+                    #[cfg(feature = "mem")]
+                    {
+                        let _ = self
+                            .save_ltm(Communication {
+                                role: Cow::Borrowed("system"),
+                                content: Cow::Owned(error_msg.clone()),
+                            })
+                            .await;
+                    }
+                    debug!("[*] {:?}: Error loading image!", self.agent.position());
+                    return Ok("".to_string());
                 }
-                debug!("[*] {:?}: Error loading image!", self.agent.position());
-                return Ok("".to_string());
-            }
-        };
+            };
+        }
 
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -671,6 +712,8 @@ impl Executor for DesignerGPT {
         _browse: bool,
         _max_tries: u64,
     ) -> Result<()> {
+        self.agent.update(Status::Idle);
+
         info!(
             "{}",
             format!("[*] {:?}: Executing task:", self.agent.position(),)

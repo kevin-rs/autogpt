@@ -9,7 +9,6 @@ pub mod architect;
 #[cfg(feature = "gpt")]
 pub mod backend;
 #[cfg(feature = "gpt")]
-#[cfg(feature = "img")]
 pub mod designer;
 #[cfg(feature = "gpt")]
 pub mod frontend;

@@ -6,6 +6,7 @@ use autogpt::common::utils::{Route, Scope, Task};
 use autogpt::traits::agent::Agent;
 use autogpt::traits::functions::AsyncFunctions;
 use autogpt::traits::functions::Functions;
+use autogpt::traits::functions::ReqResponse;
 use serde_json::json;
 use std::borrow::Cow;
 use tracing::info;
@@ -81,6 +82,15 @@ impl AsyncFunctions for MockFunctions {
 
     async fn send_request(&mut self, _request: &str) -> Result<String> {
         Ok("".to_string())
+    }
+
+    async fn imagen(&mut self, _request: &str) -> Result<Vec<u8>> {
+        // TODO: Impl
+        Ok(Default::default())
+    }
+    async fn stream(&mut self, _request: &str) -> Result<ReqResponse> {
+        // TODO: Impl
+        Ok(ReqResponse(None))
     }
 }
 
