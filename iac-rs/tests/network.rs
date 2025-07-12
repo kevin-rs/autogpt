@@ -47,7 +47,7 @@ async fn test_heartbeat() -> Result<()> {
 
     tokio::spawn(async move {
         let mut server = Server::bind(addr).await.unwrap();
-        server.set_handler(move |msg| {
+        server.set_handler(move |(msg, _conn)| {
             let log_clone = Arc::clone(&log_clone);
             async move {
                 let mut log = log_clone.lock().unwrap();
@@ -153,7 +153,7 @@ async fn test_broadcast() -> Result<()> {
 
     tokio::spawn(async move {
         let mut server = Server::bind(addr).await.unwrap();
-        server.set_handler(move |msg| {
+        server.set_handler(move |(msg, _conn)| {
             let log_clone = Arc::clone(&log_clone);
             async move {
                 let mut log = log_clone.lock().unwrap();

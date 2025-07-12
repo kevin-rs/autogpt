@@ -13,6 +13,7 @@ use rustls::server::ServerConfig as RustlsServerConfig;
 use rustls::{ClientConfig as RustlsClientCfg, version::TLS13};
 use rustls::{DigitallySignedStruct, SignatureScheme};
 use std::sync::Arc;
+use tokio::time::{Duration, timeout};
 
 use quinn::crypto::rustls::{QuicClientConfig, QuicServerConfig};
 
@@ -113,11 +114,13 @@ impl ServerCertVerifier for AllowAnyCert {
 
 pub async fn connect(addr: &str) -> Result<Connection> {
     let mut endpoint = Endpoint::client("0.0.0.0:0".parse()?)?;
-
     endpoint.set_default_client_config(init_client()?);
-    let conn = endpoint
-        .connect(addr.parse()?, "localhost")?
+
+    let connect_fut = endpoint.connect(addr.parse()?, "localhost")?;
+
+    let conn = timeout(Duration::from_secs(5), connect_fut)
         .await
-        .context("Connect failed")?;
+        .context("Connection attempt timed out")??;
+
     Ok(conn)
 }

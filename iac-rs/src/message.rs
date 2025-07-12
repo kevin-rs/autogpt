@@ -11,13 +11,12 @@ use prost::encoding::{
 };
 use rand::TryRngCore;
 use rand::rngs::OsRng;
+#[cfg(feature = "ser")]
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, instrument};
 
-#[cfg(feature = "ser")]
-use serde::{Deserialize, Serialize};
-
-/// Enum the various types of messages exchanged between IAC server and agents.
+/// Enum for various types of messages exchanged between IAC server and agents.
 ///
 /// Each variant corresponds to a specific operation type.
 #[cfg_attr(feature = "ser", derive(Serialize, Deserialize))]
@@ -38,6 +37,14 @@ pub enum MessageType {
     DelegateTask = 5,
     /// Register a cryptographic key or identity.
     RegisterKey = 6,
+    /// Create a new agent.
+    Create = 7,
+    /// Terminate an agent.
+    Terminate = 8,
+    /// Run an agent.
+    Run = 9,
+    /// Reply from server to agent.
+    Reply = 10,
 }
 
 impl MessageType {
@@ -50,6 +57,10 @@ impl MessageType {
             4 => MessageType::Command,
             5 => MessageType::DelegateTask,
             6 => MessageType::RegisterKey,
+            7 => MessageType::Create,
+            8 => MessageType::Terminate,
+            9 => MessageType::Run,
+            10 => MessageType::Reply,
             _ => MessageType::Unknown,
         }
     }
@@ -57,6 +68,24 @@ impl MessageType {
     /// Convert a `MessageType` into its corresponding integer.
     pub fn as_i32(&self) -> i32 {
         *self as i32
+    }
+}
+
+impl From<&str> for MessageType {
+    fn from(value: &str) -> Self {
+        match value.to_ascii_lowercase().as_str() {
+            "ping" => MessageType::Ping,
+            "broadcast" => MessageType::Broadcast,
+            "filetransfer" | "file_transfer" => MessageType::FileTransfer,
+            "command" => MessageType::Command,
+            "delegatetask" | "delegate_task" => MessageType::DelegateTask,
+            "registerkey" | "register_key" => MessageType::RegisterKey,
+            "create" => MessageType::Create,
+            "terminate" => MessageType::Terminate,
+            "run" => MessageType::Run,
+            "reply" => MessageType::Reply,
+            _ => MessageType::Unknown,
+        }
     }
 }
 
@@ -150,21 +179,20 @@ impl ProstMessage for Message {
     }
 }
 
-/// Decodes a `Message` from a raw byte buffer.
-///
-/// # Arguments
-///
-/// * `buf` - Byte slice containing a serialized protobuf `Message`.
-///
-/// # Returns
-///
-/// * `Ok(Message)` if decoding succeeds.
-/// * `Err(prost::DecodeError)` if the data is malformed.
-pub fn parse_message(buf: &[u8]) -> Result<Message, prost::DecodeError> {
-    Message::decode(buf)
-}
-
 impl Message {
+    pub fn new(from: &str, to: &str, msg_type: MessageType, payload_json: &str) -> Self {
+        Self {
+            from: from.to_string(),
+            to: to.to_string(),
+            msg_type,
+            payload_json: payload_json.to_string(),
+            timestamp: curr_time(),
+            msg_id: gen_msg_id(),
+            session_id: 0,
+            signature: Vec::new(),
+            extra_data: Vec::new(),
+        }
+    }
     /// Serializes the message to a byte vector using Protobuf encoding.
     #[instrument(skip_all, fields(msg_id = self.msg_id, msg_type = ?self.msg_type))]
     pub fn serialize(&self) -> Result<Vec<u8>> {
@@ -269,6 +297,23 @@ impl Message {
         );
 
         msg
+    }
+    #[instrument(skip_all, fields(from = from))]
+    pub fn reply(from: &str, to: &str, payload_json: &str, session_id: u64) -> Self {
+        let timestamp = curr_time();
+        let msg_id = gen_msg_id();
+
+        Message {
+            from: from.to_string(),
+            to: to.to_string(),
+            msg_type: MessageType::Reply,
+            payload_json: payload_json.to_string(),
+            timestamp,
+            msg_id,
+            session_id,
+            signature: Vec::new(),
+            extra_data: Vec::new(),
+        }
     }
 }
 
