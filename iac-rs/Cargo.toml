@@ -1,6 +1,6 @@
 [package]
 name = "iac-rs"
-version = "0.0.5"
+version = "0.0.6"
 description = "🛰️ IAC Protocol for Inter and Intra Agents Communications."
 edition = "2024"
 rust-version = "1.85"
@@ -16,7 +16,7 @@ exclude = ["assets", "tests", "benches"]
 anyhow = { workspace = true }
 tracing = { workspace = true }
 ed25519-compact = "2.1.1"
-prost = "0.14.1"
+prost =  { version = "0.14.1", default-features = false }
 quinn = "0.11.8"
 rcgen = "0.13.2"
 rustls = "0.23.28"
@@ -25,19 +25,22 @@ tokio = { version = "1.45.1", default-features = false }
 rand = "0.9.1"
 auto-net = "0.0.1"
 async-trait = { workspace = true }
-futures.workspace = true
+futures = { workspace = true }
+bytes = "1.10.1"
+serde = { version = "1.0.219", features = ["derive"], optional = true }
+
+[features]
+default = []
+ser = ["serde"]
+
+# TODO: Add std/non-std support
+# std = ["prost/std", "rand/std", "bytes/std"]
 
 [dev-dependencies]
 criterion = { version = "0.6", features = ["async_tokio"] }
 plotters = { version = "0.3.7", features = ["fontconfig-dlopen"] }
 tokio = { version = "1.45.1", features = ["full"] }
 tracing-subscriber = "0.3.19"
-
-[build-dependencies]
-prost-build = "0.14.1"
-
-# sudo apt install protobuf-compiler
-# export PROTOC=$(which protoc)  
 
 [badges]
 maintenance = { status = "actively-developed" }

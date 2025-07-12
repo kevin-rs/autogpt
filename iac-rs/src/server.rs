@@ -2,23 +2,32 @@ use crate::crypto::Verifier;
 use crate::message::{Message, MessageType};
 use crate::transport::init_server;
 use anyhow::Result;
+use anyhow::anyhow;
 use ed25519_compact::PublicKey;
-use quinn::Endpoint;
+use quinn::{Connection, Endpoint};
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 use tracing::{debug, error};
 use zstd::stream::decode_all;
 
+use crate::crypto::Signer;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use zstd::encode_all;
 
-type Handler =
-    Arc<dyn Fn(Message) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> + Send + Sync>;
+type Handler = Arc<
+    dyn Fn(Message, String) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>
+        + Send
+        + Sync,
+>;
 
 #[derive(Clone)]
 pub struct Server {
     endpoint: Endpoint,
     handler: Option<Handler>,
+    pub connections: Arc<RwLock<HashMap<String, Connection>>>,
 }
 
 impl PartialEq for Server {
@@ -46,23 +55,41 @@ impl Server {
         Ok(Self {
             endpoint,
             handler: None,
+            connections: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
     pub async fn run(&mut self, verifier: Verifier) -> Result<()> {
         while let Some(connecting) = self.endpoint.accept().await {
-            let remote = connecting.remote_address().to_string();
-
-            debug!(remote, "🔌 Incoming connection");
+            let remote = connecting.remote_address();
+            let remote_str = remote.to_string();
+            debug!(remote = %remote_str, "🔌 Incoming connection");
 
             let conn = connecting.await?;
+            self.connections
+                .write()
+                .await
+                .insert(remote_str.clone(), conn.clone());
             debug!(peer = %conn.remote_address(), "✅ Connection established");
 
-            tokio::spawn(Self::handle_conn(
-                conn,
-                verifier.clone(),
-                self.handler.clone(),
-            ));
+            self.connections
+                .write()
+                .await
+                .insert(remote_str.clone(), conn.clone());
+
+            let verifier = verifier.clone();
+            let handler = self.handler.clone();
+            let connections = Arc::clone(&self.connections);
+
+            tokio::spawn(async move {
+                if let Err(e) = Self::handle_conn(conn, verifier, handler, remote_str.clone()).await
+                {
+                    error!(error = %e, "❌ Connection handler failed");
+                }
+
+                connections.write().await.remove(&remote_str);
+                debug!(peer = %remote_str, "🔌 Connection removed from registry");
+            });
         }
 
         Ok(())
@@ -72,9 +99,9 @@ impl Server {
         conn: quinn::Connection,
         mut verifier: Verifier,
         handler: Option<Handler>,
-    ) -> anyhow::Result<()> {
+        remote_str: String,
+    ) -> Result<()> {
         debug!("🔁 Started handling incoming connection");
-
         loop {
             debug!("⏳ Waiting for next unidirectional stream...");
             match conn.accept_uni().await {
@@ -89,7 +116,7 @@ impl Server {
 
                     let msg = Message::deserialize(&decompressed)?;
 
-                    if msg.msg_type() == MessageType::RegisterKey {
+                    if msg.msg_type == MessageType::RegisterKey {
                         if let Ok(pk) = PublicKey::from_slice(&msg.extra_data) {
                             verifier.register_key(pk);
                             debug!("🔐 Registered new public key from agent {}", msg.from);
@@ -106,14 +133,14 @@ impl Server {
                     msg.verify(&verifier)?;
 
                     debug!(
-                        msg_type = ?msg.msg_type(),
+                        msg_type = ?msg.msg_type,
                         from = %msg.from,
                         to = %msg.to,
                         "✅ Message verified and processed"
                     );
 
                     if let Some(handler) = &handler {
-                        handler(msg).await?;
+                        handler(msg, remote_str.clone()).await?;
                     }
                 }
                 Err(e) => {
@@ -129,11 +156,33 @@ impl Server {
 
     pub fn set_handler<F, Fut>(&mut self, handler_fn: F)
     where
-        F: Fn(Message) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
+        F: Fn((Message, String)) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.handler = Some(Arc::new(move |msg| {
-            Box::pin(handler_fn(msg)) as Pin<Box<dyn Future<Output = _> + Send>>
+        self.handler = Some(Arc::new(move |msg, conn| {
+            Box::pin(handler_fn((msg, conn))) as Pin<Box<dyn Future<Output = _> + Send>>
         }));
+    }
+
+    pub async fn send(&self, to: &str, mut msg: Message, signer: &Signer) -> Result<()> {
+        msg.sign(signer)?;
+        let connections = self.connections.read().await;
+
+        let conn = connections.get(to).ok_or_else(|| {
+            error!(
+                "❌ No connection found for '{}'. Active connections: {:?}",
+                to,
+                connections.keys()
+            );
+            anyhow!("No active connection found for: {}", to)
+        })?;
+
+        let mut stream = conn.open_uni().await?;
+        let compressed = encode_all(msg.serialize()?.as_slice(), 0)?;
+        stream.write_all(&compressed).await?;
+        stream.finish()?;
+
+        debug!(to, "📤 Message sent");
+        Ok(())
     }
 }

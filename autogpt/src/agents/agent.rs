@@ -573,7 +573,7 @@ impl AgentGPT {
             let mut message = Message {
                 from: self.id.clone().into(),
                 to: peer_id.clone(),
-                msg_type: MessageType::Broadcast.into(),
+                msg_type: MessageType::Broadcast,
                 extra_data: payload.clone(),
                 ..Default::default()
             };

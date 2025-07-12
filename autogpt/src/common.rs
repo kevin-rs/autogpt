@@ -13,7 +13,4 @@ pub mod utils;
 pub mod memory;
 
 #[cfg(feature = "cli")]
-pub mod tls;
-
-#[cfg(feature = "cli")]
 pub mod input;

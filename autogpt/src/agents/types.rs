@@ -31,6 +31,12 @@ pub enum AgentType {
     Optimize(OptimizerGPT),
 }
 
+impl Default for AgentType {
+    fn default() -> Self {
+        AgentType::Architect(ArchitectGPT::default())
+    }
+}
+
 impl AgentType {
     /// Asynchronously executes tasks associated with the agent.
     ///

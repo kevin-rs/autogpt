@@ -11,6 +11,7 @@ pub use {
     async_trait::async_trait,
     auto_net::AutoNet,
     ed25519_compact::KeyPair,
+    ed25519_compact::PublicKey,
     quinn::*,
     std::net::*,
     std::time::*,

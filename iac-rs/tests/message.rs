@@ -48,7 +48,7 @@ fn test_ping_message() -> Result<()> {
         msg_id: 1,
         from: "nodeA".to_string(),
         to: "nodeB".to_string(),
-        msg_type: MessageType::Ping.into(),
+        msg_type: MessageType::Ping,
         payload_json: r#"{"ping": true}"#.to_string(),
         timestamp: 123456,
         session_id: 999,
@@ -60,7 +60,7 @@ fn test_ping_message() -> Result<()> {
     assert!(!serialized.is_empty());
 
     let deserialized = Message::deserialize(&serialized)?;
-    assert_eq!(deserialized.msg_type, MessageType::Ping.into());
+    assert_eq!(deserialized.msg_type, MessageType::Ping);
 
     msg.sign(&signer)?;
     assert!(!msg.signature.is_empty());
@@ -84,7 +84,7 @@ fn test_broadcast_message() -> Result<()> {
         msg_id: 100,
         from: "controller".to_string(),
         to: "all".to_string(),
-        msg_type: MessageType::Broadcast.into(),
+        msg_type: MessageType::Broadcast,
         payload_json: r#"{"announcement": "Ferris is King!"}"#.to_string(),
         timestamp: 98765431,
         session_id: 123,
@@ -96,7 +96,7 @@ fn test_broadcast_message() -> Result<()> {
     assert!(!serialized.is_empty());
 
     let deserialized = Message::deserialize(&serialized)?;
-    assert_eq!(deserialized.msg_type, MessageType::Broadcast.into());
+    assert_eq!(deserialized.msg_type, MessageType::Broadcast);
 
     msg.sign(&signer)?;
     assert!(!msg.signature.is_empty());

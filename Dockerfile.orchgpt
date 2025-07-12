@@ -39,9 +39,6 @@ RUN addgroup -S sudo && \
 
 WORKDIR /home/kevin
 
-COPY certs/ ./certs
-RUN chown -R kevin:kevin ./certs
-
 COPY --from=builder /kevin/target/release/orchgpt /usr/local/bin/orchgpt
 
 USER kevin
