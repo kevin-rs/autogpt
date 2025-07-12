@@ -48,40 +48,6 @@ Navigate to the core autogpt directory:
 cd autogpt/autogpt
 ```
 
-### Installing Protobuf
-
-#### 📦 Windows
-
-1. **Install Protobuf via `winget` in Powershell:**
-
-   ```sh
-   winget install protobuf
-   ```
-
-1. **Make sure `protoc` is available in your PATH:** After installation, you may need to **source the environment** or restart your terminal so the `protoc` command is recognized.
-
-1. **CMake Requirement:** If you plan to build the project from source, make sure **CMake** is installed:
-
-   ```sh
-   winget install cmake
-   ```
-
-#### 🐧 Linux (Debian)
-
-1. **Install via package manager:**
-
-   ```sh
-   sudo apt install protobuf-compiler
-
-   export PROTOC=$(which protoc)
-   ```
-
-1. **Verify installation:**
-
-   ```sh
-   protoc --version
-   ```
-
 ### ⚓ Using Cargo
 
 To run OrchGPT CLI via Cargo, execute:

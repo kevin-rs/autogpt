@@ -89,7 +89,7 @@ impl Server {
 
                     let msg = Message::deserialize(&decompressed)?;
 
-                    if msg.msg_type() == MessageType::RegisterKey {
+                    if msg.msg_type == MessageType::RegisterKey {
                         if let Ok(pk) = PublicKey::from_slice(&msg.extra_data) {
                             verifier.register_key(pk);
                             debug!("🔐 Registered new public key from agent {}", msg.from);
@@ -106,7 +106,7 @@ impl Server {
                     msg.verify(&verifier)?;
 
                     debug!(
-                        msg_type = ?msg.msg_type(),
+                        msg_type = ?msg.msg_type,
                         from = %msg.from,
                         to = %msg.to,
                         "✅ Message verified and processed"

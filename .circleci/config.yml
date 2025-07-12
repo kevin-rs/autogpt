@@ -11,14 +11,6 @@ jobs:
       - checkout
 
       - run:
-          name: Install Protobuf
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y protobuf-compiler
-            echo 'export PROTOC=$(which protoc)' >> $BASH_ENV
-            source $BASH_ENV
-
-      - run:
           name: Run Tests
           command: cargo test --all-features
 

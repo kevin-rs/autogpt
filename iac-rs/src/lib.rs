@@ -5,6 +5,10 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
 
+// TODO: Add non std support
+// #![no_std]
+// extern crate alloc;
+
 pub mod client;
 pub mod crypto;
 pub mod message;

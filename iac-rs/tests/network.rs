@@ -52,7 +52,7 @@ async fn test_heartbeat() -> Result<()> {
             async move {
                 let mut log = log_clone.lock().unwrap();
                 log.messages
-                    .push(format!("[{} -> {}] {}", msg.from, msg.to, msg.msg_type));
+                    .push(format!("[{} -> {}] {:?}", msg.from, msg.to, msg.msg_type));
                 Ok(())
             }
         });
@@ -126,10 +126,12 @@ async fn test_heartbeat() -> Result<()> {
 
     let log = message_log.lock().unwrap();
 
-    // " 1" for Ping msg_type
-    assert!(log.messages.iter().any(
-        |msg| msg.contains("[agent-1 -> agent-2] 1") || msg.contains("[agent-2 -> agent-1] 1")
-    ));
+    assert!(
+        log.messages
+            .iter()
+            .any(|msg| msg.contains("[agent-1 -> agent-2] Ping")
+                || msg.contains("[agent-2 -> agent-1] Ping"))
+    );
 
     Ok(())
 }
@@ -156,7 +158,7 @@ async fn test_broadcast() -> Result<()> {
             async move {
                 let mut log = log_clone.lock().unwrap();
                 log.messages
-                    .push(format!("[{} -> {}] {}", msg.from, msg.to, msg.msg_type));
+                    .push(format!("[{} -> {}] {:?}", msg.from, msg.to, msg.msg_type));
                 Ok(())
             }
         });
@@ -214,11 +216,10 @@ async fn test_broadcast() -> Result<()> {
 
     let log = message_log.lock().unwrap();
 
-    // " 2" for Broadcast msg_type
     assert!(
         log.messages
             .iter()
-            .any(|msg| msg.contains("[agent-1 -> agent-2] 2"))
+            .any(|msg| msg.contains("[agent-1 -> agent-2] Broadcast"))
     );
 
     Ok(())
