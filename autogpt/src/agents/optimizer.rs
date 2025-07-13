@@ -258,7 +258,7 @@ impl OptimizerGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
-            response_text = self.send_request(request).await?;
+            response_text = self.generate(request).await?;
         }
         Ok(response_text)
     }

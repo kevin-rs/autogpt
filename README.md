@@ -46,6 +46,7 @@ AutoGPT agents are modular and autonomous, built from composable components:
 
 - 🔌 **Tools & Sensors**: Interface with the real world via actions (e.g., file I/O, APIs) and perception (e.g., audio, video, data).
 - 🧠 **Memory & Knowledge**: Combines long-term vector memory with structured knowledge bases for reasoning and recall.
+- 📝 **No-Code Agent Configs**: Define agents and their behaviors with simple, declarative YAML, no coding required.
 - 🧭 **Planner & Goals**: Breaks down complex tasks into subgoals and tracks progress dynamically.
 - 🧍 **Persona & Capabilities**: Customizable behavior profiles and access controls define how agents act.
 - 🧑‍🤝‍🧑 **Collaboration**: Agents can delegate, swarm, or work in teams with other agents.
@@ -72,9 +73,15 @@ Please refer to [our tutorial](INSTALLATION.md) for guidance on installing, runn
 
 ## 🔄 Workflow
 
-AutoGPT supports two modes of operation, enabling both standalone and distributed use cases:
+AutoGPT supports 3 modes of operation, non agentic and both standalone and distributed agentic use cases:
 
-### 1. 🧠 Agentic Networkless Mode (Standalone)
+### 1. 💬 Direct Prompt Mode
+
+<video src="https://github.com/user-attachments/assets/505737f6-2fe8-4a93-8cd9-fb036b55b8fd"></video>
+
+In this mode, you can use the CLI to interact with the LLM directly, no need to define or configure agents. Use the `-p` flag to send prompts to your preferred LLM provider quickly and easily.
+
+### 2. 🧠 Agentic Networkless Mode (Standalone)
 
 <video src="https://github.com/user-attachments/assets/7d47b1d8-b2f2-4d23-a1f4-da926e425330"></video>
 
@@ -133,7 +140,7 @@ In this mode, the user runs an individual `autogpt` agent directly via a subcomm
 - ⚙️ **Task Execution**: Agents execute tasks asynchronously, leveraging their specialized functionalities.
 - 🔄 **Feedback Loop**: Continuous feedback updates users on project progress and addresses issues.
 
-### 2. 🌐 Agentic Networking Mode (Orchestrated)
+### 3. 🌐 Agentic Networking Mode (Orchestrated)
 
 <video src="https://github.com/user-attachments/assets/ecd82549-a48f-49c2-b751-23f74820bf3d"></video>
 

@@ -267,7 +267,7 @@ impl BackendGPT {
             nb_bugs: 0,
         }
     }
-    pub async fn generate(
+    pub async fn build_request(
         &mut self,
         prompt: &str,
         tasks: &mut Task,
@@ -305,7 +305,7 @@ impl BackendGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
-            response_text = self.send_request(&request).await?;
+            response_text = self.generate(&request).await?;
         }
         self.agent.add_communication(Communication {
             role: Cow::Borrowed("assistant"),
@@ -381,7 +381,7 @@ impl BackendGPT {
             WEBSERVER_CODE_PROMPT, template, tasks.description
         );
 
-        let output = self.generate(&prompt, tasks, OutputKind::Text).await?;
+        let output = self.build_request(&prompt, tasks, OutputKind::Text).await?;
 
         let code = match output {
             GenerationOutput::Text(code) => code,
@@ -454,7 +454,7 @@ impl BackendGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
-            response_text = self.send_request(&request).await?;
+            response_text = self.generate(&request).await?;
         }
 
         self.agent.add_communication(Communication {
@@ -552,7 +552,7 @@ impl BackendGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
-            response_text = self.send_request(&request).await?;
+            response_text = self.generate(&request).await?;
         }
 
         self.agent.add_communication(Communication {
@@ -659,7 +659,7 @@ impl BackendGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
-            response_text = self.send_request(&request).await?;
+            response_text = self.generate(&request).await?;
         }
 
         self.agent.add_communication(Communication {

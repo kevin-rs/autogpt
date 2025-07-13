@@ -74,6 +74,13 @@ pub struct Cli {
     #[clap(global = true, short, long)]
     pub verbose: bool,
 
+    /// Directly prompt the LLM without using an agentic workflow.
+    ///
+    /// Use this option to send a single, raw prompt to the LLM for immediate response.
+    /// This bypasses any structured task handling or multi-step reasoning.
+    #[arg(short, long)]
+    pub prompt: Option<String>,
+
     /// Subcommands for autogpt.
     #[clap(subcommand)]
     pub command: Option<Commands>,

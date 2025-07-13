@@ -80,7 +80,7 @@ impl AsyncFunctions for MockFunctions {
             .join("\n")
     }
 
-    async fn send_request(&mut self, _request: &str) -> Result<String> {
+    async fn generate(&mut self, _request: &str) -> Result<String> {
         Ok("".to_string())
     }
 

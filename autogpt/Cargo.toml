@@ -61,6 +61,8 @@ serde_yaml = { version = "0.9.34", optional = true }
 toml_edit = { version = "0.23.0", optional = true }
 crates_io_api = { version = "0.11.0", optional = true }
 semver = { version = "1.0.26", optional = true }
+futures-util = { version = "0.3.31", optional = true }
+termimad = { version = "0.33.0", optional = true }
 bytes = "1.10.1"
 
 [features]
@@ -79,9 +81,11 @@ cli = [
     "clap",
     "semver",
     "console",
+    "termimad",
     "indicatif",
     "toml_edit",
     "serde_yaml",
+    "futures-util",
     "convert_case",
     "crates_io_api",
     "tracing-appender",

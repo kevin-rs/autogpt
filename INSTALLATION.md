@@ -276,11 +276,11 @@ impl Executor for CustomAgent {
     ) -> Result<()> {
         // Custom agent logic to interact with `client` (e.g. OpenAI, Gemini, XAI, etc).
 
-        // Use the `send_request` method to send the agent's objective as a prompt
+        // Use the `generate` method to send the agent's objective as a prompt
         // to the configured AI client (e.g., OpenAI, Gemini, Claude). This abstracts
         // over the client implementation and returns a model-generated response.\
         let prompt = self.agent.objective().clone();
-        let response = self.send_request(prompt.as_ref()).await?;
+        let response = self.generate(prompt.as_ref()).await?;
 
         // (Optional) Store the result in the task or agent state
         self.agent.add_communication(Communication {
