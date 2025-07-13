@@ -10,6 +10,7 @@
 //! use anyhow::Result;
 //! use autogpt::traits::functions::Functions;
 //! use autogpt::traits::functions::AsyncFunctions;
+//! use autogpt::traits::functions::ReqResponse;
 //! use autogpt::common::utils::Communication;
 //! use autogpt::prelude::async_trait;
 //! use std::borrow::Cow;
@@ -123,6 +124,16 @@
 //!     async fn send_request(&mut self, _request: &str) -> Result<String> {
 //!         Ok("".to_string())
 //!     }
+//!
+//!     async fn imagen(&mut self, _request: &str) -> Result<Vec<u8>> {
+//!         // TODO: Impl
+//!         Ok(Default::default())
+//!     }
+//!
+//!     async fn stream(&mut self, _request: &str) -> Result<ReqResponse> {
+//!         // TODO: Impl
+//!         Ok(ReqResponse(None))
+//!     }
 //! }
 //!
 
@@ -132,6 +143,10 @@ use crate::common::utils::Communication;
 use crate::common::utils::{AgentMessage, Task};
 use anyhow::Result;
 use async_trait::async_trait;
+use reqwest::Response;
+
+#[derive(Default)]
+pub struct ReqResponse(pub Option<Response>);
 
 /// Trait to retrieve an agent.
 pub trait Functions {
@@ -201,6 +216,14 @@ pub trait AsyncFunctions: Send + Sync {
     #[allow(async_fn_in_trait)]
     #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
     async fn send_request(&mut self, request: &str) -> Result<String>;
+
+    #[allow(async_fn_in_trait)]
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+    async fn imagen(&mut self, request: &str) -> Result<Vec<u8>>;
+
+    #[allow(async_fn_in_trait)]
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+    async fn stream(&mut self, request: &str) -> Result<ReqResponse>;
 }
 
 #[async_trait]

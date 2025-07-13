@@ -37,6 +37,9 @@ use gems::{
     traits::CTrait,
 };
 
+#[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+use crate::traits::functions::ReqResponse;
+
 #[cfg(feature = "xai")]
 use x_ai::{
     chat_compl::{ChatCompletionsRequestBuilder, Message as XaiMessage},
@@ -74,7 +77,8 @@ impl MailerGPT {
     /// - Creates a Gemini client for interacting with Gemini API.
     ///
     pub async fn new(objective: &'static str, position: &'static str) -> Self {
-        let agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        let mut agent: AgentGPT = AgentGPT::new_borrowed(objective, position);
+        agent.id = agent.position().to_string().into();
         let client_id = var("NYLAS_CLIENT_ID").unwrap_or_default().to_owned();
         let client_secret = var("NYLAS_CLIENT_SECRET").unwrap_or_default().to_owned();
         let access_token = var("NYLAS_ACCESS_TOKEN").unwrap_or_default().to_owned();
@@ -594,5 +598,15 @@ impl AsyncFunctions for MailerGPT {
     #[cfg(feature = "mem")]
     async fn ltm_context(&self) -> String {
         long_term_memory_context(self.agent.id.clone()).await
+    }
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+    async fn imagen(&mut self, _request: &str) -> Result<Vec<u8>> {
+        // TODO: Impl
+        Ok(Default::default())
+    }
+    #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+    async fn stream(&mut self, _request: &str) -> Result<ReqResponse> {
+        // TODO: Impl
+        Ok(ReqResponse(None))
     }
 }

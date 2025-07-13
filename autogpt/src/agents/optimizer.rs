@@ -102,9 +102,15 @@ use anthropic_ai_sdk::types::message::{
 #[cfg(feature = "gem")]
 use gems::{
     chat::ChatBuilder,
+    imagen::ImageGenBuilder,
     messages::{Content, Message},
+    models::Model,
+    stream::StreamBuilder,
     traits::CTrait,
 };
+
+#[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
+use crate::traits::functions::ReqResponse;
 
 #[cfg(feature = "xai")]
 use x_ai::{
@@ -172,7 +178,8 @@ impl OptimizerGPT {
             debug!("Workspace directory '{}' already exists.", workspace);
         }
 
-        let agent = AgentGPT::new_borrowed(objective, position);
+        let mut agent = AgentGPT::new_borrowed(objective, position);
+        agent.id = agent.position().to_string().into();
 
         let client = ClientType::from_env();
 

@@ -5,7 +5,7 @@ use pinecone_sdk::models::{Kind, Value, Vector};
 use pinecone_sdk::pinecone::PineconeClientConfig;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use tracing::error;
+use tracing::{error, warn};
 
 async fn embed_text(client: &mut ClientType, content: Cow<'static, str>) -> Vec<f64> {
     match client {
@@ -154,7 +154,7 @@ pub async fn save_long_term_memory(
         }),
     };
     if let Err(_e) = index.upsert(&[vector], &namespace.into()).await {
-        tracing::warn!("Failed to upsert vector");
+        warn!("Upsert failed -> check `PINECONE_INDEX_URL` and trial limits.");
     }
     Ok(())
 }
