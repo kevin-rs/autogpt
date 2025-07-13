@@ -14,6 +14,12 @@ This repository contains a list of notebooks examples on how to use the sdk and 
    # Install a Rust toolchain (e.g. nightly):
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
  
+   # Create a python env
+   python3 -m venv .venv
+
+   # Source the python env
+   source .venv/bin/activate
+
    # Install Jupyter Notebook
    pip install notebook
  
@@ -25,13 +31,14 @@ This repository contains a list of notebooks examples on how to use the sdk and 
 1. Navigate to the cloned repository and build the project:
 
    ```sh
-   cd gems
+   cd autogpt
    cargo build --release --all-features
    ```
 
-1. Start Jupyter Notebook:
+1. Navigate to the examples directory and start Jupyter Notebook:
 
    ```sh
+   cd examples
    jupyter notebook
    ```
 
