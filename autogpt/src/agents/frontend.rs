@@ -247,7 +247,7 @@ impl FrontendGPT {
             nb_bugs: 0,
         }
     }
-    pub async fn generate(
+    pub async fn build_request(
         &mut self,
         prompt: &str,
         tasks: &mut Task,
@@ -285,7 +285,7 @@ impl FrontendGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
-            response_text = self.send_request(&request).await?;
+            response_text = self.generate(&request).await?;
         }
 
         self.agent.add_communication(Communication {
@@ -381,7 +381,7 @@ impl FrontendGPT {
                 .await;
         }
 
-        let output = self.generate(&prompt, tasks, OutputKind::Text).await?;
+        let output = self.build_request(&prompt, tasks, OutputKind::Text).await?;
 
         let code = match output {
             GenerationOutput::Text(code) => code,
@@ -495,7 +495,7 @@ impl FrontendGPT {
             IMPROVED_FRONTEND_CODE_PROMPT, existing_code, tasks.description
         );
 
-        let output = self.generate(&prompt, tasks, OutputKind::Text).await?;
+        let output = self.build_request(&prompt, tasks, OutputKind::Text).await?;
 
         let improved_code = match output {
             GenerationOutput::Text(code) => code,
@@ -612,7 +612,7 @@ impl FrontendGPT {
                 .await;
         }
 
-        let output = self.generate(&prompt, tasks, OutputKind::Text).await?;
+        let output = self.build_request(&prompt, tasks, OutputKind::Text).await?;
 
         let fixed_code = match output {
             GenerationOutput::Text(code) => code,

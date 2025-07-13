@@ -26,7 +26,7 @@ impl Executor for CustomAgent {
         max_tries: u64,
     ) -> Result<()> {
         let prompt = self.agent.objective().clone();
-        let response = self.send_request(prompt.as_ref()).await?;
+        let response = self.generate(prompt.as_ref()).await?;
 
         self.agent.add_communication(Communication {
             role: "assistant".into(),

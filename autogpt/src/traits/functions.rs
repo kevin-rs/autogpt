@@ -121,7 +121,7 @@
 //!             .join("\n")
 //!     }
 //!
-//!     async fn send_request(&mut self, _request: &str) -> Result<String> {
+//!     async fn generate(&mut self, _request: &str) -> Result<String> {
 //!         Ok("".to_string())
 //!     }
 //!
@@ -215,7 +215,7 @@ pub trait AsyncFunctions: Send + Sync {
 
     #[allow(async_fn_in_trait)]
     #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
-    async fn send_request(&mut self, request: &str) -> Result<String>;
+    async fn generate(&mut self, request: &str) -> Result<String>;
 
     #[allow(async_fn_in_trait)]
     #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]

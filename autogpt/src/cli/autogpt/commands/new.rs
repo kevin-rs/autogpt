@@ -59,7 +59,7 @@ pub fn handle_new(name: &str) -> Result<()> {
         deps.insert("tokio", Item::Value(Value::InlineTable(tokio_table)));
 
         let mut autogpt_table = InlineTable::new();
-        autogpt_table.insert("version", Value::from("0.1.11"));
+        autogpt_table.insert("version", Value::from(env!("CARGO_PKG_VERSION")));
         autogpt_table.insert("default-features", Value::from(false));
         autogpt_table.insert(
             "features",

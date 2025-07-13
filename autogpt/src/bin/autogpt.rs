@@ -22,6 +22,7 @@ use anyhow::Result;
 async fn main() -> Result<()> {
     #[cfg(feature = "cli")]
     {
+        use anyhow::anyhow;
         use autogpt::agents::architect::ArchitectGPT;
         use autogpt::agents::backend::BackendGPT;
         use autogpt::agents::designer::DesignerGPT;
@@ -32,7 +33,6 @@ async fn main() -> Result<()> {
         use autogpt::agents::optimizer::OptimizerGPT;
         use autogpt::cli::autogpt::commands::{build, new, run, test};
         use autogpt::cli::autogpt::{Cli, Commands};
-
         use autogpt::common::input::read_user_input;
         use autogpt::common::utils::Scope;
         use autogpt::common::utils::Task;
@@ -41,23 +41,33 @@ async fn main() -> Result<()> {
         use autogpt::common::utils::is_outdated;
         use autogpt::common::utils::prompt_for_update;
         use autogpt::common::utils::setup_logging;
+        use autogpt::prelude::CTrait;
+        use autogpt::prelude::ClientType;
         use autogpt::traits::functions::AsyncFunctions;
         use autogpt::traits::functions::Functions;
         use clap::Parser;
-        use std::env::var;
-
         use colored::*;
+        use futures_util::StreamExt;
+        use gems::messages::Content;
+        use gems::messages::Message as GemMessage;
+        use gems::models::Model;
+        use gems::stream::StreamBuilder;
+        use gems::utils::extract_text_from_partial_json;
         use iac_rs::message::Message;
         use iac_rs::prelude::*;
         use std::env;
+        use std::env::var;
         use std::io::Write;
         use std::sync::Arc;
+        use std::thread;
+        use termimad::MadSkin;
         use tokio::io::AsyncBufReadExt;
         use tokio::signal;
         use tokio::sync::Mutex;
         use tokio::time::Duration;
         use tokio::time::timeout;
         use tracing::{error, info, warn};
+
         setup_logging()?;
 
         let args: Cli = Cli::parse();
@@ -69,6 +79,13 @@ async fn main() -> Result<()> {
                 prompt_for_update();
             }
         }
+
+        pub fn type_with_cursor_effect(text: &str, delay: u64, skin: &MadSkin) {
+            skin.print_inline(text);
+            std::io::stdout().flush().unwrap();
+            thread::sleep(Duration::from_millis(delay));
+        }
+
         async fn run_client() -> Result<()> {
             let signer = Signer::new(KeyPair::generate());
 
@@ -178,8 +195,78 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
+        if let Some(prompt) = args.prompt {
+            let skin = MadSkin::default();
+            let mut client = ClientType::from_env();
+            match &mut client {
+                #[cfg(feature = "gem")]
+                ClientType::Gemini(gem_client) => {
+                    let parameters = StreamBuilder::default()
+                        .model(Model::Flash20)
+                        .input(GemMessage::User {
+                            content: Content::Text(prompt),
+                            name: None,
+                        })
+                        .build()?;
 
-        if args.command.is_none() {
+                    let response = gem_client.stream().generate(parameters).await?;
+                    let mut stream = response.bytes_stream();
+
+                    let delay = 1;
+                    let mut message: String = Default::default();
+                    while let Some(mut chunk) = stream.next().await {
+                        if let Ok(parsed_json) = std::str::from_utf8(chunk.as_mut().unwrap()) {
+                            if let Some(text_value) = extract_text_from_partial_json(parsed_json) {
+                                let lines: Vec<&str> = text_value
+                                    .split("\\n")
+                                    .flat_map(|s| s.split('\n'))
+                                    .collect();
+                                for line in lines {
+                                    message.push_str(&line.replace('\\', ""));
+                                    if !line.is_empty() {
+                                        type_with_cursor_effect(
+                                            &line.replace('\\', ""),
+                                            delay,
+                                            &skin,
+                                        );
+                                    } else {
+                                        println!("\n");
+                                    }
+                                }
+                            }
+                        } else {
+                            error!("Failed to parse chunk: {:?}", chunk.as_ref().unwrap());
+                        }
+                    }
+                }
+
+                #[cfg(feature = "oai")]
+                ClientType::OpenAI(_oai_client) => {
+                    // TODO: Implement streaming for OpenAI
+                    todo!("Implement me plz.");
+                }
+
+                #[cfg(feature = "cld")]
+                ClientType::Anthropic(_client) => {
+                    // TODO: Implement streaming for Anthropic
+                    todo!("Implement me plz.");
+                }
+
+                #[cfg(feature = "xai")]
+                ClientType::Xai(_xai_client) => {
+                    // TODO: Implement streaming for Xai
+                    todo!("Implement me plz.");
+                }
+
+                #[allow(unreachable_patterns)]
+                _ => {
+                    return Err(anyhow!(
+                        "No valid AI client configured. Enable `gem`, `oai`, `cld`, or `xai` feature."
+                    ));
+                }
+            }
+            println!();
+        } else if args.command.is_none() {
             // If no command specified, default to networking mode (connects to an orchestrator).
             info!(
                 "{}",

@@ -544,7 +544,7 @@ impl AsyncFunctions for MailerGPT {
     }
 
     #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
-    async fn send_request(&mut self, _request: &str) -> Result<String> {
+    async fn generate(&mut self, _request: &str) -> Result<String> {
         Ok("".to_string())
     }
 

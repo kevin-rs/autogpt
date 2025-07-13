@@ -229,7 +229,7 @@ impl ArchitectGPT {
         }
     }
 
-    pub async fn generate(
+    pub async fn build_request(
         &mut self,
         prompt: &str,
         tasks: &mut Task,
@@ -269,7 +269,7 @@ impl ArchitectGPT {
 
         #[cfg(any(feature = "oai", feature = "gem", feature = "cld", feature = "xai"))]
         {
-            response_text = self.send_request(&request).await?;
+            response_text = self.generate(&request).await?;
         }
 
         self.agent.add_communication(Communication {
@@ -331,7 +331,7 @@ impl ArchitectGPT {
     /// - Updates the agent status to `Completed`.
     pub async fn get_scope(&mut self, tasks: &mut Task) -> Result<Scope> {
         match self
-            .generate(ARCHITECT_SCOPE_PROMPT, tasks, OutputKind::Scope)
+            .build_request(ARCHITECT_SCOPE_PROMPT, tasks, OutputKind::Scope)
             .await?
         {
             GenerationOutput::Scope(scope) => {
@@ -369,7 +369,7 @@ impl ArchitectGPT {
     /// - Updates the agent status to `InUnitTesting`.
     pub async fn get_urls(&mut self, tasks: &mut Task) -> Result<()> {
         match self
-            .generate(ARCHITECT_ENDPOINTS_PROMPT, tasks, OutputKind::UrlList)
+            .build_request(ARCHITECT_ENDPOINTS_PROMPT, tasks, OutputKind::UrlList)
             .await?
         {
             GenerationOutput::UrlList(urls) => {
@@ -406,7 +406,7 @@ impl ArchitectGPT {
     /// - Returns the cleaned-up diagram content.
     pub async fn generate_diagram(&mut self, tasks: &mut Task) -> Result<String> {
         match self
-            .generate(ARCHITECT_DIAGRAM_PROMPT, tasks, OutputKind::Text)
+            .build_request(ARCHITECT_DIAGRAM_PROMPT, tasks, OutputKind::Text)
             .await?
         {
             GenerationOutput::Text(diagram) => Ok(diagram),
