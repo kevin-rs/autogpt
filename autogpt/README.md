@@ -27,10 +27,10 @@
 | :------: | :--------: | :--------: | :--------: |
 | [![Crates.io Downloads](https://img.shields.io/crates/d/autogpt)](https://crates.io/crates/autogpt) | [![Crates.io Downloads](https://img.shields.io/crates/d/autogpt)](https://crates.io/crates/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/autogpt.svg)](https://hub.docker.com/r/kevinrsdev/autogpt) | [![Docker](https://img.shields.io/docker/pulls/kevinrsdev/orchgpt.svg)](https://hub.docker.com/r/kevinrsdev/orchgpt) |
 | ![linux-demo](https://raw.githubusercontent.com/kevin-rs/autogpt/refs/heads/main/assets/linux.png) | ![windows-demo](https://raw.githubusercontent.com/kevin-rs/autogpt/refs/heads/main/assets/windows.png) | - | - |
-| Method 1: [Download Executable File](https://github.com/kevin-rs/autogpt/releases/download/v0.1.12/autogpt) | [Download `.exe` File](https://github.com/kevin-rs/autogpt/releases/download/v0.1.12/autogpt.exe) | - | - |
-| Method 2: `cargo install autogpt --all-features` | `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.12` | `docker pull kevinrsdev/orchgpt:0.1.12` |
+| Method 1: [Download Executable File](https://github.com/kevin-rs/autogpt/releases/download/v0.1.13/autogpt) | [Download `.exe` File](https://github.com/kevin-rs/autogpt/releases/download/v0.1.13/autogpt.exe) | - | - |
+| Method 2: `cargo install autogpt --all-features` | `cargo install autogpt --all-features` |  `docker pull kevinrsdev/autogpt:0.1.13` | `docker pull kevinrsdev/orchgpt:0.1.13` |
 | [**Set Environment Variables**](https://github.com/kevin-rs/autogpt/blob/main/INSTALLATION.md#environment-variables-setup) | [**Set Environment Variables**](https://github.com/kevin-rs/autogpt/blob/main/INSTALLATION.md#environment-variables-setup) | [**Set Environment Variables**](https://github.com/kevin-rs/autogpt/blob/main/INSTALLATION.md#-using-docker) | [**Set Environment Variables**](https://github.com/kevin-rs/autogpt/blob/main/INSTALLATION.md#-using-docker) |
-| `autogpt -h` <br> `orchgpt -h` | `autogpt.exe -h` |  `docker run kevinrsdev/autogpt:0.1.12 -h` | `docker run kevinrsdev/orchgpt:0.1.12 -h` |
+| `autogpt -h` <br> `orchgpt -h` | `autogpt.exe -h` |  `docker run kevinrsdev/autogpt:0.1.13 -h` | `docker run kevinrsdev/orchgpt:0.1.13 -h` |
 
 <video src="https://github.com/user-attachments/assets/ecd82549-a48f-49c2-b751-23f74820bf3d"></video>
 
