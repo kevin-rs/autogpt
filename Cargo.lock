@@ -1464,9 +1464,9 @@ dependencies = [
 
 [[package]]
 name = "gems"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e798f2146f21ee0ed37afaaac4283b5fc58f892f6adb04044fd88f37c004728b"
+checksum = "cea496c9c64bd6deecd692cadec42041f57e020665d92b9b53b1f2d983d82da2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

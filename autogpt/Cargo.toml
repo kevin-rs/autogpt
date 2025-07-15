@@ -43,7 +43,7 @@ uuid = { version = "1.16.0", features = ["v4"] }
 tokio = { version = "1.37.0", default-features = false, features = ["full"] }
 reqwest = { version = "0.12.22", features = ["json"] }
 serde = { version = "1.0.197", features = ["derive"] }
-gems = { version = "0.1.3", optional = true }
+gems = { version = "0.1.4", optional = true }
 getimg = { version = "0.0.1", optional = true }
 nylas = { version = "0.0.8", optional = true }
 clap = { version = "4.5.4", features = ["derive"], optional = true }
