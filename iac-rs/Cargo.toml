@@ -18,7 +18,7 @@ tracing = { workspace = true }
 ed25519-compact = "2.1.1"
 prost =  { version = "0.14.1", default-features = false }
 quinn = "0.11.8"
-rcgen = "0.13.2"
+rcgen = "0.14.3"
 rustls = "0.23.28"
 zstd = "0.13.3"
 tokio = { version = "1.45.1", default-features = false }
