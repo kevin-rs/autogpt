@@ -40,7 +40,7 @@ ser = ["serde"]
 criterion = { version = "0.6", features = ["async_tokio"] }
 plotters = { version = "0.3.7", features = ["fontconfig-dlopen"] }
 tokio = { version = "1.45.1", features = ["full"] }
-tracing-subscriber = "0.3.19"
+tracing-subscriber = "0.3.20"
 
 [badges]
 maintenance = { status = "actively-developed" }
