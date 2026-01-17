@@ -36,6 +36,13 @@
 
 </div>
 
+> [!WARNING]  
+> Due to the uninspiring, generic, and uncreative nature of AI, I have decided to archive this project. It was originally a submission for [a hackathon](https://devpost.com/software/autogpt), and I continued working on it to practice and improve my systems engineering skills. I learned allot about Rust while building this project. However, I no longer enjoy building AI systems.
+>
+> I am currently focused on game and web development, as well as Alive Internet Theory. This was a fun project through which I learned a great deal and invented new ideas along the way. Many thanks to the Lord Linus for the amazing contributions <3.
+>
+> Bye 👋!
+
 AutoGPT is a pure rust framework that simplifies AI agent creation and management for various tasks. Its remarkable speed and versatility are complemented by a mesh of built-in interconnected GPTs, ensuring exceptional performance and adaptability.
 
 ## 🧠 Framework Overview
