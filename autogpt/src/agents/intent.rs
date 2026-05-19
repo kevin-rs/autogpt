@@ -1,23 +1,19 @@
-use {
-    crate::prompts::generic::INTENT_DETECTION_PROMPT,
-    anyhow::Result,
-    serde::{Deserialize, Serialize},
-};
+// Copyright 2026 Mahmoud Harmouch.
+//
+// Licensed under the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
 
-/// The classified intent of a single user message.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "intent", rename_all = "snake_case")]
-pub enum AgentIntent {
-    DirectAnswer,
-    ToolCall {
-        tool: String,
-        #[serde(default)]
-        args: serde_json::Value,
-    },
-    TaskPlan,
-}
+use crate::common::utils::{AgentIntent, strip_code_blocks};
+use crate::prompts::generic::INTENT_DETECTION_PROMPT;
+use anyhow::Result;
+use serde::Deserialize;
 
-/// Parsed JSON shape from the LLM for intent detection.
+/// Parsed JSON response from the LLM for intent detection.
+///
+/// The LLM is prompted to output a JSON object with an `intent` discriminant plus
+/// optional `tool` and `args` fields for tool-call intents.
 #[derive(Debug, Deserialize)]
 struct IntentResponse {
     intent: String,
@@ -27,11 +23,16 @@ struct IntentResponse {
     args: Option<serde_json::Value>,
 }
 
-/// Type alias for the LLM generator function.
+/// Type alias for the asynchronous LLM generator closure passed to `classify_intent`.
 pub type GenerateFn =
     dyn FnMut(&str) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send>>;
 
 /// Classifies the user's message into one of three execution modes.
+///
+/// Builds the `INTENT_DETECTION_PROMPT` with the provided `workspace_snapshot` and
+/// `mcp_tools` context, calls the `generate_fn` LLM closure, and parses the JSON
+/// response into an `AgentIntent`. Any parsing failure falls back to `TaskPlan` so
+/// the pipeline never blocks on a malformed response.
 pub async fn classify_intent(
     prompt: &str,
     workspace_snapshot: &str,
@@ -48,7 +49,8 @@ pub async fn classify_intent(
         Err(_) => return AgentIntent::TaskPlan,
     };
 
-    let clean = crate::common::utils::strip_code_blocks(&raw);
+    let clean = strip_code_blocks(&raw);
+
     let parsed: IntentResponse = match serde_json::from_str(clean.trim()) {
         Ok(p) => p,
         Err(_) => return AgentIntent::TaskPlan,
@@ -63,3 +65,10 @@ pub async fn classify_intent(
         _ => AgentIntent::TaskPlan,
     }
 }
+
+// Copyright 2026 Mahmoud Harmouch.
+//
+// Licensed under the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.

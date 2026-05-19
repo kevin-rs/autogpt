@@ -28,6 +28,36 @@ use tokio::sync::mpsc::UnboundedSender;
 #[cfg(feature = "cli")]
 use tracing::{error, info, warn};
 
+/// Returns the true display column width of a string in a terminal.
+///
+/// Uses `unicode-width` to correctly measure wide characters (CJK, emoji)
+/// as 2 columns and combining characters as 0 columns, matching the actual
+/// terminal cursor advance for cursor positioning.
+#[cfg(feature = "cli")]
+pub fn display_width(s: &str) -> usize {
+    use unicode_width::UnicodeWidthStr;
+    UnicodeWidthStr::width(s)
+}
+
+/// Returns the emoji string on Unix-like platforms and the ASCII fallback on Windows.
+///
+/// Windows terminals (Console Host, older ConPTY builds) may display multi-codepoint
+/// emoji as empty boxes. This helper selects the safe fallback automatically so UI
+/// chrome (status badges, section markers) renders correctly on all platforms.
+#[cfg(feature = "cli")]
+pub fn emoji_text<'a>(emoji: &'a str, fallback: &'a str) -> &'a str {
+    #[cfg(windows)]
+    {
+        let _ = emoji;
+        fallback
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = fallback;
+        emoji
+    }
+}
+
 /// Terminal width used for box drawings.
 #[cfg(feature = "cli")]
 const BOX_WIDTH: usize = 80;
@@ -106,35 +136,6 @@ pub fn print_greeting() {
         "ESC".yellow().bold()
     );
     info!("");
-}
-
-/// Renders a yellow warning box to the terminal.
-///
-/// Used for home-directory warnings, update notifications, and other advisory messages.
-/// All output is routed through `tracing::warn!`.
-#[cfg(feature = "cli")]
-pub fn render_warning_box(message: &str) {
-    let inner_width = BOX_WIDTH - 2;
-    let top = format!("╭{}╮", "─".repeat(inner_width));
-    let bot = format!("╰{}╯", "─".repeat(inner_width));
-
-    warn!("{}", top.bright_yellow());
-    for line in message.lines() {
-        let padded = format!("│ {:<width$} │", line, width = inner_width - 2);
-        warn!("{}", padded.bright_yellow());
-    }
-    warn!("{}", bot.bright_yellow());
-    warn!("");
-}
-
-/// Renders a version-update banner in yellow.
-#[cfg(feature = "cli")]
-pub fn render_update_banner(current: &str, latest: &str) {
-    let msg = format!(
-        "AutoGPT update available! {} → {}\nRun `cargo install autogpt --all-features` to update.",
-        current, latest
-    );
-    render_warning_box(&msg);
 }
 
 /// Renders the help table for all available slash commands to the TUI log.

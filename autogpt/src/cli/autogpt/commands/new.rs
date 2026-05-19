@@ -95,7 +95,9 @@ prompt: |
         let features = doc["features"].or_insert(Item::Table(Table::new()));
         let f_table = features.as_table_mut().unwrap();
 
-        for feat in ["gem", "mcp", "net", "mem", "oai", "cld", "xai", "co", "hf"] {
+        for feat in [
+            "gem", "mcp", "net", "mem", "oai", "cld", "xai", "co", "mta", "hf",
+        ] {
             let mut arr = Array::default();
             if feat == feat_flag {
                 arr.push(format!("autogpt/{}", feat));

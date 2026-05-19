@@ -121,7 +121,7 @@ async fn main() -> Result<()> {
             cli::settings::SettingsManager,
             common::utils::{fetch_latest_version, is_outdated, prompt_for_update, setup_logging},
             prelude::ClientType,
-            tui::{app::TuiApp, state::TuiEvent, utils::render_update_banner},
+            tui::{app::TuiApp, state::TuiEvent},
         };
 
         #[cfg(feature = "gpt")]
@@ -191,11 +191,12 @@ async fn main() -> Result<()> {
 
         let tui_mode = args.prompt.is_none() && args.command.is_none() && !args.net;
         setup_logging(tui_mode)?;
+        let mut update_available = None;
         if let Some(latest_version) = fetch_latest_version().await
             && is_outdated(current_version, &latest_version)
         {
             if tui_mode {
-                render_update_banner(current_version, &latest_version);
+                update_available = Some((current_version.to_string(), latest_version));
             } else {
                 prompt_for_update();
             }
@@ -660,7 +661,7 @@ async fn main() -> Result<()> {
                 }
             });
 
-            match TuiApp::new(event_rx, &settings, abort_token) {
+            match TuiApp::new(event_rx, &settings, abort_token, update_available) {
                 Ok(app) => {
                     if let Err(e) = app.run(input_tx) {
                         eprintln!("TUI error: {e}");

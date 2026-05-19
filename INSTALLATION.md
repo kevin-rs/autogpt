@@ -18,6 +18,14 @@ To install with specific features (e.g., MoP, Gemini, and MCP):
 cargo install autogpt --features "cli,gem,mop,mcp"
 ```
 
+To install with Agent Metacognition enabled:
+
+```sh
+cargo install autogpt --features "cli,gem,mta"
+```
+
+The `mta` (Meta-Thinking Agent) feature adds a self-evaluation phase to `GenericAgent`. After every task reflection, the agent records the outcome and, every 3 tasks or after 2+ consecutive failures, queries the LLM with a structured metacognition prompt to derive strategy adjustments for remaining tasks. The TUI status bar shows **MetaCognizing** during this phase.
+
 ### 🐳 Using Docker
 
 To install and run the AutoGPT CLI via Docker, use the following command:

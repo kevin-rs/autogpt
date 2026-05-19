@@ -342,3 +342,35 @@ pub const INTENT_DETECTION_PROMPT: &str = r#"<role>You are AutoGPT's intent clas
 <user_message>{USER_PROMPT}</user_message>
 <workspace_snapshot>{WORKSPACE}</workspace_snapshot>
 </context>"#;
+
+/// Prompt for agent metacognition: evaluating recent task patterns and adapting strategy.
+///
+/// Used by `MetacognitionEngine` when `feature = "mta"` is active. The LLM evaluates
+/// the recent task history and recommends strategy adjustments the agent should apply
+/// to subsequent tasks. Output is a structured JSON object.
+#[cfg(feature = "mta")]
+pub(crate) const METACOGNITION_PROMPT: &str = r#"<role>You are AutoGPT's metacognitive engine. Evaluate the recent task execution history and determine whether the agent's strategy should be adjusted for the remaining tasks.</role>
+
+<evaluation_criteria>
+- PATTERN DETECTION: Identify repeated failure types (wrong file paths, missing deps, incorrect command flags).
+- ROOT CAUSE: Determine the likely root cause of failures without guessing.
+- STRATEGY ADJUSTMENT: Recommend targeted changes to improve subsequent task execution.
+- CALIBRATION: If execution is flowing well, confirm the strategy and suggest optimizations.
+</evaluation_criteria>
+
+<output_format>
+Output ONLY this JSON object (no markdown, no preamble):
+{"assessment": "<2-3 sentence pattern analysis>", "adjustment": "<1-2 sentence strategy change to apply>", "confidence": "high"|"medium"|"low", "priority": "immediate"|"next_task"|"monitor"}
+
+Rules:
+- If no adjustment is needed: {"assessment": "...", "adjustment": "none", "confidence": "high", "priority": "monitor"}
+- Keep assessment under 60 words.
+- Keep adjustment under 30 words.
+</output_format>
+
+<context>
+<original_request>{ORIGINAL_REQUEST}</original_request>
+<task_history>{TASK_HISTORY}</task_history>
+<consecutive_failures>{CONSECUTIVE_FAILURES}</consecutive_failures>
+<tasks_remaining>{TASKS_REMAINING}</tasks_remaining>
+</context>"#;

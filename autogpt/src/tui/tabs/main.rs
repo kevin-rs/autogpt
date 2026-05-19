@@ -17,6 +17,7 @@ use {
         text::{Line, Span},
         widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
     },
+    unicode_width::UnicodeWidthStr,
 };
 
 /// Renders the top navigation tab bar.
@@ -69,6 +70,7 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &TuiState, palett
         "Executing" => palette.accent,
         "Reflecting" => palette.chart_2,
         "Synthesizing" => palette.chart_1,
+        "MetaCognizing" => palette.chart_2,
         _ => palette.fg,
     };
 
@@ -159,19 +161,68 @@ pub fn render_logo(palette: &ThemePalette) -> Vec<Line<'static>> {
 
 /// Renders the main dashboard (log + tasks + input).
 pub fn render_main_tab(frame: &mut Frame, area: Rect, state: &TuiState, palette: &ThemePalette) {
+    let mut constraints = Vec::new();
+    let has_update = state.update_available.is_some();
+    let has_home_warning = state.home_dir_warning;
+
+    if has_update {
+        constraints.push(Constraint::Length(4));
+    }
+    if has_home_warning {
+        constraints.push(Constraint::Length(5));
+    }
+    constraints.push(Constraint::Length(8));
+    constraints.push(Constraint::Fill(1));
+    constraints.push(Constraint::Length(3));
+
     let vertical = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(8),
-            Constraint::Fill(1),
-            Constraint::Length(3),
-        ])
+        .constraints(constraints)
         .split(area);
+
+    let mut current_idx = 0;
+
+    if has_update {
+        if let Some((current, latest)) = state.update_available.as_ref() {
+            let msg = format!(
+                "AutoGPT update available! {} → {}\nRun `cargo install autogpt --all-features` to update.",
+                current, latest
+            );
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .border_set(symbols::border::ROUNDED)
+                .border_style(Style::default().fg(palette.warn))
+                .style(Style::default().bg(palette.bg));
+
+            let p = Paragraph::new(msg)
+                .style(Style::default().fg(palette.warn))
+                .block(block)
+                .alignment(Alignment::Center);
+            frame.render_widget(p, vertical[current_idx]);
+        }
+        current_idx += 1;
+    }
+
+    if has_home_warning {
+        let msg = "You are running AutoGPT in your home directory.\nIt is recommended to run AutoGPT from a project-specific directory\nso that generated files are scoped correctly.";
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_set(symbols::border::ROUNDED)
+            .border_style(Style::default().fg(palette.err))
+            .style(Style::default().bg(palette.bg));
+
+        let p = Paragraph::new(msg)
+            .style(Style::default().fg(palette.err))
+            .block(block)
+            .alignment(Alignment::Center);
+        frame.render_widget(p, vertical[current_idx]);
+        current_idx += 1;
+    }
 
     let top_split = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(65), Constraint::Fill(1)])
-        .split(vertical[0]);
+        .split(vertical[current_idx]);
 
     let logo_block = Block::default()
         .borders(Borders::NONE)
@@ -190,12 +241,12 @@ pub fn render_main_tab(frame: &mut Frame, area: Rect, state: &TuiState, palette:
     let mid_split = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(vertical[1]);
+        .split(vertical[current_idx + 1]);
 
     render_log_pane(frame, mid_split[0], state, palette);
     render_task_pane(frame, mid_split[1], state, palette);
 
-    let input_area = vertical[2];
+    let input_area = vertical[current_idx + 2];
     render_input_bar(frame, input_area, state, palette);
 
     if state.slash_autocomplete_active && !state.slash_matches.is_empty() {
@@ -296,27 +347,43 @@ fn render_stats_pane(frame: &mut Frame, area: Rect, state: &TuiState, palette: &
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 
-/// Choose the appropriate ratatui `Style` for a single activity-log line
-/// based on its prefix/content (error, success, command prefix, section heading, etc.).
-fn log_line_style(s: &str, palette: &ThemePalette) -> Style {
-    if s.starts_with("❯ ") {
-        Style::default()
-            .fg(palette.accent)
-            .add_modifier(Modifier::BOLD)
-    } else if s.to_lowercase().contains("error") || s.starts_with("✗") || s.starts_with("⚠") {
-        Style::default().fg(palette.err)
-    } else if s.to_lowercase().contains("success") || s.starts_with("✓") || s.starts_with("✅") {
-        Style::default().fg(palette.ok)
-    } else if s.starts_with("◆") || s.starts_with("###") {
-        Style::default()
-            .fg(palette.accent)
-            .add_modifier(Modifier::BOLD)
-    } else if s.starts_with("| ") || s.starts_with("+-") {
-        Style::default().fg(palette.muted)
+/// Choose the appropriate ratatui `Style` and rendering mode for a single
+/// activity-log line based on its structured markdown token prefix.
+fn log_line_style(s: &str, palette: &ThemePalette) -> (Style, u8) {
+    if s.starts_with("❯ ") || s.starts_with("◆ ") {
+        (
+            Style::default()
+                .fg(palette.accent)
+                .add_modifier(Modifier::BOLD),
+            0,
+        )
+    } else if s.starts_with("  [code]") {
+        (Style::default().fg(palette.chart_2), 1)
+    } else if s.starts_with("  [table]") {
+        (Style::default().fg(palette.fg), 2)
+    } else if s.starts_with("  [quote]") {
+        (
+            Style::default()
+                .fg(palette.muted)
+                .add_modifier(Modifier::ITALIC),
+            3,
+        )
+    } else if s.to_lowercase().contains("error")
+        || s.starts_with('\u{2717}')
+        || s.starts_with('\u{26a0}')
+    {
+        (Style::default().fg(palette.err), 0)
+    } else if s.to_lowercase().contains("success")
+        || s.starts_with('\u{2713}')
+        || s.starts_with("\u{2705}")
+    {
+        (Style::default().fg(palette.ok), 0)
+    } else if s.starts_with('\u{2500}') {
+        (Style::default().fg(palette.border), 0)
     } else if s.starts_with("- ") || s.starts_with("* ") {
-        Style::default().fg(palette.chart_1)
+        (Style::default().fg(palette.chart_1), 0)
     } else {
-        Style::default().fg(palette.fg)
+        (Style::default().fg(palette.fg), 0)
     }
 }
 
@@ -359,9 +426,40 @@ fn render_log_pane(frame: &mut Frame, area: Rect, state: &TuiState, palette: &Th
         .skip(visible_start)
         .take(height)
         .map(|s| {
-            let visible: String = s.chars().skip(h_offset).take(width).collect();
-            let style = log_line_style(s, palette);
-            Line::from(Span::styled(visible, style))
+            let (style, render_mode) = log_line_style(s, palette);
+            match render_mode {
+                1 => {
+                    let inner = s.trim_start_matches("  [code]");
+                    let visible: String = inner.chars().skip(h_offset).take(width).collect();
+                    Line::from(Span::styled(format!("  {visible}"), style))
+                }
+                2 => {
+                    let row_text = s.trim_start_matches("  [table]");
+                    let visible: String = row_text.chars().skip(h_offset).take(width).collect();
+                    let trimmed = visible.trim().trim_matches('|');
+                    let cells: Vec<&str> = trimmed.split('|').collect();
+                    let mut spans = Vec::new();
+                    spans.push(Span::styled("|", Style::default().fg(palette.border)));
+                    for (i, cell) in cells.iter().enumerate() {
+                        spans.push(Span::styled(cell.to_string(), style));
+                        spans.push(Span::styled("|", Style::default().fg(palette.border)));
+                        let _ = i;
+                    }
+                    Line::from(spans)
+                }
+                3 => {
+                    let inner = s.trim_start_matches("  [quote]");
+                    let visible: String = inner.chars().skip(h_offset).take(width).collect();
+                    Line::from(vec![
+                        Span::styled("  ▌ ", Style::default().fg(palette.border)),
+                        Span::styled(visible, style),
+                    ])
+                }
+                _ => {
+                    let visible: String = s.chars().skip(h_offset).take(width).collect();
+                    Line::from(Span::styled(visible, style))
+                }
+            }
         })
         .collect();
 
@@ -506,7 +604,9 @@ fn render_input_bar(frame: &mut Frame, area: Rect, state: &TuiState, palette: &T
 
     frame.render_widget(Paragraph::new(line), inner);
 
-    let cursor_x = inner.x + 2 + (cursor_pos - start).min(display_width - 3) as u16;
+    let input_prefix = "\u{276F} ";
+    let prefix_width = UnicodeWidthStr::width(input_prefix) as u16;
+    let cursor_x = inner.x + prefix_width + (cursor_pos - start).min(display_width - 3) as u16;
     frame.set_cursor_position((cursor_x, inner.y));
 }
 

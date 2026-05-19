@@ -1410,6 +1410,141 @@ pub fn prompt_for_update() {
     }
 }
 
+/// The classified intent of a single user message, used to route execution
+/// between direct LLM responses, tool invocations, and full task planning.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "intent", rename_all = "snake_case")]
+pub enum AgentIntent {
+    /// A conversational or factual question the LLM can answer directly.
+    DirectAnswer,
+    /// Instructs the agent to invoke a named tool with the given JSON arguments.
+    ToolCall {
+        tool: String,
+        #[serde(default)]
+        args: serde_json::Value,
+    },
+    /// The prompt requires decomposing into sub-tasks and executing a full pipeline.
+    TaskPlan,
+}
+
+/// The operational phase of the generic agent within a session lifecycle.
+///
+/// Transitions linearly from `Idle` through synthesis, planning, optional user
+/// approval, per-task execution, per-task reflection, and finally `Complete`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PhaseState {
+    Idle,
+    Synthesizing,
+    Planning,
+    AwaitingApproval,
+    Executing(usize),
+    Reflecting,
+    #[cfg(feature = "mta")]
+    MetaCognizing,
+    Complete,
+}
+
+/// A single structured action directive emitted by the LLM during task execution.
+///
+/// The LLM responds to execution prompts with a JSON array of `ActionRequest` values.
+/// Each variant is one atomic filesystem, shell, git, web, or MCP operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ActionRequest {
+    /// Create a directory (and any missing parent directories) at `path`.
+    CreateDir { path: String },
+    /// Create a new file at `path` with the given `content`.
+    CreateFile { path: String, content: String },
+    /// Overwrite an existing file at `path` with `content`.
+    WriteFile { path: String, content: String },
+    /// Read and return the full utf-8 content of the file at `path`.
+    ReadFile { path: String },
+    /// Replace the first occurrence of `old_text` with `new_text` inside `path`.
+    PatchFile {
+        path: String,
+        old_text: String,
+        new_text: String,
+    },
+    /// Append `content` to the end of the file at `path`.
+    AppendFile { path: String, content: String },
+    /// List all direct children of the directory at `path`.
+    ListDir { path: String },
+    /// Search for lines in `path` that contain the literal string `pattern`.
+    FindInFile { path: String, pattern: String },
+    /// Execute a shell command with `args`; optional `cwd` is relative to workspace root.
+    RunCommand {
+        cmd: String,
+        args: Vec<String>,
+        cwd: Option<String>,
+    },
+    /// Stage all files and create a git commit with `message`.
+    GitCommit { message: String },
+    /// Glob-match files under the workspace root and return matching relative paths.
+    GlobFiles { pattern: String },
+    /// Apply a list of `(old_text, new_text)` patches to `path` atomically.
+    MultiPatch {
+        path: String,
+        patches: Vec<(String, String)>,
+    },
+    /// Perform a DuckDuckGo web search for `query` and return formatted results.
+    WebSearch { query: String },
+    /// Invoke an MCP tool on the named `server` with the given JSON `args`.
+    McpCall {
+        server: String,
+        tool: String,
+        #[serde(default)]
+        args: serde_json::Value,
+    },
+}
+
+/// The outcome of executing a single `ActionRequest`.
+///
+/// Aggregates the action type label, an optional affected path, captured
+/// stdout and stderr strings, and a boolean success flag for reflection logic.
+#[derive(Debug, Clone)]
+pub struct ActionResult {
+    pub action_type: String,
+    pub path: Option<String>,
+    pub stdout: String,
+    pub stderr: String,
+    pub success: bool,
+}
+
+/// Structured inner-monologue produced by the LLM before executing each sub-task.
+///
+/// Parsed from a JSON response to the `REASONING_PROMPT`. When parsing fails
+/// the agent substitutes a plain-text fallback so the pipeline never blocks.
+#[derive(Debug, Deserialize, Default)]
+pub struct ReasoningResult {
+    pub thought: String,
+    pub approach: String,
+    #[serde(default)]
+    pub risks: Vec<String>,
+}
+
+/// High-level verdict returned by the LLM after verifying a completed sub-task.
+///
+/// Drives the retry loop: `Success` breaks the loop, `Retry` runs corrective
+/// actions up to the configured maximum, and `Skip` advances the pipeline.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReflectionOutcome {
+    Success,
+    Retry,
+    Skip,
+}
+
+/// Full reflection response from the LLM including verdict and corrective actions.
+///
+/// When `outcome` is `Retry`, the agent executes `corrective_actions` before
+/// re-evaluating. The `reasoning` field is surfaced in verbose logs.
+#[derive(Debug, Deserialize)]
+pub struct ReflectionResult {
+    pub outcome: ReflectionOutcome,
+    pub reasoning: String,
+    pub corrective_actions: Vec<ActionRequest>,
+}
+
 // Copyright 2026 Mahmoud Harmouch.
 //
 // Licensed under the MIT license

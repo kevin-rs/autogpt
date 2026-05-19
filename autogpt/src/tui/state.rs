@@ -48,10 +48,14 @@ pub enum TuiEvent {
         description: String,
         status: TaskStatus,
     },
+    /// Begin a new agent session, clearing all previous tasks from the panel.
+    NewSession,
     /// Update session performance metrics.
     StatsUpdate(SessionStats),
     /// Increment request count.
     IncRequest,
+    /// Increment response count.
+    IncResponse,
     /// Increment token usage.
     IncTokens { sent: u64, recv: u64 },
     /// Set the agent's current activity label.
@@ -343,6 +347,8 @@ pub struct TuiState {
     pub settings_auto_browse: bool,
     /// Verbose logs setting.
     pub settings_verbose: bool,
+    /// Metacognition engine toggle.
+    pub settings_metacognition: bool,
     /// Input for provider setting.
     pub settings_provider_input: tui_input::Input,
     /// Input for model setting.
@@ -393,17 +399,27 @@ pub struct TuiState {
     pub last_tick_time: Instant,
     /// Event receiver channel.
     pub receiver: UnboundedReceiver<TuiEvent>,
+    /// Optional update info: `(current_version, latest_version)`
+    pub update_available: Option<(String, String)>,
+    /// Whether the user is running AutoGPT in their home directory.
+    pub home_dir_warning: bool,
 }
 
 #[cfg(feature = "cli")]
 impl TuiState {
     /// Construct state from a receiver channel and the current app settings.
-    pub fn new(receiver: UnboundedReceiver<TuiEvent>, settings: &GlobalSettings) -> Self {
+    pub fn new(
+        receiver: UnboundedReceiver<TuiEvent>,
+        settings: &GlobalSettings,
+        update_available: Option<(String, String)>,
+    ) -> Self {
         let theme_config = ThemeConfig::load();
         let selected_theme_idx = crate::tui::theme::ALL_THEME_VARIANTS
             .iter()
             .position(|v| *v == theme_config.variant)
             .unwrap_or(0);
+
+        let home_dir_warning = matches!((std::env::current_dir(), dirs::home_dir()), (Ok(cwd), Some(home)) if cwd == home);
 
         Self {
             active_tab: AppTab::Main,
@@ -425,6 +441,7 @@ impl TuiState {
             settings_model: settings.model.clone().unwrap_or_default(),
             settings_auto_browse: settings.auto_browse,
             settings_verbose: settings.verbose,
+            settings_metacognition: settings.metacognition,
             settings_provider_input: tui_input::Input::default()
                 .with_value(settings.provider.clone()),
             settings_model_input: tui_input::Input::default()
@@ -454,6 +471,8 @@ impl TuiState {
             tick_count: 0,
             last_tick_time: Instant::now(),
             receiver,
+            update_available,
+            home_dir_warning,
         }
     }
 
@@ -478,37 +497,141 @@ impl TuiState {
         out
     }
 
-    /// Append a line to the activity log, stripping ANSI and light markdown.
-    /// Evicts the oldest line when the buffer exceeds 1 000 entries.
-    pub fn push_log(&mut self, line: String) {
-        let clean = Self::strip_ansi(&line);
-        let markdown_clean = clean
-            .replace("**", "")
-            .replace("__", "")
-            .replace("### ", "◆ ")
-            .replace("## ", "◆ ")
-            .replace("# ", "◆ ");
+    /// Strips inline bold/italic markers from a single string, preserving the text content.
+    fn strip_inline_markers(s: &str) -> String {
+        let mut result = String::with_capacity(s.len());
+        let chars: Vec<char> = s.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+        while i < len {
+            if i + 1 < len && chars[i] == '*' && chars[i + 1] == '*' {
+                i += 2;
+                while i < len {
+                    if i + 1 < len && chars[i] == '*' && chars[i + 1] == '*' {
+                        i += 2;
+                        break;
+                    }
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            } else if chars[i] == '*' && i + 1 < len && chars[i + 1] != ' ' && i > 0 {
+                i += 1;
+                while i < len {
+                    if chars[i] == '*' {
+                        i += 1;
+                        break;
+                    }
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            } else if i + 1 < len && chars[i] == '_' && chars[i + 1] == '_' {
+                i += 2;
+                while i < len {
+                    if i + 1 < len && chars[i] == '_' && chars[i + 1] == '_' {
+                        i += 2;
+                        break;
+                    }
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            } else if chars[i] == '_' && i + 1 < len && chars[i + 1] != ' ' && i > 0 {
+                i += 1;
+                while i < len {
+                    if chars[i] == '_' {
+                        i += 1;
+                        break;
+                    }
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            } else if chars[i] == '`' {
+                i += 1;
+                while i < len {
+                    if chars[i] == '`' {
+                        i += 1;
+                        break;
+                    }
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            } else {
+                result.push(chars[i]);
+                i += 1;
+            }
+        }
+        result
+    }
 
-        for sub in markdown_clean.split('\n') {
+    /// Converts a raw markdown string into styled log-line tokens for TUI rendering.
+    fn md_to_log_lines(raw: &str) -> Vec<String> {
+        let clean = Self::strip_ansi(raw);
+        let mut in_code_block = false;
+        let mut out = Vec::new();
+
+        for raw_line in clean.split('\n') {
+            let line = raw_line.trim_end();
+
+            if line.starts_with("```") {
+                in_code_block = !in_code_block;
+                continue;
+            }
+
+            if in_code_block {
+                out.push(format!("  [code]{line}"));
+                continue;
+            }
+
+            if let Some(content) = line.strip_prefix("### ") {
+                out.push(format!("◆ {}", Self::strip_inline_markers(content)));
+            } else if let Some(content) = line.strip_prefix("## ") {
+                out.push(format!("◆ {}", Self::strip_inline_markers(content)));
+            } else if let Some(content) = line.strip_prefix("# ") {
+                out.push(format!("◆ {}", Self::strip_inline_markers(content)));
+            } else if let Some(content) = line.strip_prefix("> ") {
+                out.push(format!("  [quote]{}", Self::strip_inline_markers(content)));
+            } else if line == "---"
+                || line == "==="
+                || (line.len() >= 3 && line.chars().all(|c| c == '-' || c == '='))
+            {
+                out.push("─────────────────────────────────".to_string());
+            } else if line.starts_with('|') {
+                let trimmed = line.trim();
+                let is_separator = trimmed
+                    .chars()
+                    .all(|c| c == '|' || c == '-' || c == ':' || c == ' ');
+                if is_separator {
+                    out.push("─────────────────────────────────".to_string());
+                } else {
+                    out.push(format!("  [table]{trimmed}"));
+                }
+            } else {
+                let processed = Self::strip_inline_markers(line);
+                out.push(processed);
+            }
+        }
+
+        out
+    }
+
+    /// Appends a markdown string to the activity log, converting it to display lines.
+    pub fn push_log(&mut self, line: String) {
+        for sub in Self::md_to_log_lines(&line) {
             if self.log_lines.len() >= 1000 {
                 self.log_lines.pop_front();
             }
-            self.log_lines.push_back(sub.to_string());
+            self.log_lines.push_back(sub);
         }
     }
 
-    /// Append streamed text to the last log line if it starts with the robot
-    /// emoji; otherwise push a new line.
+    /// Appends streamed text to the last log line if it starts with `🤖`; otherwise
+    /// pushes a new set of converted display lines.
     pub fn append_log(&mut self, text: String) {
         if self.log_lines.is_empty() {
             self.push_log(text);
             return;
         }
 
-        let clean = Self::strip_ansi(&text);
-        let markdown_clean = clean.replace("**", "").replace("__", "");
-
-        let lines: Vec<String> = markdown_clean.split('\n').map(|s| s.to_string()).collect();
+        let lines = Self::md_to_log_lines(&text);
         if lines.is_empty() {
             return;
         }
@@ -521,13 +644,11 @@ impl TuiState {
             }
         }
 
-        if lines.len() > 1 {
-            for line in lines.into_iter().skip(1) {
-                if self.log_lines.len() >= 1000 {
-                    self.log_lines.pop_front();
-                }
-                self.log_lines.push_back(line);
+        for line in lines.into_iter().skip(1) {
+            if self.log_lines.len() >= 1000 {
+                self.log_lines.pop_front();
             }
+            self.log_lines.push_back(line);
         }
     }
 
@@ -585,15 +706,21 @@ impl TuiState {
                     self.push_log(s);
                     self.agent_mode_label = "Idle".to_string();
                 }
+                TuiEvent::NewSession => {
+                    self.tasks.clear();
+                    self.total_tasks = 0;
+                    self.task_scroll_offset = 0;
+                }
                 TuiEvent::TaskUpdate {
                     index,
                     total,
                     description,
                     status,
                 } => {
-                    self.total_tasks = total;
+                    self.total_tasks = total.max(self.total_tasks);
                     if let Some(row) = self.tasks.iter_mut().find(|r| r.index == index) {
                         row.status = status;
+                        row.description = description;
                     } else {
                         self.tasks.push(TaskRow {
                             description,
@@ -608,6 +735,9 @@ impl TuiState {
                 }
                 TuiEvent::IncRequest => {
                     self.stats.requests += 1;
+                }
+                TuiEvent::IncResponse => {
+                    self.stats.responses += 1;
                 }
                 TuiEvent::IncTokens { sent, recv } => {
                     self.stats.tokens_sent += sent;

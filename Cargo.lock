@@ -345,6 +345,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "tui-input",
+ "unicode-width 0.2.2",
  "uuid",
  "webbrowser",
  "x-ai",

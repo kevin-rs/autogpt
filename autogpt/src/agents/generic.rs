@@ -6,7 +6,6 @@
 // except according to those terms.
 
 use crate::agents::agent::AgentGPT;
-use crate::agents::intent::AgentIntent;
 #[cfg(feature = "mop")]
 use crate::agents::mop::run_mixture;
 use crate::common::utils::{
@@ -22,7 +21,7 @@ use crate::traits::agent::Agent;
 use crate::traits::functions::{AsyncFunctions, Functions, ReqResponse};
 use async_trait::async_trait;
 use auto_derive::Auto;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::borrow::Cow;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -45,6 +44,10 @@ use {
     crate::cli::session::{Session, SessionManager, SessionTask, TaskStatus as SessionTaskStatus},
     crate::cli::settings::SettingsManager,
     crate::cli::skills::SkillStore,
+    crate::common::utils::{
+        ActionRequest, ActionResult, AgentIntent, ReasoningResult, ReflectionOutcome,
+        ReflectionResult,
+    },
     crate::prompts::generic::{
         FOLLOWUP_SYNTHESIS_PROMPT, GENERIC_SYSTEM_PROMPT, IMPLEMENTATION_PLAN_PROMPT,
         INTENT_DETECTION_PROMPT, LESSON_EXTRACTION_PROMPT, REASONING_PROMPT, REFLECTION_PROMPT,
@@ -56,7 +59,6 @@ use {
         TaskStatus as TuiTaskStatus, create_spinner, print_agent_msg, print_banner, print_error,
         print_greeting, print_section, print_success, print_task_item, print_warning,
         render_help_table, render_help_table_to_log, render_markdown, render_model_selector,
-        render_warning_box,
     },
     anyhow::anyhow,
     colored::Colorize,
@@ -86,6 +88,9 @@ use {
     },
 };
 
+#[cfg(all(feature = "cli", feature = "mta"))]
+use crate::prompts::generic::METACOGNITION_PROMPT;
+
 #[cfg(feature = "cli")]
 const MAX_CONSECUTIVE_FAILURES: u8 = 3;
 
@@ -98,117 +103,14 @@ struct IntentResponse {
     args: Option<serde_json::Value>,
 }
 
-/// The operational phase of the generic agent within a session lifecycle.
-#[cfg(feature = "cli")]
-#[derive(Debug, Clone, PartialEq)]
-pub enum PhaseState {
-    Idle,
-    Synthesizing,
-    Planning,
-    AwaitingApproval,
-    Executing(usize),
-    Reflecting,
-    Complete,
-}
-
-/// A single structured action directive emitted by the LLM during task execution.
-#[cfg(feature = "cli")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum ActionRequest {
-    CreateDir {
-        path: String,
-    },
-    CreateFile {
-        path: String,
-        content: String,
-    },
-    WriteFile {
-        path: String,
-        content: String,
-    },
-    ReadFile {
-        path: String,
-    },
-    PatchFile {
-        path: String,
-        old_text: String,
-        new_text: String,
-    },
-    AppendFile {
-        path: String,
-        content: String,
-    },
-    ListDir {
-        path: String,
-    },
-    FindInFile {
-        path: String,
-        pattern: String,
-    },
-    RunCommand {
-        cmd: String,
-        args: Vec<String>,
-        cwd: Option<String>,
-    },
-    GitCommit {
-        message: String,
-    },
-    GlobFiles {
-        pattern: String,
-    },
-    MultiPatch {
-        path: String,
-        patches: Vec<(String, String)>,
-    },
-    WebSearch {
-        query: String,
-    },
-    McpCall {
-        server: String,
-        tool: String,
-        #[serde(default)]
-        args: serde_json::Value,
-    },
-}
-
-/// Result of executing a single action directive.
-#[cfg(feature = "cli")]
-#[derive(Debug, Clone)]
-pub struct ActionResult {
-    pub action_type: String,
-    pub path: Option<String>,
-    pub stdout: String,
-    pub stderr: String,
-    pub success: bool,
-}
-
-/// Structured inner monologue emitted by the LLM before executing each task.
-#[cfg(feature = "cli")]
+#[cfg(all(feature = "cli", feature = "mta"))]
 #[derive(Debug, Deserialize, Default)]
-pub struct ReasoningResult {
-    pub thought: String,
-    pub approach: String,
-    #[serde(default)]
-    pub risks: Vec<String>,
-}
-
-/// The reflection verdict returned by the LLM after verifying task output.
-#[cfg(feature = "cli")]
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ReflectionOutcome {
-    Success,
-    Retry,
-    Skip,
-}
-
-#[cfg(feature = "cli")]
-#[derive(Debug, Deserialize)]
-pub struct ReflectionResult {
-    pub outcome: ReflectionOutcome,
-    pub reasoning: String,
-    pub corrective_actions: Vec<ActionRequest>,
+#[allow(dead_code)]
+struct MetacognitionResponse {
+    assessment: String,
+    adjustment: String,
+    confidence: String,
+    priority: String,
 }
 
 /// A general-purpose autonomous agent that operates interactively from the CLI.
@@ -224,6 +126,7 @@ pub struct ReflectionResult {
 ///   4. Execute each task by prompting the LLM for `ActionRequest` JSON and running each action.
 ///   5. Reflect on every task's output; retry up to `max_tries` times before skipping.
 ///   6. Write a session walkthrough document on completion.
+///   7. When the `mta` feature is active: run a metacognition evaluation after each completed task.
 #[cfg(feature = "cli")]
 #[derive(Debug, Default, Clone, Auto)]
 pub struct GenericAgent {
@@ -239,9 +142,13 @@ pub struct GenericAgent {
     pub provider: String,
     /// Whether web search (DuckDuckGo) is enabled (mirrors `--no-internet` flag inversion).
     pub internet_access: bool,
+    /// Whether to emit verbose reasoning and reflection logs to the Activity Log.
+    pub verbose: bool,
+    /// Whether the metacognition engine is active for this session.
+    pub metacognition_enabled: bool,
     /// Optional sender channel for streaming events to the TUI render thread.
     pub event_tx: Option<UnboundedSender<TuiEvent>>,
-    /// Token shared with the TUI to interrupt agent execution on `Esc`.
+    /// Token shared with the TUI to interrupt agent execution on 'Esc'.
     pub abort_token: Option<Arc<AtomicBool>>,
     /// Channel for reading user input forwarded from the TUI command bar.
     pub input_rx: Option<Arc<Mutex<Receiver<String>>>>,
@@ -394,10 +301,8 @@ impl Executor for GenericAgent {
             print_section("📑 Implementation Plan");
             render_markdown(&plan);
         } else {
-            self.emit_event(TuiEvent::Log(format!(
-                "=== Implementation Plan ===\n{}\n===========================",
-                plan
-            )));
+            self.emit_event(TuiEvent::Log("◆ Implementation Plan".to_string()));
+            self.emit_event(TuiEvent::Log(plan.clone()));
         }
         session_mgr.save(&session)?;
 
@@ -440,6 +345,7 @@ impl Executor for GenericAgent {
         let tasks_snapshot = session.tasks.clone();
         let total = tasks_snapshot.len();
 
+        self.emit_event(TuiEvent::NewSession);
         for (idx, task) in tasks_snapshot.iter().enumerate() {
             self.emit_event(TuiEvent::TaskUpdate {
                 index: idx,
@@ -453,6 +359,15 @@ impl Executor for GenericAgent {
 
         let mut consecutive_failures = 0;
         'task_loop: for (idx, task_item) in tasks_snapshot.iter().enumerate() {
+            let abort_clone = self
+                .abort_token
+                .clone()
+                .unwrap_or_else(|| Arc::new(AtomicBool::new(false)));
+            if abort_clone.load(Ordering::SeqCst) {
+                self.emit_event(TuiEvent::Log("⛔ Execution aborted by user.".to_string()));
+                self.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+                break 'task_loop;
+            }
             if self.event_tx.is_none() {
                 print_task_item(&task_item.description, TuiTaskStatus::InProgress);
             }
@@ -516,12 +431,24 @@ impl Executor for GenericAgent {
                 self.emit_event(TuiEvent::Thinking(
                     reasoning.thought.chars().take(300).collect::<String>(),
                 ));
+                if self.verbose {
+                    self.emit_event(TuiEvent::Log(format!(
+                        "> {}",
+                        reasoning.thought.chars().take(300).collect::<String>()
+                    )));
+                }
                 info!(
                     "  \x1b[2m> {}\x1b[0m",
                     reasoning.thought.chars().take(300).collect::<String>()
                 );
             }
             if !reasoning.approach.trim().is_empty() {
+                if self.verbose {
+                    self.emit_event(TuiEvent::Log(format!(
+                        "> Approach: {}",
+                        reasoning.approach.chars().take(200).collect::<String>()
+                    )));
+                }
                 info!(
                     "  \x1b[2m> Approach: {}\x1b[0m",
                     reasoning.approach.chars().take(200).collect::<String>()
@@ -619,7 +546,7 @@ impl Executor for GenericAgent {
                     let mut aborted = false;
 
                     if self.event_tx.is_some() {
-                        tokio::time::sleep(sleep_duration).await;
+                        sleep(sleep_duration).await;
                     } else {
                         let mut sleep_interval = interval(Duration::from_millis(150));
                         let sleep_start = std::time::Instant::now();
@@ -787,6 +714,50 @@ impl Executor for GenericAgent {
                 }
             }
 
+            #[cfg(feature = "mta")]
+            {
+                let current_task_status = &session.tasks[idx].status;
+                let outcome_str = match current_task_status {
+                    SessionTaskStatus::Completed => "success",
+                    SessionTaskStatus::Failed => "failed",
+                    SessionTaskStatus::Skipped => "skip",
+                    _ => "unknown",
+                };
+
+                let entry = self
+                    .agent
+                    .record_task_outcome(&task_item.description, outcome_str, 0);
+
+                self.emit_event(TuiEvent::Thinking(format!(
+                    "🧠 [Metacognition] {}",
+                    entry.insight
+                )));
+                if self.verbose {
+                    self.emit_event(TuiEvent::Log(format!("> 🧠 {}", entry.insight)));
+                }
+
+                if self.metacognition_enabled && self.agent.should_adjust_strategy() {
+                    self.emit_event(TuiEvent::AgentMode("MetaCognizing".to_string()));
+                    if let Ok(adjustment) = self.run_metacognition(&prompt, idx, total).await
+                        && !adjustment.is_empty()
+                        && adjustment != "none"
+                    {
+                        self.emit_event(TuiEvent::Thinking(format!(
+                            "🧠 [Strategy] {}",
+                            adjustment
+                        )));
+                        self.emit_event(TuiEvent::Log(format!("◆ Metacognition: {}", adjustment)));
+                        if self.verbose {
+                            self.emit_event(TuiEvent::Log(format!(
+                                "> Strategy adjustment: {}",
+                                adjustment
+                            )));
+                        }
+                    }
+                    self.emit_event(TuiEvent::AgentMode("Executing".to_string()));
+                }
+            }
+
             let _ = session_mgr.save(&session);
         }
 
@@ -834,7 +805,7 @@ impl Executor for GenericAgent {
                 .replace("{FILES_CREATED}", &files_str)
         );
 
-        let walkthrough = match self.generate_safe(&wt_prompt).await {
+        let walkthrough = match self.generate_tracked(&wt_prompt).await {
             Ok(w) if !w.trim().is_empty() => w,
             _ => SessionManager::generate_walkthrough(&session),
         };
@@ -844,11 +815,11 @@ impl Executor for GenericAgent {
         let _ = session_mgr.save(&session);
 
         print_section("📓 Session Walkthrough");
-        if let Some(tx) = &self.event_tx {
-            let _ = tx.send(TuiEvent::Log(format!(
-                "=== Walkthrough ===\n{}\n===================",
-                walkthrough
-            )));
+        if let Some(_tx) = &self.event_tx {
+            // let _ = tx.send(TuiEvent::Log(format!(
+            //     "=== Walkthrough ===\n{}\n===================",
+            //     walkthrough
+            // )));
         } else {
             render_markdown(&walkthrough);
         }
@@ -893,7 +864,6 @@ impl Executor for GenericAgent {
 #[cfg(feature = "cli")]
 impl GenericAgent {
     async fn generate_safe(&mut self, prompt: &str) -> anyhow::Result<String> {
-        let timeout_duration = Duration::from_secs(30);
         let mut interval = interval(Duration::from_millis(150));
         let abort_clone = self
             .abort_token
@@ -903,13 +873,16 @@ impl GenericAgent {
         let llm_future = self.generate(prompt);
         tokio::pin!(llm_future);
 
+        let timeout_future = sleep(Duration::from_secs(30));
+        tokio::pin!(timeout_future);
+
         let _ = (!is_tui_mode).then(enable_raw_mode);
         let res = loop {
             tokio::select! {
                 res = &mut llm_future => {
                     break res.map_err(|e| anyhow!("LLM Generation failed: {e}"));
                 }
-                _ = sleep(timeout_duration) => {
+                _ = &mut timeout_future => {
                     error!("LLM API request timed out after 30 seconds.");
                     break Err(anyhow!("LLM request timed out"));
                 }
@@ -921,8 +894,9 @@ impl GenericAgent {
                     } else if !is_tui_mode {
                         while event::poll(Duration::from_millis(0)).unwrap_or(false) {
                             if let Ok(Event::Key(key)) = event::read() {
-                                let is_abort = key.code == KeyCode::Esc ||
-                                    (key.modifiers.contains(event::KeyModifiers::CONTROL) && key.code == KeyCode::Char('c'));
+                                let is_abort = key.code == KeyCode::Esc
+                                    || (key.modifiers.contains(event::KeyModifiers::CONTROL)
+                                        && key.code == KeyCode::Char('c'));
                                 if is_abort {
                                     aborted = true;
                                     break;
@@ -947,7 +921,50 @@ impl GenericAgent {
         }
     }
 
+    /// Queries the LLM for a metacognitive strategy assessment based on recent task outcomes.
+    ///
+    /// Builds the `METACOGNITION_PROMPT` with the accumulated task history from
+    /// `self.agent.metacognition_context()`, invokes `generate_safe`, parses the JSON response,
+    /// and returns the `adjustment` field. Returns `"none"` when no adjustment is needed
+    /// or when JSON parsing fails gracefully.
+    #[cfg(feature = "mta")]
+    async fn run_metacognition(
+        &mut self,
+        original_request: &str,
+        idx: usize,
+        total: usize,
+    ) -> anyhow::Result<String> {
+        let history = self.agent.metacognition_context();
+        let consecutive = self.agent.consecutive_failures();
+        let remaining = total.saturating_sub(idx + 1);
+
+        let prompt = format!(
+            "{}\n\n{}",
+            GENERIC_SYSTEM_PROMPT,
+            METACOGNITION_PROMPT
+                .replace("{ORIGINAL_REQUEST}", original_request)
+                .replace("{TASK_HISTORY}", &history)
+                .replace("{CONSECUTIVE_FAILURES}", &consecutive.to_string())
+                .replace("{TASKS_REMAINING}", &remaining.to_string())
+        );
+
+        let raw = self.generate_tracked(&prompt).await.unwrap_or_default();
+        let clean = strip_code_blocks(&raw);
+
+        let parsed: MetacognitionResponse = serde_json::from_str(clean.trim()).unwrap_or_default();
+
+        if parsed.adjustment.trim().is_empty() || parsed.adjustment == "none" {
+            return Ok(String::new());
+        }
+
+        Ok(parsed.adjustment)
+    }
+
     /// Calls the LLM and records request/response token estimates on `session.stats`.
+    ///
+    /// When connected to the TUI, streams chunks over the event channel and falls back
+    /// to `generate_safe` when streaming is unavailable. Emits `IncRequest`,
+    /// `IncTokens` (sent), `IncTokens` (recv), and `IncResponse` events.
     async fn generate_and_track(
         &mut self,
         prompt: &str,
@@ -966,21 +983,29 @@ impl GenericAgent {
             let tx = event_tx.clone();
             match self.stream(prompt).await {
                 Ok(ReqResponse(Some(mut rx))) => {
-                    tx.send(TuiEvent::Log("🤖 ".to_string())).ok();
+                    let mut first_chunk = true;
                     while let Some(chunk) = rx.recv().await {
                         let chunk_str: String = chunk;
+                        if !chunk_str.trim().is_empty() || !first_chunk {
+                            if first_chunk {
+                                tx.send(TuiEvent::Log(format!("\u{1f916} {}", chunk_str)))
+                                    .ok();
+                                first_chunk = false;
+                            } else {
+                                tx.send(TuiEvent::LogAppend(chunk_str.clone())).ok();
+                            }
+                        }
                         full_response.push_str(&chunk_str);
-                        tx.send(TuiEvent::LogAppend(chunk_str)).ok();
                     }
                     if full_response.is_empty() {
                         tx.send(TuiEvent::Log(
-                            "🤖 (streaming returned empty, retrying...)".to_string(),
+                            "\u{1f916} (streaming returned empty, retrying...)".to_string(),
                         ))
                         .ok();
                         match self.generate_safe(prompt).await {
                             Ok(resp) if !resp.is_empty() => {
                                 full_response = resp.clone();
-                                tx.send(TuiEvent::Log(format!("🤖 {}", resp))).ok();
+                                tx.send(TuiEvent::Log(format!("\u{1f916} {}", resp))).ok();
                             }
                             _ => {}
                         }
@@ -989,7 +1014,8 @@ impl GenericAgent {
                 _ => {
                     let resp = self.generate_safe(prompt).await?;
                     full_response = resp;
-                    tx.send(TuiEvent::Log(format!("🤖 {}", full_response))).ok();
+                    tx.send(TuiEvent::Log(format!("\u{1f916} {}", full_response)))
+                        .ok();
                 }
             }
         } else {
@@ -1001,8 +1027,29 @@ impl GenericAgent {
             sent: 0,
             recv: (full_response.len() / 4).max(1) as u64,
         });
+        self.emit_event(TuiEvent::IncResponse);
 
         Ok(full_response)
+    }
+
+    /// Wraps `generate_safe` with request/token/response event emission for pipeline
+    /// phases that do not stream (plan generation, reasoning, reflection, etc.).
+    ///
+    /// Emits `IncRequest`, `IncTokens` (sent), `IncTokens` (recv), and `IncResponse`
+    /// so that every LLM call is reflected in the stats panel.
+    async fn generate_tracked(&mut self, prompt: &str) -> anyhow::Result<String> {
+        self.emit_event(TuiEvent::IncRequest);
+        self.emit_event(TuiEvent::IncTokens {
+            sent: (prompt.len() / 4).max(1) as u64,
+            recv: 0,
+        });
+        let result = self.generate_safe(prompt).await?;
+        self.emit_event(TuiEvent::IncTokens {
+            sent: 0,
+            recv: (result.len() / 4).max(1) as u64,
+        });
+        self.emit_event(TuiEvent::IncResponse);
+        Ok(result)
     }
 
     async fn synthesize_tasks(
@@ -1023,7 +1070,7 @@ impl GenericAgent {
         );
 
         self.emit_event(TuiEvent::AgentMode("Synthesizing".to_string()));
-        let raw: String = self.generate_safe(&full_prompt).await?;
+        let raw: String = self.generate_tracked(&full_prompt).await?;
 
         let numbered: Vec<SessionTask> = raw
             .lines()
@@ -1096,7 +1143,36 @@ impl GenericAgent {
             .replace("{PROMPT}", prompt)
             .replace("{TASK_LIST}", &task_list);
 
-        self.generate_safe(&full_prompt).await
+        let first_attempt = self.generate_tracked(&full_prompt).await;
+
+        let plan = match first_attempt {
+            Ok(p) if !p.trim().is_empty() => p,
+            _ => {
+                self.emit_event(TuiEvent::Log(
+                    "⚠ Plan generation returned empty, retrying...".to_string(),
+                ));
+                match self.generate_tracked(&full_prompt).await {
+                    Ok(p) if !p.trim().is_empty() => p,
+                    _ => {
+                        let fallback: String = tasks
+                            .iter()
+                            .enumerate()
+                            .map(|(i, t)| {
+                                format!(
+                                    "## Task {}: {}\n- Implement as described in the prompt.\n- Verify correctness and integrate with existing code.\n",
+                                    i + 1,
+                                    t.description
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        format!("# Plan: {title}\n\n{fallback}")
+                    }
+                }
+            }
+        };
+
+        Ok(plan)
     }
 
     async fn reason_about_task(
@@ -1137,7 +1213,10 @@ impl GenericAgent {
                 .replace("{WORKSPACE}", workspace)
         );
 
-        let raw = self.generate_safe(&full_prompt).await.unwrap_or_default();
+        let raw = self
+            .generate_tracked(&full_prompt)
+            .await
+            .unwrap_or_default();
         let clean = strip_code_blocks(&raw);
 
         let parsed = serde_json::from_str::<ReasoningResult>(clean.trim());
@@ -2099,7 +2178,10 @@ impl GenericAgent {
             .replace("{COMMAND_OUTPUTS}", &outputs_str)
             .replace("{RETRY_ATTEMPT}", &retry_attempt.to_string());
 
-        let raw = self.generate_safe(&full_prompt).await.unwrap_or_default();
+        let raw = self
+            .generate_tracked(&full_prompt)
+            .await
+            .unwrap_or_default();
         let clean = strip_code_blocks(&raw);
 
         match serde_json::from_str::<ReflectionResult>(clean.trim()) {
@@ -2130,7 +2212,7 @@ impl GenericAgent {
             .replace("{TASKS}", &tasks_str)
             .replace("{RESULTS}", results_summary);
 
-        let raw = self.generate_safe(&full_prompt).await.ok()?;
+        let raw = self.generate_tracked(&full_prompt).await.ok()?;
         let clean = strip_code_blocks(&raw);
 
         serde_json::from_str::<LessonOutput>(clean.trim())
@@ -2246,7 +2328,7 @@ impl GenericAgent {
                 .replace("{SKILLS_CONTEXT}", skills_context)
         );
 
-        let raw: String = self.generate_safe(&full_prompt).await?;
+        let raw: String = self.generate_tracked(&full_prompt).await?;
 
         let numbered: Vec<SessionTask> = raw
             .lines()
@@ -2310,7 +2392,7 @@ impl GenericAgent {
             .replace("{PROMPT}", prompt)
             .replace("{COMPLETED_TASKS}", &task_list);
 
-        match self.generate_safe(&summary_prompt).await {
+        match self.generate_tracked(&summary_prompt).await {
             Ok(s) if !s.trim().is_empty() => s,
             _ => task_list,
         }
@@ -2452,14 +2534,6 @@ pub async fn run_generic_agent_loop(config: GenericAgentLoopConfig) -> anyhow::R
     });
     fs::create_dir_all(&workspace)?;
 
-    if matches!((std::env::current_dir(), dirs::home_dir()), (Ok(cwd), Some(home)) if cwd == home) {
-        render_warning_box(
-            "You are running AutoGPT in your home directory.\n\
-             It is recommended to run AutoGPT from a project-specific directory\n\
-             so that generated files are scoped correctly.",
-        );
-    }
-
     let mut current_provider = default_provider();
     let mut current_model = default_model(&current_provider);
     let mut available_models = provider_models(&current_provider);
@@ -2485,6 +2559,11 @@ pub async fn run_generic_agent_loop(config: GenericAgentLoopConfig) -> anyhow::R
         let settings = SettingsManager::new().load().unwrap_or_default();
         agent.yolo = yolo || settings.yolo;
         agent.internet_access = internet_access && settings.internet_access;
+        agent.verbose = settings.verbose;
+        agent.metacognition_enabled = settings.metacognition;
+        if let Some(ref tok) = agent.abort_token {
+            tok.store(false, Ordering::SeqCst);
+        }
 
         let cwd_str = std::env::current_dir()
             .map(|p| p.to_string_lossy().to_string())
@@ -3092,7 +3171,7 @@ pub async fn run_generic_agent_loop(config: GenericAgentLoopConfig) -> anyhow::R
                     {
                         return;
                     }
-                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    sleep(Duration::from_millis(50)).await;
                 }
             });
 
