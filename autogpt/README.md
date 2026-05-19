@@ -43,9 +43,7 @@ AutoGPT is a pure rust framework that simplifies AI agent creation and managemen
 
 ## 🧠 Framework Overview
 
-### ⚙️ Agent Core Architecture
-
-AutoGPT agents are modular and autonomous, built from composable components:
+AutoGPT agents are modular, autonomous, and designed for flexibility:
 
 - 🔌 **Tools & Sensors**: Interface with the real world via actions (e.g., file I/O, APIs) and perception (e.g., audio, video, data).
 - 🧠 **Memory & Knowledge**: Combines long-term vector memory with structured knowledge bases for reasoning and recall.
@@ -55,16 +53,10 @@ AutoGPT agents are modular and autonomous, built from composable components:
 - 🧑‍🤝‍🧑 **Collaboration**: Agents can delegate, swarm, or work in teams with other agents.
 - 🪞 **Self-Reflection**: Introspection module to debug, adapt, or evolve internal strategies.
 - 🔄 **Context Management**: Manages active memory (context window) for ongoing tasks and conversations.
-- 🔌 **MCP (Model Context Protocol)**: Seamlessly connect to external tool servers (Stdio, SSE, HTTP) to extend agent capabilities with thousands of existing tools.
+- 🔌 **MCP (Model Context Protocol)**: First-class support to seamlessly connect external tool servers (Stdio, SSE, HTTP) to extend capabilities.
 - 📅 **Scheduler**: Time-based or reactive triggers for agent actions.
-
-### 🚀 Developer Features
-
-AutoGPT is designed for flexibility, integration, and scalability:
-
 - 🧪 **Custom Agent Creation**: Build tailored agents for different roles or domains.
 - 📋 **Task Orchestration**: Manage and distribute tasks across agents efficiently.
-- 🔌 **MCP Integration**: First-class support for the Model Context Protocol to unify tool access.
 - 🧱 **Extensibility**: Add new tools, behaviors, or agent types with ease.
 - 💻 **CLI Tools**: Command-line interface for rapid experimentation and control.
 - 🧰 **SDK Support**: Embed AutoGPT into existing projects or systems seamlessly.
@@ -83,7 +75,7 @@ AutoGPT supports 4 modes of operation: interactive, direct prompt, standalone ag
 
 ### 0. 🤖 GenericGPT Interactive Mode (Default)
 
-When you run `autogpt` with **no subcommand or flags**, it launches an interactive AI TUI powered by **GenericGPT**, a production-hardened autonomous software engineering agent with session persistence, model switching, and multi-provider support:
+When you run `autogpt` with **no subcommand or flags**, it launches an interactive AI TUI powered by **GenericGPT**, a production-hardened autonomous software engineering agent. GenericGPT features intent detection, a complete seven-step reasoning and execution pipeline, automatic build-and-verify loops, and metacognition for learning across tasks.
 
 ```sh
 autogpt
@@ -91,113 +83,8 @@ autogpt
 
 <video src="https://github.com/user-attachments/assets/6aae0f5e-1137-4866-bc86-8a081ce067c4"></video>
 
-The interactive shell supports the following commands:
-
-| Command         | Description                                                              |
-| --------------- | ------------------------------------------------------------------------ |
-| `<your prompt>` | Send a task to the GenericGPT autonomous agent                           |
-| `/help`         | Show available commands                                                  |
-| `/provider`     | Switch AI provider (Gemini, OpenAI, Anthropic, XAI, Cohere, HuggingFace) |
-| `/models`       | Browse and switch between provider-native models                         |
-| `/sessions`     | List and resume previous sessions                                        |
-| `/status`       | Show current model, provider, and directory                              |
-| `/workspace`    | Show the current workspace path                                          |
-| `/clear`        | Clear the terminal                                                       |
-| `exit` / `quit` | Save session and quit                                                    |
-
-> Press `ESC` at any time to interrupt a running generation.
-
-### 🔀 Mixture of Providers (MoP)
-
-AutoGPT introduces a high-availability **Mixture of Providers** architecture. When enabled via the `--mixture` or `-m` flag, every prompt is fanned out concurrently to all configured AI providers (Gemini, OpenAI, HuggingFace, etc.). A weighted scoring engine evaluates responses based on:
-
-1. **Length calibration** (rewarding detail, penalizing fluff).
-1. **Code quality** (bonus for language-tagged Markdown blocks).
-1. **Structural richness** (headings, lists, hygiene).
-1. **Reasoning depth** (connectivity words and logical flow).
-1. **Completeness** (punctuation and closing delimiters).
-
-The highest-scored response is selected as the winner and injected into the agent's context, promoting the best "intelligence" available from your configured keys.
-
-### The `.autogpt` Directory
-
-GenericGPT maintains all persistent state inside the workspace root (defaults to the **current directory**):
-
-```sh
-.autogpt/
-├── sessions/          # Markdown conversation snapshots, auto-saved after every response
-│   ├── <uuid>.md
-│   └── ...
-└── skills/            # TOML lesson files, injected into future prompts automatically
-    ├── rust.toml
-    ├── web.toml
-    └── python.toml
-```
-
-Control the workspace root with `AUTOGPT_WORKSPACE`:
-
-```sh
-export AUTOGPT_WORKSPACE=/my/project   # scope all file ops to a specific directory
-autogpt
-```
-
-### Model Selection
-
-Models are sourced dynamically from each provider's crate. Override the active model without entering the shell:
-
-```sh
-export GEMINI_MODEL=gemini-2.5-pro-preview-05-06
-export OPENAI_MODEL=gpt-4o
-export MODEL=<any-model-id>    # global fallback for any provider
-```
-
-### How GenericGPT Works
-
-Each prompt goes through a seven-step pipeline:
-
-1. **MoP Fan-out** (optional): Parallel execution across multiple providers.
-1. **Reasoning**: structured internal monologue stored in the session log.
-1. **Task synthesis**: decomposition into typed actions (`CreateFile`, `PatchFile`, `RunCommand`, ...).
-1. **Execution**: file edits via `PatchFile`; shell execution via `RunCommand`.
-1. **Build-and-verify**: auto-detects `Cargo.toml` / `package.json` / `Makefile` and runs the build; retries on failure up to 3 times.
-1. **Reflection**: reviews outcomes and lesson candidates.
-1. **Skill extraction**: lessons written to `.autogpt/skills/<domain>.toml` and injected in future sessions.
-
-```mermaid
-flowchart TD
-    A([User enters prompt]) --> B{Mixture mode?}
-    B -- Yes --> C[Run Mixture of Providers]
-    B -- No --> D[Standard Provider]
-    C & D --> E[Reasoning pre-step]
-    E --> F[Task synthesis]
-    F --> G{User approves?}
-    G -- yolo mode / yes --> H[Execute actions]
-    H --> I[Build-and-verify loop]
-    I -- pass --> J[Reflection]
-    I -- fail, retry ≤3 --> H
-    J --> K[Save skills & session]
-    K --> L([Ready for next prompt])
-```
-
-```mermaid
-flowchart TD
-    A([User launches autogpt]) --> B{Any args?}
-    B -- No --> C[GenericGPT Interactive Shell]
-    B -- Yes --> D{Subcommand}
-    C --> E[Select Provider & Model]
-    E --> F[Enter Prompt Loop]
-    F --> G{Mixture enabled?}
-    G -- Yes --> H[Mixture of Providers]
-    G -- No --> I[Standard Prompt]
-    H & I --> J[Agent Generates Response]
-    J --> F
-    D -- arch --> K[ArchitectGPT]
-    D -- back --> L[BackendGPT]
-    D -- front --> M[FrontendGPT]
-    D -- design --> N[DesignerGPT]
-    D -- manage --> O[ManagerGPT]
-    D -- -p prompt --> P[Direct LLM Prompt]
-```
+> [!NOTE]
+> For an in-depth breakdown of how GenericGPT works under the hood, including its architecture, interactive shell, Mixture of Providers (MoP), and execution pipeline, see the [GenericGPT Documentation](GenericGPT.md).
 
 ### 1. 💬 Direct Prompt Mode
 

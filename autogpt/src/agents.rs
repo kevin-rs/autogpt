@@ -31,6 +31,8 @@ pub mod intent;
 pub mod mailer;
 #[cfg(feature = "gpt")]
 pub mod manager;
+#[cfg(feature = "mta")]
+pub mod metacognition;
 #[cfg(feature = "mop")]
 pub mod mop;
 #[cfg(feature = "gpt")]

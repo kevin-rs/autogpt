@@ -21,7 +21,7 @@ use {
     },
     anyhow::Result,
     crossterm::{
-        event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+        event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
         execute,
         terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
@@ -30,6 +30,7 @@ use {
         backend::CrosstermBackend,
         layout::{Constraint, Direction, Layout},
     },
+    std::process::Command,
     std::sync::Arc,
     std::sync::atomic::{AtomicBool, Ordering},
     std::{io, time::Duration},
@@ -53,13 +54,14 @@ impl TuiApp {
         receiver: UnboundedReceiver<TuiEvent>,
         settings: &GlobalSettings,
         abort_token: Arc<AtomicBool>,
+        update_available: Option<(String, String)>,
     ) -> Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
-        let state = TuiState::new(receiver, settings);
+        let state = TuiState::new(receiver, settings, update_available);
 
         Ok(Self {
             terminal,
@@ -116,6 +118,7 @@ impl TuiApp {
 
             if event::poll(Duration::from_millis(50))?
                 && let Ok(Event::Key(key)) = event::read()
+                && key.kind == KeyEventKind::Press
             {
                 self.handle_key(key.code, key.modifiers, &input_tx)?;
             }
@@ -258,8 +261,8 @@ impl TuiApp {
                         self.state.agent_mode_label = "Executing".to_string();
                     } else if !is_approval && !text.starts_with('/') {
                         self.state.agent_mode_label = "Synthesizing".to_string();
-                        self.state.tasks.clear();
-                        self.state.total_tasks = 0;
+                        // self.state.tasks.clear();
+                        // self.state.total_tasks = 0;
                     }
 
                     let _ = input_tx.try_send(text);
@@ -368,12 +371,12 @@ impl TuiApp {
 
     /// Handle keystrokes while the Settings tab is active.
     ///
-    /// Toggles booleans for fields 0-3 and delegates text input to the
-    /// focused input widget for fields 4-7.
+    /// Toggles booleans for fields 0-4 and delegates text input to the
+    /// focused input widget for fields 5-8.
     fn handle_settings_key(&mut self, code: KeyCode, modifiers: KeyModifiers) {
-        let total_fields = 8;
+        let total_fields = 9;
 
-        if self.state.settings_focus_idx >= 4 {
+        if self.state.settings_focus_idx >= 5 {
             let handled = match code {
                 KeyCode::Up => {
                     self.state.settings_focus_idx = self.state.settings_focus_idx.saturating_sub(1);
@@ -396,7 +399,7 @@ impl TuiApp {
                 let ev =
                     crossterm::event::Event::Key(crossterm::event::KeyEvent::new(code, modifiers));
                 match self.state.settings_focus_idx {
-                    4 => {
+                    5 => {
                         if code == KeyCode::Char('v') && modifiers.contains(KeyModifiers::CONTROL) {
                             let clipboard = get_clipboard();
                             let mut val = self.state.settings_provider_input.value().to_string();
@@ -408,7 +411,7 @@ impl TuiApp {
                             self.state.settings_provider_input.handle_event(&ev);
                         }
                     }
-                    5 => {
+                    6 => {
                         if code == KeyCode::Char('v') && modifiers.contains(KeyModifiers::CONTROL) {
                             let clipboard = get_clipboard();
                             let mut val = self.state.settings_model_input.value().to_string();
@@ -420,10 +423,10 @@ impl TuiApp {
                             self.state.settings_model_input.handle_event(&ev);
                         }
                     }
-                    6 => {
+                    7 => {
                         self.state.settings_retries_input.handle_event(&ev);
                     }
-                    7 => {
+                    8 => {
                         if code == KeyCode::Char('v') && modifiers.contains(KeyModifiers::CONTROL) {
                             let clipboard = get_clipboard();
                             let mut val = self.state.settings_workspace_input.value().to_string();
@@ -455,6 +458,7 @@ impl TuiApp {
                 1 => self.state.settings_internet = !self.state.settings_internet,
                 2 => self.state.settings_auto_browse = !self.state.settings_auto_browse,
                 3 => self.state.settings_verbose = !self.state.settings_verbose,
+                4 => self.state.settings_metacognition = !self.state.settings_metacognition,
                 _ => {}
             },
             KeyCode::Up if self.state.settings_focus_idx > 0 => {
@@ -478,6 +482,7 @@ impl TuiApp {
             s.internet_access = self.state.settings_internet;
             s.auto_browse = self.state.settings_auto_browse;
             s.verbose = self.state.settings_verbose;
+            s.metacognition = self.state.settings_metacognition;
             s.max_retries = self.state.settings_max_retries;
             s.provider = self.state.settings_provider.clone();
             if !self.state.settings_model.is_empty() {
@@ -608,7 +613,6 @@ impl TuiApp {
 }
 
 fn get_clipboard() -> String {
-    use std::process::Command;
     let commands = [
         ("xclip", vec!["-selection", "clipboard", "-o"]),
         ("xsel", vec!["-ob"]),

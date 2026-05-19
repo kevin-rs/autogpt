@@ -89,6 +89,14 @@ pub struct GlobalSettings {
     /// Persisted so the preference survives restarts without re-passing the flag.
     #[serde(default = "default_true")]
     pub internet_access: bool,
+
+    /// Whether the metacognition engine is enabled during task execution.
+    ///
+    /// When `true`, the agent performs a periodic self-assessment LLM call after
+    /// task groups to refine its strategy. Requires the `mta` feature at compile time
+    /// to have any effect.
+    #[serde(default = "default_true")]
+    pub metacognition: bool,
 }
 
 #[cfg(feature = "cli")]
@@ -136,6 +144,7 @@ impl Default for GlobalSettings {
             max_retries: default_max_retries(),
             auto_browse: true,
             internet_access: true,
+            metacognition: true,
         }
     }
 }

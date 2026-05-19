@@ -8,6 +8,8 @@
 //! # `AgentGPT` agent.
 //!
 
+#[cfg(feature = "mta")]
+use crate::agents::metacognition::{MetacognitionEngine, MetacognitionEntry};
 use crate::common::utils::{
     Capability, ContextManager, Knowledge, Message, Persona, Planner, Reflection, Status, Task,
     TaskScheduler, Tool, default_eval_fn,
@@ -138,6 +140,12 @@ pub struct AgentGPT {
     /// as part of its tool-use loop.  Each entry is keyed by the server name.
     #[cfg(feature = "mcp")]
     pub mcp_servers: Vec<McpServerConfig>,
+
+    /// Metacognition engine that accumulates task outcomes and derives strategy
+    /// adjustments across the session. Active only when the `mta` feature is
+    /// compiled in.
+    #[cfg(feature = "mta")]
+    pub metacognition: MetacognitionEngine,
 }
 
 impl Default for AgentGPT {
@@ -188,6 +196,8 @@ impl Default for AgentGPT {
             rr_idx: 0,
             #[cfg(feature = "mcp")]
             mcp_servers: vec![],
+            #[cfg(feature = "mta")]
+            metacognition: MetacognitionEngine::new(),
         }
     }
 }
@@ -228,6 +238,43 @@ impl AgentGPT {
     #[cfg(feature = "mcp")]
     pub fn mcp_servers(&self) -> &[McpServerConfig] {
         &self.mcp_servers
+    }
+
+    /// Records the outcome of a completed task into the metacognition engine
+    /// and returns the resulting insight entry.
+    ///
+    /// Each call updates the consecutive-failure and consecutive-success counters
+    /// and derives a pattern-based insight and optional strategy adjustment.
+    #[cfg(feature = "mta")]
+    pub fn record_task_outcome(
+        &mut self,
+        task_description: &str,
+        outcome: &str,
+        retry_count: u8,
+    ) -> MetacognitionEntry {
+        self.metacognition
+            .record(task_description, outcome, retry_count)
+    }
+
+    /// Returns `true` when the metacognition engine has observed enough data
+    /// to recommend a strategy adjustment to the LLM.
+    #[cfg(feature = "mta")]
+    pub fn should_adjust_strategy(&self) -> bool {
+        self.metacognition.should_adjust()
+    }
+
+    /// Serialises the recent task history and current strategy pattern into a
+    /// compact string suitable for injection into the metacognition LLM prompt.
+    #[cfg(feature = "mta")]
+    pub fn metacognition_context(&self) -> String {
+        self.metacognition.to_prompt_context()
+    }
+
+    /// Returns the number of consecutive task failures recorded by the
+    /// metacognition engine in the current session.
+    #[cfg(feature = "mta")]
+    pub fn consecutive_failures(&self) -> u8 {
+        self.metacognition.consecutive_failures
     }
 
     /// Creates a new instance of `AgentGPT` with owned strings.
@@ -302,6 +349,8 @@ impl AgentGPT {
             rr_idx: 0,
             #[cfg(feature = "mcp")]
             mcp_servers: vec![],
+            #[cfg(feature = "mta")]
+            metacognition: MetacognitionEngine::new(),
         }
     }
 
@@ -377,6 +426,8 @@ impl AgentGPT {
             rr_idx: 0,
             #[cfg(feature = "mcp")]
             mcp_servers: vec![],
+            #[cfg(feature = "mta")]
+            metacognition: MetacognitionEngine::new(),
         }
     }
 
@@ -526,6 +577,8 @@ impl Agent for AgentGPT {
             rr_idx: 0,
             #[cfg(feature = "mcp")]
             mcp_servers: vec![],
+            #[cfg(feature = "mta")]
+            metacognition: MetacognitionEngine::new(),
         }
     }
 

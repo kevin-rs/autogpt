@@ -16,6 +16,7 @@ use {
         text::{Line, Span},
         widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     },
+    unicode_width::{UnicodeWidthChar, UnicodeWidthStr},
 };
 
 /// Renders the settings tab.
@@ -81,6 +82,11 @@ fn render_toggle_settings(frame: &mut Frame, area: Rect, state: &TuiState, palet
             "📝 Verbose",
             state.settings_verbose,
             "Show extra debug logging",
+        ),
+        (
+            "🧠 Metacognition",
+            state.settings_metacognition,
+            "Periodic self-assessment between tasks",
         ),
     ];
 
@@ -164,25 +170,25 @@ fn render_text_settings(frame: &mut Frame, area: Rect, state: &TuiState, palette
             "  Provider       ",
             state.settings_provider_input.value(),
             palette.accent,
-            state.settings_focus_idx == 4,
+            state.settings_focus_idx == 5,
         ),
         (
             "  Model          ",
             state.settings_model_input.value(),
             palette.chart_1,
-            state.settings_focus_idx == 5,
+            state.settings_focus_idx == 6,
         ),
         (
             "  Max Retries    ",
             state.settings_retries_input.value(),
             palette.fg,
-            state.settings_focus_idx == 6,
+            state.settings_focus_idx == 7,
         ),
         (
             "  Workspace      ",
             state.settings_workspace_input.value(),
             palette.fg,
-            state.settings_focus_idx == 7,
+            state.settings_focus_idx == 8,
         ),
     ];
 
@@ -202,17 +208,23 @@ fn render_text_settings(frame: &mut Frame, area: Rect, state: &TuiState, palette
                 .fg(palette.tab_active_fg)
                 .bg(palette.tab_active_bg);
 
-            let cursor_x = inner.x
-                + 4
-                + (match state.settings_focus_idx {
-                    4 => state.settings_provider_input.visual_cursor(),
-                    5 => state.settings_model_input.visual_cursor(),
-                    6 => state.settings_retries_input.visual_cursor(),
-                    7 => state.settings_workspace_input.visual_cursor(),
-                    _ => 0,
-                } as u16);
-
-            cursor_pos = Some((cursor_x, current_y + 1));
+            let prefix = "    ";
+            let prefix_cols = UnicodeWidthStr::width(prefix) as u16;
+            let input_obj = match state.settings_focus_idx {
+                5 => &state.settings_provider_input,
+                6 => &state.settings_model_input,
+                7 => &state.settings_retries_input,
+                8 => &state.settings_workspace_input,
+                _ => &state.settings_provider_input,
+            };
+            let visual_idx = input_obj.visual_cursor();
+            let cursor_col: u16 = input_obj
+                .value()
+                .chars()
+                .take(visual_idx)
+                .map(|c| UnicodeWidthChar::width(c).unwrap_or(1) as u16)
+                .sum();
+            cursor_pos = Some((inner.x + prefix_cols + cursor_col, current_y + 1));
         }
 
         all_lines.push(Line::from(vec![
@@ -220,7 +232,7 @@ fn render_text_settings(frame: &mut Frame, area: Rect, state: &TuiState, palette
             Span::styled(val_disp.to_string(), val_style),
         ]));
         all_lines.push(Line::from(Span::styled(
-            "  ─────────────────────",
+            "  ───────────────────────",
             Style::default().fg(palette.border),
         )));
 

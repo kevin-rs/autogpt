@@ -22,6 +22,7 @@ use {
         text::{Line, Span},
         widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     },
+    unicode_width::UnicodeWidthChar,
 };
 
 /// Renders the prompt editor tab.
@@ -226,7 +227,8 @@ fn render_prompt_editor(frame: &mut Frame, area: Rect, state: &TuiState, palette
                 cur_row += 1;
                 cur_col = 0;
             } else {
-                cur_col += 1;
+                let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1) as u16;
+                cur_col += ch_width;
                 if cur_col as usize >= panel_width {
                     cur_row += 1;
                     cur_col = 0;
