@@ -7,7 +7,7 @@ In addition to the CLI and TUI, you can interact with MCP programmatically from 
 ```toml
 # Cargo.toml
 [dependencies]
-autogpt = { version = "0.4.3", features = ["mcp"] }
+autogpt = { version = "0.4.4", features = ["mcp"] }
 ```
 
 ## Core Types
