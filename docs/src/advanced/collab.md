@@ -126,6 +126,6 @@ The TUI shows `🤝` (start), `🔀` (fallback), and `⚠` (exhausted) log prefi
 
 ## See Also
 
-- [CollabPool example](../../examples/collab-agent/)
+- [CollabPool example](https://github.com/wiseaidotdev/autogpt/tree/main/examples/collab-agent)
 - [Metacognition](./metacognition.md)
 - [Feature Flags](./feature-flags.md)

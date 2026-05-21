@@ -28,8 +28,8 @@ Download the latest pre-built executables directly from GitHub Releases without 
 
 | Platform       | Download                                                                                    |
 | -------------- | ------------------------------------------------------------------------------------------- |
-| Linux x86-64   | [autogpt](https://github.com/wiseaidotdev/autogpt/releases/download/v0.4.4/autogpt)         |
-| Windows x86-64 | [autogpt.exe](https://github.com/wiseaidotdev/autogpt/releases/download/v0.4.4/autogpt.exe) |
+| Linux x86-64   | [autogpt](https://github.com/wiseaidotdev/autogpt/releases/download/v0.4.5/autogpt)         |
+| Windows x86-64 | [autogpt.exe](https://github.com/wiseaidotdev/autogpt/releases/download/v0.4.5/autogpt.exe) |
 
 ## Using Docker
 
@@ -91,7 +91,7 @@ To embed AutoGPT in your own Rust project, add it to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-autogpt = { version = "0.4.4", features = ["gem", "gpt"] }
+autogpt = { version = "0.4.5", features = ["gem", "gpt"] }
 tokio = { version = "1", features = ["full"] }
 ```
 

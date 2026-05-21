@@ -356,10 +356,7 @@ async fn main() {
     let persona = "Lead Architect";
     let behavior = "Design a microservices architecture for an e-commerce platform.";
 
-    let pool = CollabPool::from_providers(vec![
-        "gemini".to_string(),
-        "openai".to_string(),
-    ]);
+    let pool = CollabPool::from_env(persona, behavior, "/tmp/ws", false, false, None, None);
 
     let agent_a = ArchitectGPT::new(persona, behavior).await;
     let agent_b = ArchitectGPT::new(persona, behavior).await;

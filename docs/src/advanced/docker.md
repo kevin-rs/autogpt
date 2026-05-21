@@ -6,8 +6,8 @@ AutoGPT ships two Docker images: `kevinrsdev/autogpt` for the agent binary and `
 
 | Image                | Tag     | Size   | Purpose                |
 | -------------------- | ------- | ------ | ---------------------- |
-| `kevinrsdev/autogpt` | `0.4.4` | ~12 MB | `autogpt` agent CLI    |
-| `kevinrsdev/orchgpt` | `0.4.4` | ~12 MB | `orchgpt` orchestrator |
+| `kevinrsdev/autogpt` | `0.4.5` | ~12 MB | `autogpt` agent CLI    |
+| `kevinrsdev/orchgpt` | `0.4.5` | ~12 MB | `orchgpt` orchestrator |
 
 Both images are Alpine-based and stripped of debug symbols for minimal footprint.
 

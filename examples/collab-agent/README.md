@@ -1,12 +1,12 @@
 # collab-agent
 
-Demonstrates attaching a `CollabPool` directly to an `AgentGPT` via the built-in `with_collab_pool` API introduced in autogpt v0.4.4.
+Demonstrates attaching a `CollabPool` directly to an `AgentGPT` via the built-in `with_collab_pool` API introduced in autogpt v0.4.5.
 
 ## What it shows
 
-- Using `CollabPool::from_env()` to discover all configured LLM providers from environment variables.
+- Using `CollabPool::from_providers()` to configure LLM providers.
 - Attaching the pool to an `AgentGPT` with `.with_collab_pool(pool)`.
-- Inspecting the pool via `.collab_pool()` and `.collab_pool_mut()`.
+- Inspecting the pool via `.collab_pool()` or `.collab_pool_mut()`.
 
 ## Requirements
 

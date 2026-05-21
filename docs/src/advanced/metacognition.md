@@ -126,6 +126,6 @@ async fn main() {
 
 ## See Also
 
-- [Metacognition example](../../examples/metacognition-agent/)
+- [Metacognition example](https://github.com/wiseaidotdev/autogpt/tree/main/examples/metacognition-agent)
 - [Collaborative Agents](./collab.md)
 - [Feature Flags](./feature-flags.md)

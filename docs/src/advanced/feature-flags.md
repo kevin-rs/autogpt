@@ -26,31 +26,31 @@ AutoGPT's `Cargo.toml` uses feature flags to keep the binary lean. Only compile 
 **Minimal SDK, Gemini only:**
 
 ```toml
-autogpt = { version = "0.4.4", features = ["gem", "gpt"] }
+autogpt = { version = "0.4.5", features = ["gem", "gpt"] }
 ```
 
 **Full CLI with Gemini:**
 
 ```toml
-autogpt = { version = "0.4.4", features = ["gem", "gpt", "cli"] }
+autogpt = { version = "0.4.5", features = ["gem", "gpt", "cli"] }
 ```
 
 **SDK with memory:**
 
 ```toml
-autogpt = { version = "0.4.4", features = ["gem", "gpt", "mem"] }
+autogpt = { version = "0.4.5", features = ["gem", "gpt", "mem"] }
 ```
 
 **Networked orchestrated mode:**
 
 ```toml
-autogpt = { version = "0.4.4", features = ["gem", "gpt", "net", "cli"] }
+autogpt = { version = "0.4.5", features = ["gem", "gpt", "net", "cli"] }
 ```
 
 **Everything:**
 
 ```toml
-autogpt = { version = "0.4.4", features = ["gem", "gpt", "img", "git", "mail", "mem", "net", "cli"] }
+autogpt = { version = "0.4.5", features = ["gem", "gpt", "img", "git", "mail", "mem", "net", "cli"] }
 ```
 
 Or equivalently from the command line:
