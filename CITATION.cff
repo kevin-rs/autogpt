@@ -4,7 +4,7 @@ title: AutoGPT
 abstract: World's first, most capable, blazingly fast, and extremely flexible pure Rust agentic framework.
 authors:
   - name: "Mahmoud Harmouch"
-version: v0.4.4
-date-released: "2026-05-19"
+version: v0.4.5
+date-released: "2026-05-21"
 license: MIT
 repository-code: "https://github.com/wiseaidotdev/autogpt"

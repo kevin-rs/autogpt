@@ -1,6 +1,6 @@
 # collab-agent
 
-Demonstrates attaching a `CollabPool` directly to an `AgentGPT` via the built-in `with_collab_pool` API introduced in autogpt v0.4.4.
+Demonstrates attaching a `CollabPool` directly to an `AgentGPT` via the built-in `with_collab_pool` API introduced in autogpt v0.4.5.
 
 ## What it shows
 
