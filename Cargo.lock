@@ -328,6 +328,7 @@ dependencies = [
  "indicatif",
  "nylas",
  "openai_dive",
+ "phf 0.13.1",
  "pinecone-sdk",
  "ratatui",
  "reqwest 0.12.28",

@@ -88,6 +88,9 @@ use {
     },
 };
 
+#[cfg(all(feature = "cli", feature = "col"))]
+use crate::agents::collab::{CollabPool, CollabSelection};
+
 #[cfg(all(feature = "cli", feature = "mta"))]
 use crate::prompts::generic::METACOGNITION_PROMPT;
 
@@ -314,6 +317,11 @@ impl Executor for GenericAgent {
                 self.emit_event(TuiEvent::AgentMode("Awaiting approval".to_string()));
                 let mut rx = rx_lock.lock().await;
                 rx.recv().await.unwrap_or_default()
+            } else if self.event_tx.is_some() {
+                self.emit_event(TuiEvent::Log(
+                    "⚠ Auto-approving plan (TUI mode, no input channel attached).".to_string(),
+                ));
+                "yes".to_string()
             } else {
                 info!(
                     "{}  Approve this plan and begin execution? {} ",
@@ -2442,6 +2450,8 @@ pub struct GenericAgentLoopConfig {
     pub event_tx: Option<UnboundedSender<TuiEvent>>,
     pub input_rx: Option<Receiver<String>>,
     pub abort_token: Option<Arc<AtomicBool>>,
+    #[cfg(feature = "col")]
+    pub collab: bool,
 }
 
 /// Runs the interactive AutoGPT CLI loop.
@@ -2467,6 +2477,8 @@ pub async fn run_generic_agent_loop(config: GenericAgentLoopConfig) -> anyhow::R
         event_tx,
         input_rx,
         abort_token,
+        #[cfg(feature = "col")]
+        collab,
     } = config;
     print_banner();
     print_greeting();
@@ -3110,39 +3122,233 @@ pub async fn run_generic_agent_loop(config: GenericAgentLoopConfig) -> anyhow::R
         }
 
         if agent.event_tx.is_some() {
-            let mut task = Task {
-                description: input.clone().into(),
-                scope: Some(Scope {
-                    crud: true,
-                    auth: false,
-                    external: true,
-                }),
-                urls: None,
-                frontend_code: None,
-                backend_code: None,
-                api_schema: None,
-            };
-            let current_yolo = agent.yolo;
-            match Executor::execute(&mut agent, &mut task, !current_yolo, false, 2).await {
-                Ok(_) => {
-                    if let Ok(entries) = session_mgr.list()
-                        && let Some(entry) = entries.first()
-                        && let Ok(s) = session_mgr.load(&entry.id)
-                    {
-                        active_session = Some(s);
+            #[cfg(feature = "col")]
+            if collab {
+                let mut pool = CollabPool::from_env(
+                    &agent.agent.persona,
+                    &agent.agent.behavior,
+                    &workspace,
+                    yolo,
+                    agent.verbose,
+                    event_tx.clone(),
+                    shared_input_rx.clone(),
+                );
+                if pool.len() > 1 {
+                    let start = pool.pick_start(&CollabSelection::Random);
+                    let mut task_obj = Task {
+                        description: input.clone().into(),
+                        scope: Some(Scope {
+                            crud: true,
+                            auth: false,
+                            external: true,
+                        }),
+                        urls: None,
+                        frontend_code: None,
+                        backend_code: None,
+                        api_schema: None,
+                    };
+                    let start_provider_name = pool.provider_name(start).to_string();
+                    agent.emit_event(TuiEvent::Log(format!(
+                        "🤝 Collab: starting synthesis on provider '{}'",
+                        start_provider_name
+                    )));
+
+                    let mut start_ok = false;
+                    'start_retry: loop {
+                        if let Some(start_agent) = pool.agent_mut(start) {
+                            match Executor::execute(start_agent, &mut task_obj, !yolo, false, 2)
+                                .await
+                            {
+                                Ok(_) => {
+                                    start_ok = true;
+                                    break 'start_retry;
+                                }
+                                Err(e) => {
+                                    let err_str = e.to_string();
+                                    let is_rate_limit = err_str.contains("402")
+                                        || err_str.contains("quota")
+                                        || err_str.contains("credits")
+                                        || err_str.contains("permission")
+                                        || err_str.contains("monthly limit")
+                                        || err_str.contains("Unauthorized")
+                                        || err_str.contains("does not have permission")
+                                        || err_str.contains("401");
+                                    agent.emit_event(TuiEvent::Log(format!(
+                                        "⚠ Collab start agent error: {e}"
+                                    )));
+                                    if is_rate_limit && pool.mark_failure(start) {
+                                        continue 'start_retry;
+                                    }
+                                    pool.exhausted.insert(start);
+                                    break 'start_retry;
+                                }
+                            }
+                        } else {
+                            break 'start_retry;
+                        }
+                    }
+
+                    if !start_ok {
+                        while let Some(next_idx) = pool.next_available() {
+                            let next_name = pool.provider_name(next_idx).to_string();
+                            agent.emit_event(TuiEvent::Log(format!(
+                                "🔀 Collab: falling back to provider '{next_name}'"
+                            )));
+                            'fallback_retry: loop {
+                                if let Some(fb_agent) = pool.agent_mut(next_idx) {
+                                    match Executor::execute(
+                                        fb_agent,
+                                        &mut task_obj,
+                                        !yolo,
+                                        false,
+                                        2,
+                                    )
+                                    .await
+                                    {
+                                        Ok(_) => break 'fallback_retry,
+                                        Err(e) => {
+                                            let err_str = e.to_string();
+                                            let is_rate_limit = err_str.contains("402")
+                                                || err_str.contains("quota")
+                                                || err_str.contains("credits")
+                                                || err_str.contains("permission")
+                                                || err_str.contains("monthly limit")
+                                                || err_str.contains("Unauthorized")
+                                                || err_str.contains("does not have permission")
+                                                || err_str.contains("401");
+                                            agent.emit_event(TuiEvent::Log(format!(
+                                                "⚠ Collab [{next_name}] error: {e}"
+                                            )));
+                                            if is_rate_limit && pool.mark_failure(next_idx) {
+                                                continue 'fallback_retry;
+                                            }
+                                            break 'fallback_retry;
+                                        }
+                                    }
+                                } else {
+                                    break 'fallback_retry;
+                                }
+                            }
+                        }
+                        if pool.exhausted.len() >= pool.slots.len() {
+                            agent.emit_event(TuiEvent::Log(
+                                "⚠ All collab providers exhausted.".to_string(),
+                            ));
+                        }
+                    }
+                } else {
+                    agent.emit_event(TuiEvent::Log(
+                        "⚠ Collab: fewer than two providers found. Falling back to single-provider mode.".to_string(),
+                    ));
+                    let mut task = Task {
+                        description: input.clone().into(),
+                        scope: Some(Scope {
+                            crud: true,
+                            auth: false,
+                            external: true,
+                        }),
+                        urls: None,
+                        frontend_code: None,
+                        backend_code: None,
+                        api_schema: None,
+                    };
+                    let current_yolo = agent.yolo;
+                    match Executor::execute(&mut agent, &mut task, !current_yolo, false, 2).await {
+                        Ok(_) => {
+                            if let Ok(entries) = session_mgr.list()
+                                && let Some(entry) = entries.first()
+                                && let Ok(s) = session_mgr.load(&entry.id)
+                            {
+                                active_session = Some(s);
+                            }
+                        }
+                        Err(e) if e.to_string().contains("User aborted") => {
+                            agent.emit_event(TuiEvent::Log("⚠ Execution interrupted.".to_string()));
+                            agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+                            if let Some(ref tok) = abort_token {
+                                tok.store(false, Ordering::SeqCst);
+                            }
+                            continue 'outer;
+                        }
+                        Err(e) => {
+                            agent.emit_event(TuiEvent::Log(format!("✗ Agent error: {e}")));
+                            agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+                        }
                     }
                 }
-                Err(e) if e.to_string().contains("User aborted") => {
-                    agent.emit_event(TuiEvent::Log("⚠ Execution interrupted.".to_string()));
-                    agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
-                    if let Some(ref tok) = abort_token {
-                        tok.store(false, Ordering::SeqCst);
+            } else {
+                let mut task = Task {
+                    description: input.clone().into(),
+                    scope: Some(Scope {
+                        crud: true,
+                        auth: false,
+                        external: true,
+                    }),
+                    urls: None,
+                    frontend_code: None,
+                    backend_code: None,
+                    api_schema: None,
+                };
+                let current_yolo = agent.yolo;
+                match Executor::execute(&mut agent, &mut task, !current_yolo, false, 2).await {
+                    Ok(_) => {
+                        if let Ok(entries) = session_mgr.list()
+                            && let Some(entry) = entries.first()
+                            && let Ok(s) = session_mgr.load(&entry.id)
+                        {
+                            active_session = Some(s);
+                        }
                     }
-                    continue 'outer;
+                    Err(e) if e.to_string().contains("User aborted") => {
+                        agent.emit_event(TuiEvent::Log("⚠ Execution interrupted.".to_string()));
+                        agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+                        if let Some(ref tok) = abort_token {
+                            tok.store(false, Ordering::SeqCst);
+                        }
+                        continue 'outer;
+                    }
+                    Err(e) => {
+                        agent.emit_event(TuiEvent::Log(format!("✗ Agent error: {e}")));
+                        agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+                    }
                 }
-                Err(e) => {
-                    agent.emit_event(TuiEvent::Log(format!("✗ Agent error: {e}")));
-                    agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+            }
+            #[cfg(not(feature = "col"))]
+            {
+                let mut task = Task {
+                    description: input.clone().into(),
+                    scope: Some(Scope {
+                        crud: true,
+                        auth: false,
+                        external: true,
+                    }),
+                    urls: None,
+                    frontend_code: None,
+                    backend_code: None,
+                    api_schema: None,
+                };
+                let current_yolo = agent.yolo;
+                match Executor::execute(&mut agent, &mut task, !current_yolo, false, 2).await {
+                    Ok(_) => {
+                        if let Ok(entries) = session_mgr.list()
+                            && let Some(entry) = entries.first()
+                            && let Ok(s) = session_mgr.load(&entry.id)
+                        {
+                            active_session = Some(s);
+                        }
+                    }
+                    Err(e) if e.to_string().contains("User aborted") => {
+                        agent.emit_event(TuiEvent::Log("⚠ Execution interrupted.".to_string()));
+                        agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+                        if let Some(ref tok) = abort_token {
+                            tok.store(false, Ordering::SeqCst);
+                        }
+                        continue 'outer;
+                    }
+                    Err(e) => {
+                        agent.emit_event(TuiEvent::Log(format!("✗ Agent error: {e}")));
+                        agent.emit_event(TuiEvent::AgentMode("Idle".to_string()));
+                    }
                 }
             }
         } else {

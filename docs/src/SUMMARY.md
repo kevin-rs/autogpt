@@ -47,6 +47,8 @@
   - [Authentication](./advanced/mcp-auth.md)
   - [SDK Usage](./advanced/mcp-sdk.md)
 - [Long-Term Memory](./advanced/memory-pinecone.md)
+- [Collaborative Agents](./advanced/collab.md)
+- [Metacognition](./advanced/metacognition.md)
 - [Feature Flags](./advanced/feature-flags.md)
 - [Docker Deployment](./advanced/docker.md)
 

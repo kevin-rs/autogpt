@@ -25,6 +25,7 @@ iac-rs = { version = "0.0.8", path = "./iac-rs" }
 chrono = "0.4.41"
 derivative = "2.2.0"
 duckduckgo = "0.3.1"
+phf = { version = "0.13.1", features = ["macros"] }
 
 [profile.release]
 opt-level = "z"
