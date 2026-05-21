@@ -342,6 +342,82 @@ async fn main() {
 }
 ```
 
+#### 🤝 Collaborative Multi-Provider Agent (SDK: `col` feature)
+
+Attach a [`CollabPool`] to `AutoGPT` so the orchestrator executes agents
+sequentially in round-robin provider order. Each entry in `agents![...]`
+corresponds to one entry in the pool's provider list.
+
+```rust
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let persona = "Lead Architect";
+    let behavior = "Design a microservices architecture for an e-commerce platform.";
+
+    let pool = CollabPool::from_providers(vec![
+        "gemini".to_string(),
+        "openai".to_string(),
+    ]);
+
+    let agent_a = ArchitectGPT::new(persona, behavior).await;
+    let agent_b = ArchitectGPT::new(persona, behavior).await;
+
+    let autogpt = AutoGPT::default()
+        .with(agents![agent_a, agent_b])
+        .with_collab_pool(pool)
+        .build()
+        .expect("Failed to build AutoGPT");
+
+    match autogpt.run().await {
+        Ok(response) => println!("{}", response),
+        Err(err) => eprintln!("Agent error: {:?}", err),
+    }
+}
+```
+
+> [!NOTE]
+> **How it works**: `AutoGPT::run()` picks a random starting provider via
+> [`CollabSelection::Random`], then executes each agent in the `agents![...]`
+> list sequentially mapped to pool providers in round-robin order.
+> Enable `CollabSelection::Explicit(name)` to always start from a specific
+> provider.
+
+#### 🧠 Agent Metacognition SDK (`mta` feature)
+
+The `mta` feature embeds a [`MetacognitionEngine`] inside every [`AgentGPT`]
+that records task outcomes and injects strategy context into prompts.
+
+```rust
+use autogpt::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    let persona = "Research Analyst";
+    let behavior = "Summarise research papers.";
+
+    let mut agent = AgentGPT::new_borrowed(persona, behavior);
+
+    agent.record_task_outcome("parse pdf", "success", 0);
+    agent.record_task_outcome("extract sections", "failed", 2);
+
+    println!("{}", agent.metacognition_context());
+    println!("Should adjust? {}", agent.should_adjust_strategy());
+}
+```
+
+| Method                                        | Description                                         |
+| --------------------------------------------- | --------------------------------------------------- |
+| `record_task_outcome(task, outcome, retries)` | Record a task result and generate an insight entry  |
+| `metacognition_context()`                     | Returns the LLM-injectable strategy context string  |
+| `should_adjust_strategy()`                    | `true` when the engine recommends a strategy change |
+| `consecutive_failures()`                      | Number of consecutive failing tasks                 |
+
+The engine triggers automatically inside `GenericAgent` every 3 tasks or
+after 2+ consecutive failures, querying the LLM to produce strategy
+adjustments. The TUI status bar shows **MetaCognizing** during this phase.
+
 ## 🛠️ CLI Usage
 
 The CLI provides a convenient means to interact with the code generation ecosystem. The `autogpt` crate bundles two binaries in a single package:
@@ -500,6 +576,35 @@ This opens a conversational AI shell where you can:
 - Check current status with `/status`.
 - Press `ESC` to interrupt a running generation.
 - Type `exit` or `quit` to save the session and close.
+
+#### 🤝 Collaborative Multi-Provider Mode (`--collab`, requires `col + cli`)
+
+Collab mode spawns one `GenericAgent` per configured provider (all providers
+with an API key set in the environment) and distributes the task across them
+in round-robin order with per-model fallback:
+
+```sh
+# Build with collab support:
+cargo run --features "cli,col,gem,oai,xai" --bin autogpt -- --collab
+
+# Or install:
+cargo install autogpt --features "cli,col,gem,oai"
+autogpt --collab
+```
+
+**Provider discovery**: Any provider feature compiled in whose API key env var
+is set at runtime is automatically added to the pool (e.g. `GEMINI_API_KEY`,
+`OPENAI_API_KEY`, `XAI_API_KEY`).
+
+**Fallback behaviour**:
+
+| Event                             | Action                                        |
+| --------------------------------- | --------------------------------------------- |
+| Rate-limit / quota error          | Rotate to next model within the same provider |
+| All models for provider exhausted | Remove provider from pool, route to next      |
+| All providers exhausted           | Log `⚠ All collab providers exhausted.`       |
+
+The TUI logs the active pool and each routing step with `🤝`/`🔀` prefixes.
 
 #### ⚡ Direct Prompt Mode
 

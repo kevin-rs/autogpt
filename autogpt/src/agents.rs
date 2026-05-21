@@ -15,6 +15,8 @@ pub mod agent;
 pub mod architect;
 #[cfg(feature = "gpt")]
 pub mod backend;
+#[cfg(feature = "col")]
+pub mod collab;
 #[cfg(feature = "gpt")]
 pub mod designer;
 #[cfg(feature = "gpt")]

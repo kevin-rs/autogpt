@@ -654,6 +654,8 @@ async fn main() -> Result<()> {
                     event_tx: Some(tx_clone),
                     input_rx: Some(input_rx),
                     abort_token: Some(abort_clone),
+                    #[cfg(feature = "col")]
+                    collab: args.collab || settings.collab,
                 })
                 .await
                 {
@@ -678,6 +680,8 @@ async fn main() -> Result<()> {
                         event_tx: None,
                         input_rx: None,
                         abort_token: None,
+                        #[cfg(feature = "col")]
+                        collab: args.collab || settings.collab,
                     })
                     .await?;
                 }

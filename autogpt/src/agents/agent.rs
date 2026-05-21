@@ -8,6 +8,8 @@
 //! # `AgentGPT` agent.
 //!
 
+#[cfg(feature = "col")]
+use crate::agents::collab::CollabPool;
 #[cfg(feature = "mta")]
 use crate::agents::metacognition::{MetacognitionEngine, MetacognitionEntry};
 use crate::common::utils::{
@@ -146,6 +148,13 @@ pub struct AgentGPT {
     /// compiled in.
     #[cfg(feature = "mta")]
     pub metacognition: MetacognitionEngine,
+
+    /// Embedded collaborative multi-provider pool. When present, any agent method
+    /// that supports collab routing will distribute tasks across pool providers
+    /// automatically. Active only when the `col` feature is compiled in.
+    #[cfg(feature = "col")]
+    #[derivative(PartialEq = "ignore")]
+    pub collab_pool: Option<Box<CollabPool>>,
 }
 
 impl Default for AgentGPT {
@@ -198,6 +207,8 @@ impl Default for AgentGPT {
             mcp_servers: vec![],
             #[cfg(feature = "mta")]
             metacognition: MetacognitionEngine::new(),
+            #[cfg(feature = "col")]
+            collab_pool: None,
         }
     }
 }
@@ -351,6 +362,8 @@ impl AgentGPT {
             mcp_servers: vec![],
             #[cfg(feature = "mta")]
             metacognition: MetacognitionEngine::new(),
+            #[cfg(feature = "col")]
+            collab_pool: None,
         }
     }
 
@@ -428,6 +441,8 @@ impl AgentGPT {
             mcp_servers: vec![],
             #[cfg(feature = "mta")]
             metacognition: MetacognitionEngine::new(),
+            #[cfg(feature = "col")]
+            collab_pool: None,
         }
     }
 
@@ -506,6 +521,37 @@ impl AgentGPT {
             self.memory.drain(0..len - keep_count);
         }
     }
+
+    /// Attaches a `CollabPool` to this agent, enabling built-in multi-provider
+    /// task distribution when the `col` feature is active.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use autogpt::agents::agent::AgentGPT;
+    /// use autogpt::agents::collab::CollabPool;
+    ///
+    /// let mut agent = AgentGPT::new_borrowed("MyAgent", "Do research");
+    /// agent.with_collab_pool(CollabPool::from_env("MyAgent", "Do research",
+    ///     "/tmp/ws", false, false, None, None));
+    /// ```
+    #[cfg(feature = "col")]
+    pub fn with_collab_pool(&mut self, pool: CollabPool) -> &mut Self {
+        self.collab_pool = Some(Box::new(pool));
+        self
+    }
+
+    /// Returns a reference to the embedded `CollabPool` if one has been attached.
+    #[cfg(feature = "col")]
+    pub fn collab_pool(&self) -> Option<&CollabPool> {
+        self.collab_pool.as_deref()
+    }
+
+    /// Returns a mutable reference to the embedded `CollabPool` if one has been attached.
+    #[cfg(feature = "col")]
+    pub fn collab_pool_mut(&mut self) -> Option<&mut CollabPool> {
+        self.collab_pool.as_deref_mut()
+    }
 }
 
 impl Agent for AgentGPT {
@@ -579,6 +625,8 @@ impl Agent for AgentGPT {
             mcp_servers: vec![],
             #[cfg(feature = "mta")]
             metacognition: MetacognitionEngine::new(),
+            #[cfg(feature = "col")]
+            collab_pool: None,
         }
     }
 

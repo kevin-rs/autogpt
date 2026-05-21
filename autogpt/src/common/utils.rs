@@ -77,6 +77,7 @@ pub use crate::agents::agent::AgentGPT;
 pub use crate::traits::agent::Agent;
 use chrono::prelude::*;
 use derivative::Derivative;
+use phf::phf_map;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -109,6 +110,26 @@ use {
 
 #[cfg(feature = "xai")]
 use x_ai::{chat_compl::Message as XaiMessage, client::XaiClient, traits::ClientConfig};
+
+/// A hash map from provider name to the environment variable that holds its API key.
+pub static PROVIDER_ENV_MAP: phf::Map<&'static str, &'static str> = phf_map! {
+    "gemini"       => "GEMINI_API_KEY",
+    "openai"       => "OPENAI_API_KEY",
+    "anthropic"    => "ANTHROPIC_API_KEY",
+    "xai"          => "XAI_API_KEY",
+    "cohere"       => "CO_API_KEY",
+    "huggingface"  => "HF_API_KEY",
+};
+
+/// Canonical provider names in priority order.
+pub static PROVIDER_NAMES: &[&str] = &[
+    "gemini",
+    "openai",
+    "anthropic",
+    "xai",
+    "cohere",
+    "huggingface",
+];
 
 #[cfg(feature = "gem")]
 pub use gems::{
@@ -338,6 +359,25 @@ impl ClientType {
         {
             ClientType::None
         }
+    }
+
+    /// Returns the names of LLM providers that have a valid API key configured
+    /// in the current environment.
+    ///
+    /// # Returns
+    ///
+    /// `Vec<String>` of provider names for which an API key is present.
+    pub fn available_providers() -> Vec<String> {
+        PROVIDER_NAMES
+            .iter()
+            .filter_map(|&name| {
+                let env_key = PROVIDER_ENV_MAP.get(name).copied()?;
+                var(env_key)
+                    .ok()
+                    .filter(|v| !v.is_empty())
+                    .map(|_| name.to_string())
+            })
+            .collect()
     }
 }
 

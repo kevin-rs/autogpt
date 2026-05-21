@@ -37,6 +37,7 @@ auto-derive = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 duckduckgo = { workspace = true }
+phf = { workspace = true }
 iac-rs = { workspace = true, optional = true }
 
 uuid = { version = "=1.23.1", features = ["v4"] }
@@ -79,17 +80,20 @@ unicode-width = { version = "0.2.2", optional = true }
 default = []
 gpt = []
 mop = []
-img = ["getimg"]
+mta = []
+col = []
+mcp = ["dirs"]
 git = ["git2"]
 gem = ["gems"]
 xai = ["x-ai"]
 net = ["iac-rs"]
+img = ["getimg"]
 mail = ["nylas"]
+co = ["cohere-rust"]
 oai = ["openai_dive"]
 mem = ["pinecone-sdk"]
-cld = ["anthropic-ai-sdk"]
-co = ["cohere-rust"]
 hf = ["api_huggingface"]
+cld = ["anthropic-ai-sdk"]
 cli = [
     "clap",
     "dirs",
@@ -112,8 +116,6 @@ cli = [
     "tracing-appender",
     "tracing-subscriber",
 ]
-mcp = ["dirs"]
-mta = []
 
 [package.metadata.docs.rs]
 all-features = true

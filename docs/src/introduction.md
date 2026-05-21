@@ -66,6 +66,16 @@ That is the entire program. AutoGPT initializes the LLM client, constructs the t
 <h3>9 Built-in Agents</h3>
 <p>ManagerGPT, ArchitectGPT, BackendGPT, FrontendGPT, DesignerGPT, GitGPT, MailerGPT, OptimizerGPT, and GenericGPT.</p>
 </div>
+<div class="feature-card">
+<span class="icon">🤝</span>
+<h3>Collaborative Agents</h3>
+<p>Route tasks across multiple LLM providers with <code>CollabPool</code>. Automatic model-level fallback on quota/rate-limit errors.</p>
+</div>
+<div class="feature-card">
+<span class="icon">🧠</span>
+<h3>Metacognition</h3>
+<p>Agents record task outcomes and inject strategy context into prompts. Self-corrects strategy after consecutive failures.</p>
+</div>
 </div>
 
 ## Architecture at a Glance
@@ -85,7 +95,7 @@ flowchart TD
 
     subgraph Network["Orchestrated Mode (IAC / TLS)"]
         direction LR
-        Orch["🔀 orchgpt\nOrchestrator"]
+        Orch["🔀 orchgpt Orchestrator"]
     end
 
     subgraph Providers["LLM Providers"]
@@ -96,7 +106,7 @@ flowchart TD
         HF["HuggingFace"]
     end
 
-    DB[("🧠 Pinecone\nVector DB")]
+    DB[("🧠 Pinecone Vector DB")]
 
     User -->|"goal prompt"| MG
     MG --> AG
@@ -117,12 +127,15 @@ flowchart TD
 | Direct Prompt     | `autogpt -p "..."`                | One-shot LLM query from the terminal            |
 | Standalone Agent  | `autogpt arch` / `back` / `front` | Run a single specialized agent                  |
 | Orchestrated      | `autogpt --net`                   | Networked multi-agent mode via IAC/TLS          |
+| Collaborative     | `autogpt --collab`                | Round-robin multi-provider collab mode          |
 
 ## Quick Links
 
 - **[Installation →](./getting-started/installation.md)**: Get AutoGPT running in minutes.
 - **[Quickstart →](./getting-started/quickstart.md)**: Build your first agent.
 - **[Custom Agents →](./sdk/custom-agents.md)**: Compose your own agent from scratch.
+- **[Collaborative Agents →](./advanced/collab.md)**: Route tasks across multiple LLM providers.
+- **[Metacognition →](./advanced/metacognition.md)**: Self-correcting strategy via recorded outcomes.
 - **[IAC Protocol →](./advanced/iac-protocol.md)**: Understand the communication layer.
 - **[GitHub](https://github.com/wiseaidotdev/autogpt)**: Source code and releases.
 

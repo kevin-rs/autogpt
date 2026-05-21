@@ -136,6 +136,15 @@ pub struct Cli {
     #[arg(short = 'm', long, default_value_t = false)]
     pub mixture: bool,
 
+    /// Enable collaborative multi-provider mode.
+    ///
+    /// Spawns one agent per available LLM provider.  Planned task items are
+    /// distributed in round-robin order across providers and automatically
+    /// re-routed to healthy providers on failure.  Requires the `col` feature.
+    #[cfg(feature = "col")]
+    #[arg(long, default_value_t = false)]
+    pub collab: bool,
+
     /// Optional workspace path (can be "." for current directory)
     #[arg(value_name = "WORKSPACE")]
     pub workspace: Option<String>,

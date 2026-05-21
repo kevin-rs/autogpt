@@ -62,6 +62,12 @@ pub enum TuiEvent {
     AgentMode(String),
     /// Show interactive session picker with (id, title, status_str) entries.
     SessionsPick(Vec<(String, String, String)>),
+    /// Broadcast the list of (provider, model) pairs discovered by the collab pool.
+    #[cfg(feature = "col")]
+    CollabPool(Vec<(String, String)>),
+    /// Record which provider was assigned to execute a specific task index.
+    #[cfg(feature = "col")]
+    CollabAssign { task_idx: usize, provider: String },
     /// Terminate the TUI.
     Quit,
 }
@@ -403,6 +409,9 @@ pub struct TuiState {
     pub update_available: Option<(String, String)>,
     /// Whether the user is running AutoGPT in their home directory.
     pub home_dir_warning: bool,
+    /// Provider labels discovered by the collab pool (empty when col is inactive).
+    #[cfg(feature = "col")]
+    pub collab_providers: Vec<String>,
 }
 
 #[cfg(feature = "cli")]
@@ -473,6 +482,8 @@ impl TuiState {
             receiver,
             update_available,
             home_dir_warning,
+            #[cfg(feature = "col")]
+            collab_providers: Vec::new(),
         }
     }
 
@@ -755,6 +766,19 @@ impl TuiState {
                 }
                 TuiEvent::Quit => {
                     self.should_quit = true;
+                }
+                #[cfg(feature = "col")]
+                TuiEvent::CollabPool(providers) => {
+                    self.collab_providers = providers
+                        .iter()
+                        .map(|(p, m)| format!("{} ({})", p, m))
+                        .collect();
+                    let label = self.collab_providers.join(", ");
+                    self.push_log(format!("🤝 Collab pool: [{}]", label));
+                }
+                #[cfg(feature = "col")]
+                TuiEvent::CollabAssign { task_idx, provider } => {
+                    self.push_log(format!("🔀 Task {} → {}", task_idx + 1, provider));
                 }
             }
         }

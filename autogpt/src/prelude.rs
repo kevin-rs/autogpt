@@ -52,6 +52,12 @@ pub use {
     crate::mcp::types::{McpServerInfo, McpServerStatus, McpTool, McpToolParam, McpToolResult},
 };
 
+#[cfg(feature = "col")]
+pub use crate::agents::collab::{CollabPool, CollabSelection};
+
+#[cfg(feature = "mta")]
+pub use crate::agents::metacognition::{MetacognitionEngine, MetacognitionEntry};
+
 #[cfg(feature = "net")]
 pub use {
     crate::collaboration::Collaborator, iac_rs::prelude::Message as IacMessage, iac_rs::prelude::*,
@@ -137,6 +143,13 @@ pub struct AutoGPT {
     /// Scope permission: whether agents can access external resources or services.
     /// `true` grants permission to interact with external endpoints.
     pub external: bool,
+
+    /// Optional collaborative provider pool.
+    ///
+    /// When set, `AutoGPT::run()` logs the active providers before dispatching
+    /// agents and the pool metadata is available for downstream routing.
+    #[cfg(feature = "col")]
+    pub collab_pool: Option<CollabPool>,
 }
 
 impl Default for AutoGPT {
@@ -150,6 +163,8 @@ impl Default for AutoGPT {
             crud: true,
             auth: false,
             external: true,
+            #[cfg(feature = "col")]
+            collab_pool: None,
         }
     }
 }
@@ -210,10 +225,76 @@ impl AutoGPT {
             crud: self.crud,
             auth: self.auth,
             external: self.external,
+            #[cfg(feature = "col")]
+            collab_pool: self.collab_pool,
         })
     }
 
+    /// Attaches a [`CollabPool`] to this `AutoGPT` instance.
+    ///
+    /// The pool metadata is logged at execution start so downstream tooling
+    /// can see which providers are active.
+    #[cfg(feature = "col")]
+    pub fn with_collab_pool(mut self, pool: CollabPool) -> Self {
+        self.collab_pool = Some(pool);
+        self
+    }
+
     pub async fn run(&self) -> Result<String> {
+        #[cfg(feature = "col")]
+        if let Some(pool) = self
+            .collab_pool
+            .as_ref()
+            .filter(|p| !p.is_empty() && !self.agents.is_empty())
+        {
+            let n_agents = self.agents.len();
+            let n_pool = pool.len();
+
+            let providers: Vec<String> = (0..n_pool)
+                .map(|i| pool.provider_name(i).to_string())
+                .collect();
+            tracing::info!(
+                "[AutoGPT] Collab, {} provider(s): {}",
+                n_pool,
+                providers.join(", ")
+            );
+
+            let start = pool.pick_start(&CollabSelection::Random);
+            let start_name = pool.provider_name(start % n_pool).to_string();
+            tracing::info!("[AutoGPT] Collab: starting with provider '{start_name}'");
+
+            for step in 0..n_agents {
+                let agent_idx = (start + step) % n_agents;
+                let provider_name = pool.provider_name(agent_idx % n_pool).to_string();
+                let agent_arc = self.agents[agent_idx].clone();
+
+                let behavior = agent_arc.lock().await.get_agent().behavior().clone();
+                let mut task = Task {
+                    description: behavior,
+                    scope: Some(Scope {
+                        crud: self.crud,
+                        auth: self.auth,
+                        external: self.external,
+                    }),
+                    urls: None,
+                    frontend_code: None,
+                    backend_code: None,
+                    api_schema: None,
+                };
+
+                tracing::info!("[AutoGPT] Collab [{provider_name}]: executing agent {agent_idx}");
+                let mut agent = agent_arc.lock().await;
+                if let Err(e) = agent
+                    .execute(&mut task, self.execute, self.browse, self.max_tries)
+                    .await
+                {
+                    tracing::warn!("[AutoGPT] Collab [{provider_name}] error: {e}");
+                }
+            }
+
+            return Ok("Collab execution complete.".to_string());
+        }
+
         if self.agents.is_empty() {
             return Err(anyhow!("No agents to run."));
         }

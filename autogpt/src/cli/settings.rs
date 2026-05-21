@@ -97,6 +97,21 @@ pub struct GlobalSettings {
     /// to have any effect.
     #[serde(default = "default_true")]
     pub metacognition: bool,
+
+    /// Enable collaborative multi-provider mode.
+    ///
+    /// When `true`, one `GenericAgent` is spawned per available LLM provider and
+    /// planned task items are distributed across them in round-robin order.
+    /// Requires the `col` feature at compile time.
+    #[cfg(feature = "col")]
+    #[serde(default)]
+    pub collab: bool,
+
+    /// When `true` (default) the starting provider is selected at random.
+    /// When `false` the TUI will prompt the user to pick a provider.
+    #[cfg(feature = "col")]
+    #[serde(default = "default_true")]
+    pub collab_random: bool,
 }
 
 #[cfg(feature = "cli")]
@@ -145,6 +160,10 @@ impl Default for GlobalSettings {
             auto_browse: true,
             internet_access: true,
             metacognition: true,
+            #[cfg(feature = "col")]
+            collab: false,
+            #[cfg(feature = "col")]
+            collab_random: true,
         }
     }
 }

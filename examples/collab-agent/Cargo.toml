@@ -1,0 +1,8 @@
+[package]
+name = "collab-agent"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.52.2", features = ["full"] }
+autogpt = { path = "../../autogpt", features = ["col", "gem", "gpt"] }
