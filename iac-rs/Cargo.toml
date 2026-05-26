@@ -21,7 +21,7 @@ quinn = "0.11.9"
 rcgen = "0.14.7"
 rustls = "0.23.40"
 zstd = "0.13.3"
-tokio = { version = "1.52.2", default-features = false }
+tokio = { version = "1.52.3", default-features = false }
 rand = "0.10.1"
 auto-net = "0.0.1"
 async-trait = { workspace = true }
@@ -39,7 +39,7 @@ ser = ["serde"]
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["async_tokio"] }
 plotters = { version = "0.3.7", features = ["fontconfig-dlopen"] }
-tokio = { version = "1.52.2", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 tracing-subscriber = "0.3.23"
 
 [badges]
